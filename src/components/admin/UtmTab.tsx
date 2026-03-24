@@ -4,7 +4,23 @@ import { useState } from "react";
 import type { Partner, PartnerType } from "@/types";
 import { PARTNER_TYPES } from "@/services/constants";
 import { useAdminPartners } from "@/hooks/useAdminData";
-import { Card, Button, Input, Select, CopyButton, Badge, Label } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/Select";
+import { CopyButton } from "@/components/ui/CopyButton";
+import {
+  Loader2,
+  Link2,
+  Bookmark,
+  Save,
+  Search,
+  Globe,
+  Calendar,
+  Code2,
+} from "lucide-react";
 
 const BASE_URLS = [
   { value: "https://secure.qlower.com/signup", label: "Inscription Qlower" },
@@ -64,8 +80,9 @@ export default function UtmTab() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A3855]" />
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <Loader2 className="size-6 text-[#0A3855] animate-spin" />
+        <p className="text-sm text-gray-400">Chargement...</p>
       </div>
     );
   }
@@ -73,25 +90,27 @@ export default function UtmTab() {
   return (
     <div className="space-y-6">
       {/* Sub-tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-1 p-1 bg-white rounded-lg border border-gray-200 w-fit">
         <button
           onClick={() => setActiveSubTab("generator")}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
             activeSubTab === "generator"
-              ? "bg-[#0A3855] text-white"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              ? "bg-[#0A3855] text-white shadow-sm"
+              : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
           }`}
         >
+          <Link2 className="size-4" />
           Generateur
         </button>
         <button
           onClick={() => setActiveSubTab("saved")}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
             activeSubTab === "saved"
-              ? "bg-[#0A3855] text-white"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              ? "bg-[#0A3855] text-white shadow-sm"
+              : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
           }`}
         >
+          <Bookmark className="size-4" />
           Sauvegardes ({savedLinks.length})
         </button>
       </div>
@@ -100,89 +119,114 @@ export default function UtmTab() {
         <>
           {/* Generator form */}
           <Card>
-            <h4 className="font-semibold text-gray-900 mb-4">Generateur de lien UTM</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Partner selection */}
-              <div className="space-y-2">
-                <div className="flex flex-col gap-1">
-                  <Label>Partenaire</Label>
+            <CardHeader className="border-b">
+              <CardTitle className="flex items-center gap-2">
+                <Link2 className="size-4 text-[#0A3855]" />
+                Generateur de lien UTM
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Partner selection */}
+                <div className="space-y-2">
+                  <div className="space-y-1.5">
+                    <Label>Partenaire</Label>
+                    <div className="relative">
+                      <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        value={partnerSearch}
+                        onChange={(e) => {
+                          setPartnerSearch(e.target.value);
+                          setSelectedPartnerId(null);
+                        }}
+                        placeholder="Rechercher ou saisir..."
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+                  {partnerSearch && !selectedPartnerId && filteredPartners.length > 0 && (
+                    <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto shadow-lg bg-white">
+                      {filteredPartners.slice(0, 8).map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            setSelectedPartnerId(p.id);
+                            setPartnerSearch(p.nom);
+                          }}
+                          className="w-full text-left px-3 py-2.5 text-sm hover:bg-[#F8FAFB] flex items-center gap-2 border-b border-gray-50 last:border-0 transition-colors"
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                              p.active ? "bg-emerald-500" : "bg-red-400"
+                            }`}
+                          />
+                          <span className="font-medium">{p.nom}</span>
+                          <span className="text-xs text-gray-400 ml-auto font-mono">
+                            {p.utm}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <Select
+                  label="Type"
+                  value={type}
+                  onChange={(e) => setType(e.target.value as PartnerType)}
+                  options={PARTNER_TYPES.map((t) => ({ value: t, label: t }))}
+                />
+
+                <div className="space-y-1.5">
+                  <Label>Campagne</Label>
                   <Input
-                    value={partnerSearch}
-                    onChange={(e) => {
-                      setPartnerSearch(e.target.value);
-                      setSelectedPartnerId(null);
-                    }}
-                    placeholder="Rechercher ou saisir..."
+                    value={campaign}
+                    onChange={(e) => setCampaign(e.target.value)}
+                    placeholder="ex: lancement-2026, promo-ete..."
                   />
                 </div>
-                {partnerSearch && !selectedPartnerId && filteredPartners.length > 0 && (
-                  <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto">
-                    {filteredPartners.slice(0, 8).map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => {
-                          setSelectedPartnerId(p.id);
-                          setPartnerSearch(p.nom);
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                      >
-                        <span className={`w-2 h-2 rounded-full ${p.active ? "bg-green-500" : "bg-red-400"}`} />
-                        <span>{p.nom}</span>
-                        <span className="text-xs text-gray-400 ml-auto">{p.utm}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
 
-              <Select
-                label="Type"
-                value={type}
-                onChange={(e) => setType(e.target.value as PartnerType)}
-                options={PARTNER_TYPES.map((t) => ({ value: t, label: t }))}
-              />
-
-              <div className="flex flex-col gap-1">
-                <Label>Campagne</Label>
-                <Input
-                  value={campaign}
-                  onChange={(e) => setCampaign(e.target.value)}
-                  placeholder="ex: lancement-2026, promo-ete..."
-                />
-              </div>
-
-              <div>
-                <Select
-                  label="URL de base"
-                  value={baseUrlKey}
-                  onChange={(e) => setBaseUrlKey(e.target.value)}
-                  options={BASE_URLS}
-                />
-                {baseUrlKey === "custom" && (
-                  <Input
-                    value={customUrl}
-                    onChange={(e) => setCustomUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="mt-2"
+                <div>
+                  <Select
+                    label="URL de base"
+                    value={baseUrlKey}
+                    onChange={(e) => setBaseUrlKey(e.target.value)}
+                    options={BASE_URLS}
                   />
-                )}
+                  {baseUrlKey === "custom" && (
+                    <Input
+                      value={customUrl}
+                      onChange={(e) => setCustomUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="mt-2"
+                    />
+                  )}
+                </div>
               </div>
-            </div>
+            </CardContent>
           </Card>
 
           {/* Generated link preview */}
           {generatedUrl && (
-            <Card className="bg-gray-50">
-              <p className="text-xs font-medium text-gray-500 mb-2">Lien genere</p>
-              <div className="bg-white border border-gray-200 rounded-lg p-3 mb-3 break-all">
-                <code className="text-sm text-[#0A3855]">{generatedUrl}</code>
-              </div>
-              <div className="flex gap-2">
-                <CopyButton text={generatedUrl} label="Copier le lien" />
-                <Button variant="secondary" onClick={handleSave}>
-                  Sauvegarder
-                </Button>
-              </div>
+            <Card className="bg-[#F8FAFB]">
+              <CardContent>
+                <div className="flex items-center gap-2 mb-3">
+                  <Code2 className="size-4 text-gray-500" />
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Lien genere
+                  </p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 font-mono text-sm text-[#0A3855] break-all leading-relaxed">
+                  {generatedUrl}
+                </div>
+                <div className="flex gap-2">
+                  <CopyButton text={generatedUrl} label="Copier le lien" />
+                  <Button variant="outline" onClick={handleSave}>
+                    <Save className="size-4 mr-1.5" />
+                    Sauvegarder
+                  </Button>
+                </div>
+              </CardContent>
             </Card>
           )}
         </>
@@ -190,31 +234,52 @@ export default function UtmTab() {
 
       {activeSubTab === "saved" && (
         <Card>
-          <h4 className="font-semibold text-gray-900 mb-4">Liens sauvegardes</h4>
-          {savedLinks.length === 0 ? (
-            <p className="text-sm text-gray-400">Aucun lien sauvegarde</p>
-          ) : (
-            <div className="space-y-2">
-              {savedLinks.map((link) => (
-                <div
-                  key={link.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100"
-                >
-                  <div className="min-w-0 flex-1 mr-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-gray-900">{link.partner}</span>
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">{link.campaign}</Badge>
-                      <span className="text-xs text-gray-400">
-                        {new Date(link.createdAt).toLocaleDateString("fr-FR")}
-                      </span>
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <Bookmark className="size-4 text-[#0A3855]" />
+              Liens sauvegardes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {savedLinks.length === 0 ? (
+              <div className="text-center py-8">
+                <Bookmark className="size-8 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-gray-400">Aucun lien sauvegarde</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {savedLinks.map((link) => (
+                  <div
+                    key={link.id}
+                    className="flex items-center justify-between p-4 bg-[#F8FAFB] rounded-lg border border-gray-100 hover:border-gray-200 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1 mr-4">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Globe className="size-3.5 text-gray-400" />
+                        <span className="text-sm font-medium text-gray-900">
+                          {link.partner}
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className="bg-[#E5EDF1] text-[#0A3855] border border-[#0A3855]/10"
+                        >
+                          {link.campaign}
+                        </Badge>
+                        <span className="flex items-center gap-1 text-xs text-gray-400">
+                          <Calendar className="size-3" />
+                          {new Date(link.createdAt).toLocaleDateString("fr-FR")}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 truncate font-mono">
+                        {link.url}
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500 truncate">{link.url}</p>
+                    <CopyButton text={link.url} label="Copier" />
                   </div>
-                  <CopyButton text={link.url} label="Copier" />
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </CardContent>
         </Card>
       )}
     </div>
