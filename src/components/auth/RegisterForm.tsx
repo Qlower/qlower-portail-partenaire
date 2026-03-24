@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, Check, Loader2, Wand2, Upload, CloudUpload } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useOnboardPartner } from "@/hooks/useMutations";
 import { isValidEmail, slug } from "@/services/links";
