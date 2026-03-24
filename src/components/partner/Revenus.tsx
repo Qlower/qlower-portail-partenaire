@@ -1,6 +1,6 @@
 "use client";
 
-import { useInvoices } from "@/hooks/usePartnerData";
+import { useInvoices, useLeads } from "@/hooks/usePartnerData";
 import { calcCommission, COMM_LABELS } from "@/services/commission";
 import { PageHeader, Card, Stat, Badge } from "@/components/ui";
 import type { Partner, Invoice } from "@/types";
@@ -28,10 +28,16 @@ function statusBadge(statut: Invoice["statut"]) {
 
 export default function Revenus({ partner }: RevenusProps) {
   const { data: invoices, isLoading } = useInvoices(partner.id);
+  const { data: leads } = useLeads(partner.id);
+
+  // Count actifs from real leads data
+  const abonnes = leads?.filter((l) => l.stage === "Abonne").length || 0;
+  const payeurs = leads?.filter((l) => l.stage === "Payeur").length || 0;
+  const actifs = abonnes + payeurs;
 
   const commission = calcCommission(
     partner.comm_rules,
-    partner.abonnes,
+    actifs,
     partner.biens_moyens,
     partner.ca_par_client,
   );
@@ -50,11 +56,12 @@ export default function Revenus({ partner }: RevenusProps) {
   const progressPct = Math.min(Math.round((paidTotal / objectifAnnuel) * 100), 100);
 
   // Determine how far along timeline based on data
+  const totalLeads = leads?.length || 0;
   const timelineProgress = paidTotal > 0
     ? (paidTotal >= objectifAnnuel ? 4 : 3)
-    : partner.abonnes > 0
+    : actifs > 0
       ? 2
-      : partner.leads > 0
+      : totalLeads > 0
         ? 1
         : 0;
 
@@ -70,7 +77,7 @@ export default function Revenus({ partner }: RevenusProps) {
             <p className="text-3xl font-bold">{commission.total.toLocaleString("fr-FR")} &euro;</p>
           </div>
           <div className="bg-white/10 rounded-xl px-3 py-1.5">
-            <span className="text-xs font-medium text-gray-300">{partner.abonnes} abonne{partner.abonnes > 1 ? "s" : ""}</span>
+            <span className="text-xs font-medium text-gray-300">{actifs} actif{actifs > 1 ? "s" : ""}</span>
           </div>
         </div>
 

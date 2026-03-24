@@ -26,14 +26,14 @@ function verifySignature(body: string, request: NextRequest): boolean {
     return crypto.createHash("sha256").update(src).digest("hex") === sigV2;
   }
 
-  // No signature header at all — reject only if secret is configured
-  return false;
+  // No signature header — allow in dev, reject in prod
+  return process.env.NODE_ENV === "development";
 }
 
 // ── Fetch full contact from HubSpot ─────────────────────────
 async function fetchContact(contactId: string) {
   const res = await fetch(
-    `${HS_BASE}/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,phone,partenaire__lead_,utm_source,hs_lifecyclestage`,
+    `${HS_BASE}/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,phone,partenaire__lead_,utm_source,hs_lifecyclestage,lifecyclestage`,
     { headers: { Authorization: `Bearer ${HS_TOKEN}` } }
   );
   if (!res.ok) return null;
@@ -41,11 +41,20 @@ async function fetchContact(contactId: string) {
 }
 
 // ── Map HubSpot lifecycle to our stage ──────────────────────
-function mapStage(lifecycle: string | null): "Abonne" | "Payeur" | "Non payeur" {
-  if (!lifecycle) return "Non payeur";
-  const lc = lifecycle.toLowerCase();
-  if (lc === "customer") return "Payeur";
-  if (["subscriber", "lead", "marketingqualifiedlead", "salesqualifiedlead", "opportunity"].includes(lc)) return "Abonne";
+// HubSpot lifecycle IDs from Qlower's CRM:
+//   lead, marketingqualifiedlead, 1452450030 (SQL), opportunity, 1452450031 (non payeur)
+//   customer (payeur non abonné), 999998694 (abonné), evangelist (promoteur), 1452451003 (churn)
+function mapStage(props: Record<string, string | null>): "Abonne" | "Payeur" | "Non payeur" {
+  const lc = (props.lifecyclestage || props.hs_lifecyclestage || "").toLowerCase();
+  if (!lc) return "Non payeur";
+
+  // Abonné
+  if (lc === "999998694") return "Abonne";
+
+  // Payeur (payeur non abonné + promoteur)
+  if (["customer", "evangelist"].includes(lc)) return "Payeur";
+
+  // Non payeur (lead, MQL, SQL, opportunity, user non payeur, churn)
   return "Non payeur";
 }
 
@@ -69,7 +78,7 @@ async function upsertLead(
 
   const nom = [props.firstname, props.lastname].filter(Boolean).join(" ") || props.email || "Inconnu";
   const email = props.email || "";
-  const stage = mapStage(props.hs_lifecyclestage);
+  const stage = mapStage(props);
 
   // Check if lead already exists
   const { data: existing } = await supabase

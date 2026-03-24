@@ -41,9 +41,10 @@ export function Dashboard({
   const [search, setSearch] = useState("");
 
   // Computed values
-  const abonnes = leads.filter((l) => l.stage === "Abonne" || l.stage === "Payeur").length;
+  const abonnes = leads.filter((l) => l.stage === "Abonne").length;
   const payeurs = leads.filter((l) => l.stage === "Payeur").length;
-  const commission = calcCommission(commRules, abonnes, biensMoyens, caParClient);
+  const actifs = abonnes + payeurs; // both count for commission
+  const commission = calcCommission(commRules, actifs, biensMoyens, caParClient);
 
   // Filtered leads
   const filteredLeads = useMemo(() => {
@@ -86,8 +87,8 @@ export function Dashboard({
   const tabs: { key: FilterTab; label: string; count?: number }[] = [
     { key: "all", label: "Tous", count: leads.length },
     { key: "Abonne", label: "Abonnes", count: abonnes },
-    { key: "Payeur", label: "Payeurs", count: payeurs },
-    { key: "Non payeur", label: "Non payeurs", count: leads.length - abonnes },
+    { key: "Payeur", label: "Payeurs ponctuels", count: payeurs },
+    { key: "Non payeur", label: "Non payeurs", count: leads.length - actifs },
   ];
 
   const stageBadge = (stage: LeadStage) => {
@@ -149,9 +150,9 @@ export function Dashboard({
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Stat icon="&#x1F465;" value={leads.length} label="Total leads" subtitle="Tous les contacts generes" />
-        <Stat icon="&#x2705;" value={abonnes} label="Abonnes" subtitle="Inscrits sur Qlower" />
-        <Stat icon="&#x1F4B3;" value={payeurs} label="Payeurs" subtitle="Abonnement actif" />
+        <Stat icon="&#x1F465;" value={leads.length} label="Total leads" subtitle="Contacts generes" />
+        <Stat icon="&#x2705;" value={abonnes} label="Abonnes" subtitle="Abonnement actif" />
+        <Stat icon="&#x1F4B3;" value={payeurs} label="Payeurs ponctuels" subtitle="Sans abonnement" />
       </div>
 
       {/* Chart */}
