@@ -6,12 +6,28 @@ const HS_CLIENT_SECRET = process.env.HUBSPOT_CLIENT_SECRET || "";
 const HS_TOKEN = process.env.HUBSPOT_TOKEN!;
 const HS_BASE = "https://api.hubapi.com";
 
-// ── Verify HubSpot signature (v3) ───────────────────────────
-function verifySignature(body: string, signature: string | null, url: string, method: string): boolean {
-  if (!HS_CLIENT_SECRET || !signature) return !HS_CLIENT_SECRET;
-  const sourceString = HS_CLIENT_SECRET + method + url + body;
-  const hash = crypto.createHash("sha256").update(sourceString).digest("hex");
-  return hash === signature;
+// ── Verify HubSpot signature ─────────────────────────────────
+// v2: SHA-256(clientSecret + requestBody)
+// v3: SHA-256(clientSecret + method + url + body) — only for public apps
+function verifySignature(body: string, request: NextRequest): boolean {
+  if (!HS_CLIENT_SECRET) return true; // no secret = skip verification
+
+  // Try v3 first (x-hubspot-signature-v3)
+  const sigV3 = request.headers.get("x-hubspot-signature-v3");
+  if (sigV3) {
+    const src = HS_CLIENT_SECRET + "POST" + request.url + body;
+    return crypto.createHash("sha256").update(src).digest("hex") === sigV3;
+  }
+
+  // Try v2 (x-hubspot-signature)
+  const sigV2 = request.headers.get("x-hubspot-signature");
+  if (sigV2) {
+    const src = HS_CLIENT_SECRET + body;
+    return crypto.createHash("sha256").update(src).digest("hex") === sigV2;
+  }
+
+  // No signature header at all — reject only if secret is configured
+  return false;
 }
 
 // ── Fetch full contact from HubSpot ─────────────────────────
@@ -113,8 +129,7 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
 
   // Verify signature
-  const signature = request.headers.get("x-hubspot-signature-v3");
-  if (!verifySignature(rawBody, signature, request.url, "POST")) {
+  if (!verifySignature(rawBody, request)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
