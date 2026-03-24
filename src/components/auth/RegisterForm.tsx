@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useOnboardPartner } from "@/hooks/useMutations";
-import { isValidEmail } from "@/services/links";
+import { isValidEmail, slug } from "@/services/links";
 import { METIERS } from "@/services/constants";
+import { DEFAULT_TRANCHES } from "@/services/commission";
+import { api } from "@/lib/axios";
 import { Button, Input, PasswordInput, Select, Alert, Card } from "@/components/ui";
 
 const STEP_LABELS = [
@@ -61,8 +65,9 @@ const initial: FormData = {
 };
 
 export default function RegisterForm() {
-  const { signUp } = useAuth();
+  const { signUp, supabase } = useAuth();
   const onboard = useOnboardPartner();
+  const router = useRouter();
 
   const [step, setStep] = useState<StepIndex>(0);
   const [form, setForm] = useState<FormData>(initial);
@@ -111,20 +116,50 @@ export default function RegisterForm() {
     setError("");
     setLoading(true);
 
-    try {
-      // 1. Sync to HubSpot
-      await onboard.mutateAsync({
-        partnerName: form.company,
-        utmValue: form.company.toLowerCase().replace(/\s+/g, "-"),
-      });
+    const partnerId = slug(form.company || "nouveau") + "-" + Date.now().toString().slice(-4);
+    const utm = slug(form.company || "nouveau");
+    const code = form.promoCode || (form.company.toUpperCase().replace(/\s/g, "").slice(0, 4) + "20");
 
-      // 2. Create Supabase account
-      await signUp(form.email, form.password, {
+    try {
+      // 1. Create Supabase auth user
+      const authResult = await signUp(form.email, form.password, {
         first_name: form.prenom,
         last_name: form.nom,
         company: form.company,
         metier: form.metier,
+        partner_id: partnerId,
       });
+
+      // 2. Create partner record in DB via API (uses service_role)
+      await api.post("/admin/partners", {
+        id: partnerId,
+        nom: form.company || `${form.prenom} ${form.nom}`,
+        email: form.email,
+        type: "autre",
+        contrat: "affiliation",
+        code,
+        utm,
+        comm_rules: [
+          { type: "annuelle", montant: 100, actif: true },
+          { type: "souscription", montant: 0, actif: false },
+          { type: "biens", tranches: DEFAULT_TRANCHES(), actif: false },
+          { type: "pct_ca", pct: 0, actif: false },
+        ],
+      });
+
+      // 3. Update user metadata with partner_id
+      await supabase.auth.updateUser({
+        data: { partner_id: partnerId },
+      });
+
+      // 4. Sync to HubSpot (non-blocking)
+      onboard.mutateAsync({
+        partnerName: form.company,
+        utmValue: utm,
+      }).catch(() => {});
+
+      // 5. Redirect to dashboard
+      router.push("/dashboard");
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Erreur lors de la creation du compte.";
@@ -135,7 +170,7 @@ export default function RegisterForm() {
   };
 
   /* ── Step progress indicator ────────────────────────────────── */
-  const Progress = () => (
+  const renderProgress = () => (
     <div className="flex items-center justify-center mb-8">
       {STEP_LABELS.map((label, i) => (
         <div key={label} className="flex items-center">
@@ -178,7 +213,7 @@ export default function RegisterForm() {
   );
 
   /* ── Step content ───────────────────────────────────────────── */
-  const StepContent = () => {
+  const renderStep = () => {
     switch (step) {
       case 0:
         return (
@@ -361,6 +396,11 @@ export default function RegisterForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12">
       <div className="w-full max-w-lg">
+        {/* Back link */}
+        <Link href="/" className="inline-flex items-center gap-1 text-sm text-[#0A3855] hover:underline mb-4">
+          ← Retour
+        </Link>
+
         {/* Branding */}
         <div className="flex flex-col items-center mb-6">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0A3855] to-[#1a5a7a] flex items-center justify-center shadow-lg mb-3">
@@ -372,7 +412,7 @@ export default function RegisterForm() {
           </p>
         </div>
 
-        <Progress />
+        {renderProgress()}
 
         <Card className="mb-4">
           {error && (
@@ -385,7 +425,7 @@ export default function RegisterForm() {
             onSubmit={step === 5 ? handleFinish : (e) => { e.preventDefault(); next(); }}
             className="flex flex-col gap-6"
           >
-            <StepContent />
+            {renderStep()}
 
             <div className="flex items-center justify-between pt-2">
               {step > 0 ? (

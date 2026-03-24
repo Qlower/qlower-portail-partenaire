@@ -1,23 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { PartnerShell } from "@/components/layout/PartnerShell";
 import { HomePage } from "@/components/HomePage";
-import LoginForm from "@/components/auth/LoginForm";
-import RegisterForm from "@/components/auth/RegisterForm";
-
-type View = "home" | "login" | "register" | "app";
 
 export default function Page() {
   const { user, loading } = useAuth();
-  const [view, setView] = useState<View>("home");
+  const router = useRouter();
 
   useEffect(() => {
-    if (user && view !== "register") {
-      setView("app");
-    }
-  }, [user, view]);
+    if (user) router.replace("/dashboard");
+  }, [user, router]);
 
   if (loading) {
     return (
@@ -32,20 +26,12 @@ export default function Page() {
     );
   }
 
-  if (user && view === "app") {
-    return <PartnerShell />;
-  }
+  if (user) return null;
 
   return (
-    <main className="max-w-4xl mx-auto px-4 py-6">
-      {view === "home" && (
-        <HomePage
-          onLogin={() => setView("login")}
-          onRegister={() => setView("register")}
-        />
-      )}
-      {view === "login" && <LoginForm />}
-      {view === "register" && <RegisterForm />}
-    </main>
+    <HomePage
+      onLogin={() => router.push("/login")}
+      onRegister={() => router.push("/register")}
+    />
   );
 }

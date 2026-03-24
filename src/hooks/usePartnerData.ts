@@ -28,6 +28,24 @@ export function usePartner(partnerId: string | undefined) {
   });
 }
 
+// Fallback: find partner by auth user_id (when partner_id not in metadata)
+export function usePartnerByUserId(userId: string | undefined) {
+  return useQuery<Partner>({
+    queryKey: ["partner_by_user", userId],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("partners")
+        .select("*")
+        .eq("user_id", userId!)
+        .single();
+      if (error) throw error;
+      return data as Partner;
+    },
+    enabled: !!userId,
+  });
+}
+
 export function useLeads(partnerId: string | undefined) {
   return useQuery<Lead[]>({
     queryKey: ["leads", partnerId],

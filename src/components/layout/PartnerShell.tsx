@@ -2,11 +2,15 @@
 
 import { createContext, useContext, useState, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { usePartner } from "@/hooks/usePartnerData";
+import { usePartner, usePartnerByUserId } from "@/hooks/usePartnerData";
 import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { OnboardingGuide } from "@/components/dashboard/OnboardingGuide";
+import PageReferer from "@/components/partner/PageReferer";
+import Revenus from "@/components/partner/Revenus";
+import Outils from "@/components/partner/Outils";
+import Parametres from "@/components/partner/Parametres";
 import type { Partner } from "@/types";
 
 // ── Partner Context ──────────────────────────────────────────
@@ -28,8 +32,18 @@ type Module = "guide" | "dashboard" | "referer" | "revenus" | "outils" | "settin
 
 export function PartnerShell() {
   const { user, signOut, loading: authLoading } = useAuth();
-  const partnerId = user?.user_metadata?.partner_id as string | undefined;
-  const { data: partner, isLoading: partnerLoading, error: partnerError } = usePartner(partnerId);
+  const partnerIdFromMeta = user?.user_metadata?.partner_id as string | undefined;
+
+  // Try by partner_id from metadata first, fallback to user_id lookup
+  const { data: partnerById, isLoading: loadingById } = usePartner(partnerIdFromMeta);
+  const { data: partnerByUser, isLoading: loadingByUser } = usePartnerByUserId(
+    !partnerIdFromMeta && user?.id ? user.id : undefined
+  );
+
+  const partner = partnerById || partnerByUser;
+  // Only consider loading if the relevant query is actually enabled
+  const partnerLoading = (partnerIdFromMeta ? loadingById : false) || (!partnerIdFromMeta && user?.id ? loadingByUser : false);
+  const partnerId = partner?.id;
 
   const [module, setModule] = useState<Module>("dashboard");
   const [guideDone, setGuideDone] = useState(false);
@@ -56,16 +70,14 @@ export function PartnerShell() {
   }
 
   // ── Error state ──
-  if (partnerError || !partner) {
+  if (!partner) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-sm">
           <div className="text-4xl mb-3">&#x26A0;&#xFE0F;</div>
           <h2 className="text-lg font-bold text-gray-900 mb-2">Espace non accessible</h2>
           <p className="text-sm text-gray-500 mb-4">
-            {partnerError
-              ? "Erreur lors du chargement des donnees partenaire."
-              : "Aucun compte partenaire associe a cet utilisateur."}
+            Aucun compte partenaire associe a cet utilisateur.
           </p>
           <button
             onClick={() => signOut()}
@@ -104,28 +116,20 @@ export function PartnerShell() {
           />
         );
       case "referer":
-        return (
-          <div className="py-12 text-center text-sm text-gray-400">
-            Module Referer - a implementer
-          </div>
-        );
+        return <PageReferer partner={partner} />;
       case "revenus":
-        return (
-          <div className="py-12 text-center text-sm text-gray-400">
-            Module Revenus - a implementer
-          </div>
-        );
+        return <Revenus partner={partner} />;
       case "outils":
-        return (
-          <div className="py-12 text-center text-sm text-gray-400">
-            Module Outils - a implementer
-          </div>
-        );
+        return <Outils partner={partner} />;
       case "settings":
         return (
-          <div className="py-12 text-center text-sm text-gray-400">
-            Module Parametres - a implementer
-          </div>
+          <Parametres
+            partner={partner}
+            onRestartGuide={() => {
+              setGuideDone(false);
+              setModule("guide");
+            }}
+          />
         );
       default:
         return null;

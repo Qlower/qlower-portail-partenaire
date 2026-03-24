@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { isValidEmail } from "@/services/links";
 import { Button, Input, PasswordInput, Alert } from "@/components/ui";
 
 export default function LoginForm() {
   const { signIn } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -28,6 +31,7 @@ export default function LoginForm() {
     setLoading(true);
     try {
       await signIn(email, password);
+      router.push("/dashboard");
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Erreur de connexion.";
@@ -40,6 +44,11 @@ export default function LoginForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
       <div className="w-full max-w-md">
+        {/* Back link */}
+        <Link href="/" className="inline-flex items-center gap-1 text-sm text-[#0A3855] hover:underline mb-6">
+          ← Retour
+        </Link>
+
         {/* Branding */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0A3855] to-[#1a5a7a] flex items-center justify-center shadow-lg mb-4">
@@ -93,12 +102,12 @@ export default function LoginForm() {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-500">
               Pas encore de compte ?{" "}
-              <a
+              <Link
                 href="/register"
                 className="text-[#0A3855] font-semibold hover:underline"
               >
                 Devenir partenaire
-              </a>
+              </Link>
             </p>
           </div>
         </div>
