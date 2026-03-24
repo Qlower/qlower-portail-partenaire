@@ -4,7 +4,23 @@ import { useState } from "react";
 import type { PartnerType, ContratType } from "@/types";
 import { PARTNER_TYPES } from "@/services/constants";
 import { useBatchCreatePartners } from "@/hooks/useAdminData";
-import { Card, Button, Input, Select, Badge, Alert, AlertDescription } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select } from "@/components/ui/Select";
+import {
+  Upload,
+  Plus,
+  Trash2,
+  Loader2,
+  Download,
+  CheckCircle2,
+  AlertCircle,
+  FileSpreadsheet,
+  Table2,
+} from "lucide-react";
 
 interface BatchRow {
   nom: string;
@@ -72,7 +88,7 @@ export default function BatchTab() {
       const result = await batchMutation.mutateAsync(validRows);
       setCreated((result.created || []) as unknown as CreatedPartner[]);
     } catch {
-      setError("Erreur lors de la création batch");
+      setError("Erreur lors de la creation batch");
     } finally {
       setCreating(false);
     }
@@ -95,141 +111,210 @@ export default function BatchTab() {
 
   return (
     <div className="space-y-6">
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* CSV Import */}
       <Card>
-        <h4 className="font-semibold text-gray-900 mb-3">Import CSV</h4>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center mb-3">
-          <p className="text-sm text-gray-500 mb-2">
-            Collez votre CSV ici (format : nom, type, contrat)
-          </p>
-          <textarea
-            value={csvText}
-            onChange={(e) => setCsvText(e.target.value)}
-            placeholder={"Cabinet Dupont,cgp,affiliation\nAgence Martin,agence-immo,marque_blanche"}
-            className="w-full h-24 p-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A3855]/30 resize-none font-mono"
-          />
-          <Button variant="secondary" className="mt-2" onClick={handleCsvParse} disabled={!csvText.trim()}>
-            Parser le CSV
-          </Button>
-        </div>
+        <CardHeader className="border-b">
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="size-4 text-[#0A3855]" />
+            Import CSV
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center bg-[#F8FAFB] hover:border-[#0A3855]/30 transition-colors">
+            <FileSpreadsheet className="size-8 text-gray-400 mx-auto mb-3" />
+            <p className="text-sm text-gray-600 font-medium mb-1">
+              Collez votre CSV ici
+            </p>
+            <p className="text-xs text-gray-400 mb-4">
+              Format : nom, type, contrat
+            </p>
+            <textarea
+              value={csvText}
+              onChange={(e) => setCsvText(e.target.value)}
+              placeholder={"Cabinet Dupont,cgp,affiliation\nAgence Martin,agence-immo,marque_blanche"}
+              className="w-full h-24 p-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A3855]/20 focus:border-[#0A3855] resize-none font-mono bg-white"
+            />
+            <Button
+              variant="outline"
+              className="mt-3"
+              onClick={handleCsvParse}
+              disabled={!csvText.trim()}
+            >
+              <Upload className="size-4 mr-1.5" />
+              Parser le CSV
+            </Button>
+          </div>
+        </CardContent>
       </Card>
 
       {/* Manual entry */}
       <Card>
-        <h4 className="font-semibold text-gray-900 mb-3">Saisie manuelle</h4>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left pb-2 text-xs text-gray-500 font-medium">Nom</th>
-                <th className="text-left pb-2 text-xs text-gray-500 font-medium">Type</th>
-                <th className="text-left pb-2 text-xs text-gray-500 font-medium">Contrat</th>
-                <th className="w-10" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={i} className="border-b border-gray-50">
-                  <td className="py-1.5 pr-2">
-                    <Input
-                      value={row.nom}
-                      onChange={(e) => updateRow(i, { nom: e.target.value })}
-                      placeholder="Nom du partenaire"
-                    />
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    <Select
-                      value={row.type}
-                      onChange={(e) => updateRow(i, { type: e.target.value as PartnerType })}
-                      options={PARTNER_TYPES.map((t) => ({ value: t, label: t }))}
-                    />
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    <Select
-                      value={row.contrat}
-                      onChange={(e) => updateRow(i, { contrat: e.target.value as ContratType })}
-                      options={CONTRAT_OPTIONS}
-                    />
-                  </td>
-                  <td className="py-1.5">
-                    <button
-                      onClick={() => removeRow(i)}
-                      className="text-red-400 hover:text-red-600 text-xs px-2"
-                      disabled={rows.length <= 1}
-                    >
-                      X
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex gap-3 mt-3">
-          <Button variant="ghost" onClick={addRow}>
-            + Ajouter ligne
-          </Button>
-        </div>
-      </Card>
-
-      {/* Summary */}
-      <Card size="sm" className="bg-gray-50">
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-gray-500">
-            {validRows.length} ligne(s) valide(s)
-          </span>
-          <Badge variant="secondary" className="bg-amber-100 text-amber-800">{afCount} AF</Badge>
-          <Badge variant="secondary" className="bg-blue-100 text-blue-800">{mbCount} MB</Badge>
-        </div>
-      </Card>
-
-      {/* Create button */}
-      {created.length === 0 && (
-        <Button
-          className="bg-[#F6CCA4] text-[#1C1C1C] hover:bg-[#F5C89A]"
-          onClick={handleCreate}
-          disabled={creating || validRows.length === 0}
-        >
-          {creating ? "Creation..." : `Creer ${validRows.length} partenaire(s)`}
-        </Button>
-      )}
-
-      {/* Success state */}
-      {created.length > 0 && (
-        <Card className="border-2 border-green-200">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-semibold text-green-800">
-              {created.length} partenaire(s) cree(s) avec succes
-            </h4>
-            <Button variant="secondary" onClick={handleExportCsv}>
-              Export CSV
-            </Button>
-          </div>
+        <CardHeader className="border-b">
+          <CardTitle className="flex items-center gap-2">
+            <Table2 className="size-4 text-[#0A3855]" />
+            Saisie manuelle
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left pb-2 text-xs text-gray-500">Nom</th>
-                  <th className="text-left pb-2 text-xs text-gray-500">Code</th>
-                  <th className="text-left pb-2 text-xs text-gray-500">Email</th>
-                  <th className="text-left pb-2 text-xs text-gray-500">Mot de passe temp.</th>
+                  <th className="text-left pb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Nom
+                  </th>
+                  <th className="text-left pb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="text-left pb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Contrat
+                  </th>
+                  <th className="w-12" />
                 </tr>
               </thead>
-              <tbody>
-                {created.map((p, i) => (
-                  <tr key={i} className="border-b border-gray-50">
-                    <td className="py-1.5">{p.nom}</td>
-                    <td className="py-1.5 font-mono text-xs">{p.code}</td>
-                    <td className="py-1.5">{p.email}</td>
-                    <td className="py-1.5 font-mono text-xs text-red-600">{p.temp_password}</td>
+              <tbody className="divide-y divide-gray-50">
+                {rows.map((row, i) => (
+                  <tr key={i} className="group">
+                    <td className="py-2 pr-3">
+                      <Input
+                        value={row.nom}
+                        onChange={(e) => updateRow(i, { nom: e.target.value })}
+                        placeholder="Nom du partenaire"
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <Select
+                        value={row.type}
+                        onChange={(e) => updateRow(i, { type: e.target.value as PartnerType })}
+                        options={PARTNER_TYPES.map((t) => ({ value: t, label: t }))}
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <Select
+                        value={row.contrat}
+                        onChange={(e) => updateRow(i, { contrat: e.target.value as ContratType })}
+                        options={CONTRAT_OPTIONS}
+                      />
+                    </td>
+                    <td className="py-2">
+                      <button
+                        onClick={() => removeRow(i)}
+                        disabled={rows.length <= 1}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 rounded"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          <Button variant="ghost" onClick={addRow} className="mt-3">
+            <Plus className="size-4 mr-1.5" />
+            Ajouter ligne
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Summary */}
+      <Card className="bg-[#F8FAFB]">
+        <CardContent>
+          <div className="flex items-center gap-4 text-sm">
+            <span className="text-gray-500 font-medium">
+              {validRows.length} ligne(s) valide(s)
+            </span>
+            <Badge
+              variant="secondary"
+              className="bg-amber-50 text-amber-700 border border-amber-200"
+            >
+              {afCount} AF
+            </Badge>
+            <Badge
+              variant="secondary"
+              className="bg-sky-50 text-sky-700 border border-sky-200"
+            >
+              {mbCount} MB
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Create button */}
+      {created.length === 0 && (
+        <Button
+          className="bg-[#F6CCA4] text-[#6B4D2D] hover:bg-[#F0BF8E] border border-[#E8B88A]"
+          onClick={handleCreate}
+          disabled={creating || validRows.length === 0}
+        >
+          {creating ? (
+            <>
+              <Loader2 className="size-4 mr-1.5 animate-spin" />
+              Creation...
+            </>
+          ) : (
+            `Creer ${validRows.length} partenaire(s)`
+          )}
+        </Button>
+      )}
+
+      {/* Success state */}
+      {created.length > 0 && (
+        <Card className="border-emerald-200 bg-emerald-50/30">
+          <CardHeader className="border-b border-emerald-100">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-emerald-800">
+                <CheckCircle2 className="size-5" />
+                {created.length} partenaire(s) cree(s) avec succes
+              </CardTitle>
+              <Button variant="outline" size="sm" onClick={handleExportCsv}>
+                <Download className="size-4 mr-1.5" />
+                Export CSV
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-emerald-100">
+                    <th className="text-left pb-2 text-xs font-medium text-emerald-600 uppercase tracking-wider">
+                      Nom
+                    </th>
+                    <th className="text-left pb-2 text-xs font-medium text-emerald-600 uppercase tracking-wider">
+                      Code
+                    </th>
+                    <th className="text-left pb-2 text-xs font-medium text-emerald-600 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th className="text-left pb-2 text-xs font-medium text-emerald-600 uppercase tracking-wider">
+                      Mot de passe temp.
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-emerald-50">
+                  {created.map((p, i) => (
+                    <tr key={i}>
+                      <td className="py-2 font-medium text-gray-900">{p.nom}</td>
+                      <td className="py-2 font-mono text-xs text-gray-600">{p.code}</td>
+                      <td className="py-2 text-gray-600">{p.email}</td>
+                      <td className="py-2 font-mono text-xs text-red-600 bg-red-50/50 rounded px-2">
+                        {p.temp_password}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
         </Card>
       )}
     </div>
