@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import type { Partner, ContratType } from "@/types";
 import { api } from "@/lib/axios";
-import { Card, Button, Select, Badge, Alert } from "@/components/ui";
+import { Card, Button, Select, Badge, Alert, AlertDescription } from "@/components/ui";
 
 type Audience = "tous" | "affiliation" | "marque_blanche";
 
@@ -116,7 +116,7 @@ export default function CampagnesTab() {
             </p>
             <div className="flex flex-wrap gap-1.5">
               {targeted.map((p) => (
-                <Badge key={p.id} variant={sentPartners.has(p.id) ? "green" : "blue"}>
+                <Badge key={p.id} variant="secondary" className={sentPartners.has(p.id) ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"}>
                   {p.nom}
                 </Badge>
               ))}
@@ -156,7 +156,7 @@ export default function CampagnesTab() {
         <h4 className="font-semibold text-gray-900 mb-3">Previsualisation et envoi</h4>
 
         {!selectedTemplate ? (
-          <Alert type="info">Selectionnez un template pour previsualiser.</Alert>
+          <Alert><AlertDescription>Selectionnez un template pour previsualiser.</AlertDescription></Alert>
         ) : (
           <>
             <div className="flex gap-3 mb-4">
@@ -168,7 +168,7 @@ export default function CampagnesTab() {
                 {showPreview ? "Masquer apercu" : "Previsualiser"}
               </Button>
               <Button
-                variant="accent"
+                className="bg-[#F6CCA4] text-[#1C1C1C] hover:bg-[#F5C89A]"
                 onClick={handleSendAll}
                 disabled={targeted.length === 0 || allSent}
               >
@@ -209,9 +209,9 @@ export default function CampagnesTab() {
                       </button>
                     )}
                     {sentPartners.has(p.id) ? (
-                      <Badge variant="green">Envoye</Badge>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">Envoye</Badge>
                     ) : (
-                      <Badge variant="gray">En attente</Badge>
+                      <Badge variant="secondary" className="bg-gray-100 text-gray-800">En attente</Badge>
                     )}
                   </div>
                 </div>

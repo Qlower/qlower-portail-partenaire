@@ -5,7 +5,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePartner, useReferrals } from "@/hooks/usePartnerData";
 import { buildSignupLink, buildRdvLink } from "@/services/links";
 import { STAGE_STYLES } from "@/services/constants";
-import { PageHeader, Card, CopyButton, Badge } from "@/components/ui";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/CopyButton";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import ReferralForm from "./ReferralForm";
 import type { Partner } from "@/types";
 
@@ -56,134 +60,168 @@ export default function PageReferer({ partner }: PageRefererProps) {
   ];
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Referer un contact"
         subtitle="Partagez Qlower et generez des commissions"
       />
 
       {/* Mode selector cards */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {modes.map((m) => (
           <button
             key={m.key}
             onClick={() => setMode(m.key)}
-            className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all duration-200 ${
+            className={`group relative flex flex-col items-center gap-3 rounded-xl border-2 p-5 text-center transition-all duration-200 cursor-pointer ${
               mode === m.key
-                ? "border-[#0A3855] bg-[#0A3855]/5 shadow-sm"
-                : "border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm"
+                ? "border-[#0A3855] bg-[#E5EDF1]/60 shadow-md ring-1 ring-[#0A3855]/10"
+                : "border-gray-200 bg-white hover:border-[#0A3855]/30 hover:bg-[#E5EDF1]/20 hover:shadow-sm"
             }`}
           >
+            {/* Active indicator dot */}
+            {mode === m.key && (
+              <div className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-[#0A3855] shadow-sm" />
+            )}
             <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 ${
                 mode === m.key
-                  ? "bg-[#0A3855] text-white"
-                  : "bg-gray-100 text-gray-400"
+                  ? "bg-[#0A3855] text-white shadow-lg shadow-[#0A3855]/25"
+                  : "bg-[#E5EDF1] text-[#0A3855]/60 group-hover:bg-[#0A3855]/10 group-hover:text-[#0A3855]"
               }`}
             >
               {m.icon}
             </div>
-            <span
-              className={`text-sm font-semibold ${
-                mode === m.key ? "text-[#0A3855]" : "text-gray-700"
-              }`}
-            >
-              {m.title}
-            </span>
-            <span className="text-[11px] text-gray-400 leading-tight">{m.desc}</span>
+            <div>
+              <span
+                className={`block text-sm font-semibold transition-colors ${
+                  mode === m.key ? "text-[#0A3855]" : "text-gray-800"
+                }`}
+              >
+                {m.title}
+              </span>
+              <span className="block text-xs text-gray-500 mt-0.5 leading-tight">{m.desc}</span>
+            </div>
           </button>
         ))}
       </div>
 
       {/* Active content */}
-      <div className="mb-6">
+      <div>
         {mode === "link" && (
-          <Card>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">
-              Votre lien d&apos;inscription personnalise
-            </h3>
-            <div className="flex items-center gap-2">
-              <span className="flex-1 truncate text-sm text-gray-600 bg-gray-50 rounded-lg border border-gray-200 px-3 py-2.5">
-                {signupLink}
-              </span>
-              <CopyButton text={signupLink} />
-            </div>
-            <p className="text-xs text-gray-400 mt-3">
-              Chaque inscription via ce lien sera automatiquement track&eacute;e et attribu&eacute;e &agrave; votre compte partenaire.
-            </p>
+          <Card className="border-gray-200 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold text-gray-900">
+                Votre lien d&apos;inscription personnalise
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <code className="block truncate text-sm text-[#0A3855] bg-[#E5EDF1]/50 rounded-lg border border-[#0A3855]/10 px-4 py-3 font-mono">
+                    {signupLink}
+                  </code>
+                </div>
+                <CopyButton text={signupLink} />
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Chaque inscription via ce lien sera automatiquement track&eacute;e et attribu&eacute;e &agrave; votre compte partenaire.
+              </p>
+            </CardContent>
           </Card>
         )}
 
         {mode === "form" && <ReferralForm partner={partner} />}
 
         {mode === "rdv" && (
-          <Card>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">
-              Votre lien de rendez-vous
-            </h3>
-            <div className="flex items-center gap-2">
-              <span className="flex-1 truncate text-sm text-gray-600 bg-gray-50 rounded-lg border border-gray-200 px-3 py-2.5">
-                {rdvLink}
-              </span>
-              <CopyButton text={rdvLink} />
-            </div>
-            <p className="text-xs text-gray-400 mt-3">
-              Vos contacts peuvent r&eacute;server un cr&eacute;neau directement avec l&apos;&eacute;quipe Qlower.
-            </p>
+          <Card className="border-gray-200 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold text-gray-900">
+                Votre lien de rendez-vous
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <code className="block truncate text-sm text-[#0A3855] bg-[#E5EDF1]/50 rounded-lg border border-[#0A3855]/10 px-4 py-3 font-mono">
+                    {rdvLink}
+                  </code>
+                </div>
+                <CopyButton text={rdvLink} />
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Vos contacts peuvent r&eacute;server un cr&eacute;neau directement avec l&apos;&eacute;quipe Qlower.
+              </p>
+            </CardContent>
           </Card>
         )}
       </div>
 
       {/* Referral history */}
-      <Card>
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">
-          Historique des referrals
-        </h3>
-
-        {referralsLoading ? (
-          <div className="text-center py-8">
-            <div className="w-6 h-6 border-2 border-[#0A3855] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-gray-400 mt-2">Chargement...</p>
+      <Card className="border-gray-200 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold text-gray-900">
+              Historique des referrals
+            </CardTitle>
+            {referrals && referrals.length > 0 && (
+              <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855] text-xs">
+                {referrals.length} contact{referrals.length > 1 ? "s" : ""}
+              </Badge>
+            )}
           </div>
-        ) : !referrals || referrals.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-sm text-gray-400">Aucun referral pour le moment.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto -mx-5">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 pb-3">Contact</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 pb-3">Email</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 pb-3">Statut</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 pb-3">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {referrals.map((r) => {
-                  const stageStyle = STAGE_STYLES[r.statut] || { text: "text-gray-600", bg: "bg-gray-100" };
-                  return (
-                    <tr key={r.id} className="border-b border-gray-50 last:border-0">
-                      <td className="px-5 py-3 font-medium text-gray-900">
-                        {r.prenom} {r.nom}
-                      </td>
-                      <td className="px-5 py-3 text-gray-500">{r.email}</td>
-                      <td className="px-5 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${stageStyle.bg} ${stageStyle.text}`}>
-                          {r.statut}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-gray-400">
-                        {new Date(r.created_at).toLocaleDateString("fr-FR")}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        </CardHeader>
+        <CardContent>
+          {referralsLoading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="w-8 h-8 border-2 border-[#0A3855] border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-gray-400 mt-3">Chargement...</p>
+            </div>
+          ) : !referrals || referrals.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="w-12 h-12 rounded-full bg-[#E5EDF1] flex items-center justify-center mb-3">
+                <svg className="w-6 h-6 text-[#0A3855]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-gray-500">Aucun referral pour le moment</p>
+              <p className="text-xs text-gray-400 mt-1">Vos contacts appara&icirc;tront ici une fois envoy&eacute;s</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-6">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 pb-3">Contact</th>
+                    <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 pb-3">Email</th>
+                    <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 pb-3">Statut</th>
+                    <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 pb-3">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {referrals.map((r) => {
+                    const stageStyle = STAGE_STYLES[r.statut] || { text: "text-gray-600", bg: "bg-gray-100" };
+                    return (
+                      <tr key={r.id} className="hover:bg-[#E5EDF1]/20 transition-colors">
+                        <td className="px-6 py-3.5 font-medium text-gray-900">
+                          {r.prenom} {r.nom}
+                        </td>
+                        <td className="px-6 py-3.5 text-gray-500">{r.email}</td>
+                        <td className="px-6 py-3.5">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${stageStyle.bg} ${stageStyle.text}`}>
+                            {r.statut}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3.5 text-gray-400 tabular-nums">
+                          {new Date(r.created_at).toLocaleDateString("fr-FR")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
       </Card>
     </div>
   );

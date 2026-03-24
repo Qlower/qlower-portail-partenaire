@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { usePartner, usePartnerByUserId } from "@/hooks/usePartnerData";
@@ -71,6 +71,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
+  const handleNavigate = (key: string) => {
+    router.push(key === "dashboard" ? "/dashboard" : `/dashboard/${key}`);
+    setSidebarOpen(false);
+  };
+
   return (
     <PartnerContext.Provider value={{ partner, partnerId: partner.id }}>
       <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -79,16 +91,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           brandColor={partner.brand_color}
           contrat={partner.contrat}
           onLogout={() => signOut()}
+          onMenuToggle={() => setSidebarOpen((v) => !v)}
         />
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar
-            activeModule={activeModule}
-            onNavigate={(key) => router.push(key === "dashboard" ? "/dashboard" : `/dashboard/${key}`)}
-            showGuide={true}
-            guideDone={false}
-            contrat={partner.contrat}
-          />
-          <main className="flex-1 overflow-y-auto p-5">
+
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* Mobile overlay */}
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
+          {/* Sidebar */}
+          <div className={`
+            fixed inset-y-0 left-0 z-40 w-[220px] transform transition-transform duration-200 ease-out
+            lg:relative lg:translate-x-0 lg:z-auto
+            ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+          `}>
+            <Sidebar
+              activeModule={activeModule}
+              onNavigate={handleNavigate}
+              showGuide={true}
+              guideDone={false}
+              contrat={partner.contrat}
+            />
+          </div>
+
+          {/* Main content */}
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6">
             {children}
           </main>
         </div>

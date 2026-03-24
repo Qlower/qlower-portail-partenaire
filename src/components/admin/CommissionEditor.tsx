@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { CommissionRule, Tranche } from "@/types";
 import { COMM_LABELS, DEFAULT_TRANCHES, calcCommission } from "@/services/commission";
-import { Card, Input, Alert } from "@/components/ui";
+import { Card, Input, Alert, AlertDescription } from "@/components/ui";
 
 interface CommissionEditorProps {
   rules: CommissionRule[];
@@ -186,13 +186,13 @@ export default function CommissionEditor({
       ))}
 
       {warnings.length > 0 && (
-        <Alert type="warning">
-          {warnings.length} regle(s) active(s) avec valeur a 0 -- aucune commission ne sera calculee.
+        <Alert>
+          <AlertDescription>{warnings.length} regle(s) active(s) avec valeur a 0 -- aucune commission ne sera calculee.</AlertDescription>
         </Alert>
       )}
 
       {/* Live preview */}
-      <Card padding="sm" className="bg-gray-50">
+      <Card size="sm" className="bg-gray-50">
         <p className="text-xs font-medium text-gray-500 mb-2">
           Apercu (pour {previewAbonnes} abonnes, {biensMoyens} biens/client, {caParClient} EUR CA/client)
         </p>

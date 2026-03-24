@@ -1,9 +1,11 @@
-export { Button } from "./Button";
-export { Card } from "./Card";
-export { Input, PasswordInput } from "./Input";
+export { Button, buttonVariants } from "./Button";
+export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./card";
+export { Input } from "./Input";
+export { Label } from "./label";
+export { Badge, badgeVariants } from "./badge";
+export { Alert, AlertTitle, AlertDescription } from "./alert";
+export { Separator } from "./separator";
 export { Select } from "./Select";
-export { Badge } from "./Badge";
-export { Alert } from "./Alert";
 export { Stat } from "./Stat";
 export { PageHeader } from "./PageHeader";
 export { CopyButton } from "./CopyButton";

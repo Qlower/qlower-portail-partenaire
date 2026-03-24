@@ -6,7 +6,7 @@ import { PARTNER_TYPES } from "@/services/constants";
 import { calcCommission, DEFAULT_TRANCHES } from "@/services/commission";
 import { slug } from "@/services/links";
 import { api } from "@/lib/axios";
-import { Card, Button, Input, Select, Badge, Alert } from "@/components/ui";
+import { Card, Button, Input, Select, Badge, Alert, AlertDescription, Label } from "@/components/ui";
 import CommissionEditor from "./CommissionEditor";
 
 const CONTRAT_OPTIONS = [
@@ -135,8 +135,8 @@ export default function PartnersTab() {
 
   return (
     <div className="space-y-4">
-      {error && <Alert type="error">{error}</Alert>}
-      {success && <Alert type="success">{success}</Alert>}
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+      {success && <Alert><AlertDescription>{success}</AlertDescription></Alert>}
 
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-bold text-gray-900">Partenaires ({partners.length})</h3>
@@ -150,49 +150,59 @@ export default function PartnersTab() {
         <Card className="border-2 border-[#F6CCA4]">
           <h4 className="font-semibold text-gray-900 mb-4">Creer un partenaire</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-            <Input
-              label="Identifiant (code)"
-              value={form.identifiant}
-              onChange={(e) => setForm({ ...form, identifiant: e.target.value })}
-              placeholder={slug(form.nom) || "auto-genere"}
-            />
-            <Input
-              label="Nom"
-              value={form.nom}
-              onChange={(e) => setForm({ ...form, nom: e.target.value })}
-              placeholder="Nom du partenaire"
-            />
+            <div className="flex flex-col gap-1">
+              <Label>Identifiant (code)</Label>
+              <Input
+                value={form.identifiant}
+                onChange={(e) => setForm({ ...form, identifiant: e.target.value })}
+                placeholder={slug(form.nom) || "auto-genere"}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label>Nom</Label>
+              <Input
+                value={form.nom}
+                onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                placeholder="Nom du partenaire"
+              />
+            </div>
             <Select
               label="Type"
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value as PartnerType })}
               options={PARTNER_TYPES.map((t) => ({ value: t, label: t }))}
             />
-            <Input
-              label="UTM source"
-              value={form.utm}
-              onChange={(e) => setForm({ ...form, utm: e.target.value })}
-              placeholder={slug(form.nom) || "auto-genere"}
-            />
+            <div className="flex flex-col gap-1">
+              <Label>UTM source</Label>
+              <Input
+                value={form.utm}
+                onChange={(e) => setForm({ ...form, utm: e.target.value })}
+                placeholder={slug(form.nom) || "auto-genere"}
+              />
+            </div>
             <Select
               label="Contrat"
               value={form.contrat}
               onChange={(e) => setForm({ ...form, contrat: e.target.value as ContratType })}
               options={CONTRAT_OPTIONS}
             />
-            <Input
-              label="Objectif annuel"
-              type="number"
-              value={form.objectif}
-              onChange={(e) => setForm({ ...form, objectif: Number(e.target.value) })}
-            />
-            <Input
-              label="Email"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="contact@partenaire.com"
-            />
+            <div className="flex flex-col gap-1">
+              <Label>Objectif annuel</Label>
+              <Input
+                type="number"
+                value={form.objectif}
+                onChange={(e) => setForm({ ...form, objectif: Number(e.target.value) })}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="contact@partenaire.com"
+              />
+            </div>
           </div>
 
           <CommissionEditor
@@ -201,7 +211,7 @@ export default function PartnersTab() {
           />
 
           <div className="mt-4">
-            <Button variant="accent" onClick={handleCreate} disabled={creating || !form.nom}>
+            <Button className="bg-[#F6CCA4] text-[#1C1C1C] hover:bg-[#F5C89A]" onClick={handleCreate} disabled={creating || !form.nom}>
               {creating ? "Creation..." : "Creer + Synchroniser HubSpot"}
             </Button>
           </div>
@@ -220,7 +230,7 @@ export default function PartnersTab() {
             const isEditing = editingId === p.id;
 
             return (
-              <Card key={p.id} padding="sm">
+              <Card key={p.id} size="sm">
                 {/* Summary row */}
                 <div className="flex items-center gap-3 flex-wrap">
                   {/* Status dot */}
@@ -242,13 +252,13 @@ export default function PartnersTab() {
                     <span className="text-xs font-semibold text-[#0A3855]">{commission.total} EUR</span>
                   </div>
 
-                  <Badge variant={p.type === "cgp" ? "blue" : p.type === "agence-immo" ? "green" : "purple"}>
+                  <Badge variant="secondary" className={p.type === "cgp" ? "bg-blue-100 text-blue-800" : p.type === "agence-immo" ? "bg-green-100 text-green-800" : "bg-purple-100 text-purple-800"}>
                     {p.type}
                   </Badge>
-                  <Badge variant={p.contrat === "affiliation" ? "amber" : "blue"}>
+                  <Badge variant="secondary" className={p.contrat === "affiliation" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"}>
                     {p.contrat === "affiliation" ? "AF" : "MB"}
                   </Badge>
-                  <Badge variant={p.active ? "green" : "red"}>
+                  <Badge variant={p.active ? "default" : "destructive"} className={p.active ? "bg-green-100 text-green-800" : undefined}>
                     {p.active ? "Actif" : "Inactif"}
                   </Badge>
 
@@ -261,8 +271,8 @@ export default function PartnersTab() {
                       {isEditing ? "Fermer" : "Modifier"}
                     </Button>
                     <Button
-                      variant={p.active ? "danger" : "success"}
-                      className="text-xs"
+                      variant={p.active ? "destructive" : "default"}
+                      className={`text-xs ${!p.active ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}
                       onClick={() => handleToggleActive(p)}
                     >
                       {p.active ? "Desactiver" : "Activer"}
@@ -274,28 +284,34 @@ export default function PartnersTab() {
                 {isEditing && (
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                      <Input
-                        label="Nom"
-                        value={editForm.nom ?? ""}
-                        onChange={(e) => setEditForm({ ...editForm, nom: e.target.value })}
-                      />
-                      <Input
-                        label="Email"
-                        type="email"
-                        value={editForm.email ?? ""}
-                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                      />
+                      <div className="flex flex-col gap-1">
+                        <Label>Nom</Label>
+                        <Input
+                          value={editForm.nom ?? ""}
+                          onChange={(e) => setEditForm({ ...editForm, nom: e.target.value })}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <Label>Email</Label>
+                        <Input
+                          type="email"
+                          value={editForm.email ?? ""}
+                          onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        />
+                      </div>
                       <Select
                         label="Type"
                         value={editForm.type ?? p.type}
                         onChange={(e) => setEditForm({ ...editForm, type: e.target.value as PartnerType })}
                         options={PARTNER_TYPES.map((t) => ({ value: t, label: t }))}
                       />
-                      <Input
-                        label="UTM"
-                        value={editForm.utm ?? ""}
-                        onChange={(e) => setEditForm({ ...editForm, utm: e.target.value })}
-                      />
+                      <div className="flex flex-col gap-1">
+                        <Label>UTM</Label>
+                        <Input
+                          value={editForm.utm ?? ""}
+                          onChange={(e) => setEditForm({ ...editForm, utm: e.target.value })}
+                        />
+                      </div>
                       <Select
                         label="Contrat"
                         value={editForm.contrat ?? p.contrat}
@@ -304,14 +320,16 @@ export default function PartnersTab() {
                         }
                         options={CONTRAT_OPTIONS}
                       />
-                      <Input
-                        label="Objectif annuel"
-                        type="number"
-                        value={editForm.comm_obj_annuel ?? 0}
-                        onChange={(e) =>
-                          setEditForm({ ...editForm, comm_obj_annuel: Number(e.target.value) })
-                        }
-                      />
+                      <div className="flex flex-col gap-1">
+                        <Label>Objectif annuel</Label>
+                        <Input
+                          type="number"
+                          value={editForm.comm_obj_annuel ?? 0}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, comm_obj_annuel: Number(e.target.value) })
+                          }
+                        />
+                      </div>
                     </div>
 
                     <CommissionEditor
@@ -337,11 +355,11 @@ export default function PartnersTab() {
       )}
 
       {/* HubSpot values reference */}
-      <Card padding="sm" className="bg-gray-50">
+      <Card size="sm" className="bg-gray-50">
         <p className="text-xs font-medium text-gray-500 mb-2">Valeurs HubSpot partenaire__lead_</p>
         <div className="flex flex-wrap gap-2">
           {["Abonne", "Payeur", "Non payeur"].map((v) => (
-            <Badge key={v} variant="gray">
+            <Badge key={v} variant="secondary" className="bg-gray-100 text-gray-800">
               partenaire__lead_{v.toLowerCase().replace(/\s/g, "_")}
             </Badge>
           ))}

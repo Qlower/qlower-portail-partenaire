@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { PartnerType, ContratType } from "@/types";
 import { PARTNER_TYPES } from "@/services/constants";
 import { api } from "@/lib/axios";
-import { Card, Button, Input, Select, Badge, Alert } from "@/components/ui";
+import { Card, Button, Input, Select, Badge, Alert, AlertDescription } from "@/components/ui";
 
 interface BatchRow {
   nom: string;
@@ -93,7 +93,7 @@ export default function BatchTab() {
 
   return (
     <div className="space-y-6">
-      {error && <Alert type="error">{error}</Alert>}
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
       {/* CSV Import */}
       <Card>
@@ -174,20 +174,20 @@ export default function BatchTab() {
       </Card>
 
       {/* Summary */}
-      <Card padding="sm" className="bg-gray-50">
+      <Card size="sm" className="bg-gray-50">
         <div className="flex items-center gap-4 text-sm">
           <span className="text-gray-500">
             {validRows.length} ligne(s) valide(s)
           </span>
-          <Badge variant="amber">{afCount} AF</Badge>
-          <Badge variant="blue">{mbCount} MB</Badge>
+          <Badge variant="secondary" className="bg-amber-100 text-amber-800">{afCount} AF</Badge>
+          <Badge variant="secondary" className="bg-blue-100 text-blue-800">{mbCount} MB</Badge>
         </div>
       </Card>
 
       {/* Create button */}
       {created.length === 0 && (
         <Button
-          variant="accent"
+          className="bg-[#F6CCA4] text-[#1C1C1C] hover:bg-[#F5C89A]"
           onClick={handleCreate}
           disabled={creating || validRows.length === 0}
         >

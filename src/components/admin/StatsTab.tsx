@@ -75,7 +75,7 @@ export default function StatsTab() {
                           className={`w-2 h-2 rounded-full ${p.active ? "bg-green-500" : "bg-red-400"}`}
                         />
                         <span className="font-medium text-gray-900">{p.nom}</span>
-                        <Badge variant={p.contrat === "affiliation" ? "amber" : "blue"} className="text-[10px]">
+                        <Badge variant="secondary" className={`text-[10px] ${p.contrat === "affiliation" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"}`}>
                           {p.contrat === "affiliation" ? "AF" : "MB"}
                         </Badge>
                       </div>
@@ -88,7 +88,7 @@ export default function StatsTab() {
                     </td>
                     <td className="py-2.5 text-right">{taux}%</td>
                     <td className="py-2.5 text-center">
-                      <Badge variant={mbEligible ? "green" : "gray"}>
+                      <Badge variant="secondary" className={mbEligible ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
                         {mbEligible ? "Eligible" : "< 50 leads"}
                       </Badge>
                     </td>

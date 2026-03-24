@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import type { Partner, PartnerType } from "@/types";
 import { PARTNER_TYPES } from "@/services/constants";
 import { api } from "@/lib/axios";
-import { Card, Button, Input, Select, CopyButton, Badge } from "@/components/ui";
+import { Card, Button, Input, Select, CopyButton, Badge, Label } from "@/components/ui";
 
 const BASE_URLS = [
   { value: "https://secure.qlower.com/signup", label: "Inscription Qlower" },
@@ -113,15 +113,17 @@ export default function UtmTab() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Partner selection */}
               <div className="space-y-2">
-                <Input
-                  label="Partenaire"
-                  value={partnerSearch}
-                  onChange={(e) => {
-                    setPartnerSearch(e.target.value);
-                    setSelectedPartnerId(null);
-                  }}
-                  placeholder="Rechercher ou saisir..."
-                />
+                <div className="flex flex-col gap-1">
+                  <Label>Partenaire</Label>
+                  <Input
+                    value={partnerSearch}
+                    onChange={(e) => {
+                      setPartnerSearch(e.target.value);
+                      setSelectedPartnerId(null);
+                    }}
+                    placeholder="Rechercher ou saisir..."
+                  />
+                </div>
                 {partnerSearch && !selectedPartnerId && filteredPartners.length > 0 && (
                   <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto">
                     {filteredPartners.slice(0, 8).map((p) => (
@@ -149,12 +151,14 @@ export default function UtmTab() {
                 options={PARTNER_TYPES.map((t) => ({ value: t, label: t }))}
               />
 
-              <Input
-                label="Campagne"
-                value={campaign}
-                onChange={(e) => setCampaign(e.target.value)}
-                placeholder="ex: lancement-2026, promo-ete..."
-              />
+              <div className="flex flex-col gap-1">
+                <Label>Campagne</Label>
+                <Input
+                  value={campaign}
+                  onChange={(e) => setCampaign(e.target.value)}
+                  placeholder="ex: lancement-2026, promo-ete..."
+                />
+              </div>
 
               <div>
                 <Select
@@ -208,7 +212,7 @@ export default function UtmTab() {
                   <div className="min-w-0 flex-1 mr-3">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium text-gray-900">{link.partner}</span>
-                      <Badge variant="blue">{link.campaign}</Badge>
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">{link.campaign}</Badge>
                       <span className="text-xs text-gray-400">
                         {new Date(link.createdAt).toLocaleDateString("fr-FR")}
                       </span>

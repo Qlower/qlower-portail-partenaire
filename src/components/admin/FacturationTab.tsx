@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import type { Partner } from "@/types";
 import { calcCommission, COMM_LABELS } from "@/services/commission";
 import { api } from "@/lib/axios";
-import { Card, Button, Badge, Alert } from "@/components/ui";
+import { Card, Button, Badge, Alert, AlertDescription } from "@/components/ui";
 
 export default function FacturationTab() {
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -68,7 +68,7 @@ export default function FacturationTab() {
 
       {/* Partner billing table */}
       {activePartners.length === 0 ? (
-        <Alert type="info">Aucun partenaire actif a facturer.</Alert>
+        <Alert><AlertDescription>Aucun partenaire actif a facturer.</AlertDescription></Alert>
       ) : (
         <div className="space-y-2">
           {activePartners.map((p) => {
@@ -78,20 +78,20 @@ export default function FacturationTab() {
             const isGenerated = generatedIds.has(p.id);
 
             return (
-              <Card key={p.id} padding="sm">
+              <Card key={p.id} size="sm">
                 <div
                   className="flex items-center justify-between cursor-pointer"
                   onClick={() => setExpandedId(isExpanded ? null : p.id)}
                 >
                   <div className="flex items-center gap-3">
                     <span className="font-semibold text-gray-900">{p.nom}</span>
-                    <Badge variant="gray">{activeRules.length} regle(s)</Badge>
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-800">{activeRules.length} regle(s)</Badge>
                     <span className="text-sm text-gray-500">{p.abonnes} abonnes</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-lg font-bold text-[#0A3855]">{commission.total} EUR</span>
                     {isGenerated ? (
-                      <Badge variant="green">Genere</Badge>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">Genere</Badge>
                     ) : (
                       <Button
                         variant="outline"
@@ -130,7 +130,7 @@ export default function FacturationTab() {
                       <p className="text-xs font-medium text-gray-500 mb-1">Regles actives</p>
                       <div className="flex flex-wrap gap-1">
                         {activeRules.map((r) => (
-                          <Badge key={r.type} variant="blue">
+                          <Badge key={r.type} variant="secondary" className="bg-blue-100 text-blue-800">
                             {COMM_LABELS[r.type]}
                           </Badge>
                         ))}

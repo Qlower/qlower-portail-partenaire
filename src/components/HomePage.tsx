@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Button, Card } from "@/components/ui";
+import Link from "next/link";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 interface HomePageProps {
   onLogin: () => void;
@@ -11,299 +15,317 @@ interface HomePageProps {
 export function HomePage({ onLogin, onRegister }: HomePageProps) {
   return (
     <div className="min-h-screen bg-white">
-      {/* Hero */}
-      <HeroSection onLogin={onLogin} onRegister={onRegister} />
-
-      {/* Simulator */}
+      <Navbar onLogin={onLogin} onRegister={onRegister} />
+      <HeroSection onRegister={onRegister} />
+      <LogoBar />
       <SimulatorSection />
-
-      {/* Why Join */}
-      <WhyJoinSection />
-
-      {/* How It Works */}
+      <FeaturesSection />
       <HowItWorksSection />
-
-      {/* Testimonials */}
       <TestimonialsSection />
-
-      {/* Bottom CTA */}
-      <BottomCTASection onLogin={onLogin} onRegister={onRegister} />
+      <CtaSection onRegister={onRegister} />
+      <Footer />
     </div>
   );
 }
 
-/* ────────────────────────────────────────────────────────────── */
-/* HERO                                                          */
-/* ────────────────────────────────────────────────────────────── */
-function HeroSection({ onLogin, onRegister }: { onLogin: () => void; onRegister: () => void }) {
-  const checks = [
-    "Commission sur chaque inscription",
-    "Tableau de bord en temps reel",
-    "Outils marketing fournis",
-    "Support dedie partenaire",
-  ];
-
+/* ─── Navbar ──────────────────────────────────────────────────── */
+function Navbar({ onLogin, onRegister }: { onLogin: () => void; onRegister: () => void }) {
   return (
-    <section className="bg-[#FFF5ED] relative overflow-hidden">
-      <div className="max-w-5xl mx-auto px-6 py-20 sm:py-28 relative z-10">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:gap-16">
+    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-100">
+      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-[#0A3855] flex items-center justify-center text-white font-bold text-base shadow-sm">
+            Q
+          </div>
+          <span className="text-base font-bold text-gray-900">
+            Qlower <span className="font-normal text-gray-400">Pro</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={onLogin} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors px-3 py-1.5">
+            Se connecter
+          </button>
+          <Button onClick={onRegister} size="sm">
+            Devenir partenaire
+          </Button>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+/* ─── Hero ────────────────────────────────────────────────────── */
+function HeroSection({ onRegister }: { onRegister: () => void }) {
+  return (
+    <section className="relative overflow-hidden">
+      {/* Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#FFF5ED] via-white to-[#E5EDF1]/40" />
+      <div className="absolute top-20 right-[10%] w-[500px] h-[500px] bg-[#F6CCA4]/15 rounded-full blur-[100px]" />
+      <div className="absolute bottom-0 left-[5%] w-[400px] h-[400px] bg-[#0A3855]/5 rounded-full blur-[100px]" />
+
+      <div className="relative max-w-6xl mx-auto px-6 pt-20 pb-28 sm:pt-28 sm:pb-36">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:gap-20">
           {/* Text */}
-          <div className="flex-1 mb-10 lg:mb-0">
-            {/* Logo */}
-            <div className="flex items-center gap-2.5 mb-8">
-              <div className="w-10 h-10 rounded-xl bg-[#0A3855] flex items-center justify-center text-white font-bold text-lg shadow-md">
-                Q
-              </div>
-              <span className="text-lg font-bold text-gray-900">
-                Qlower <span className="font-normal text-gray-400">Pro</span>
-              </span>
-              <span className="text-xs bg-[#0A3855]/10 text-[#0A3855] px-2.5 py-0.5 rounded-full font-medium">
-                Programme Partenaires
+          <div className="flex-1 mb-14 lg:mb-0">
+            <Badge variant="secondary" className="mb-6 px-3 py-1 text-xs font-medium bg-[#0A3855]/8 text-[#0A3855] border-0">
+              Programme Partenaires 2026
+            </Badge>
+
+            <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-gray-900 leading-[1.1] tracking-tight mb-6">
+              Générez des revenus en recommandant{" "}
+              <span className="bg-gradient-to-r from-[#0A3855] to-[#0A3855]/70 bg-clip-text text-transparent">
+                Qlower
+              </span>{" "}
+              à vos clients
+            </h1>
+
+            <p className="text-lg text-gray-500 mb-10 max-w-lg leading-relaxed">
+              Rejoignez le programme partenaires et percevez une commission sur chaque client qui souscrit à Qlower via votre lien.
+            </p>
+
+            <div className="flex items-center gap-4 flex-wrap mb-10">
+              <Button onClick={onRegister} size="lg" className="px-8 py-3 text-base shadow-lg shadow-[#0A3855]/20">
+                Commencer gratuitement
+              </Button>
+              <span className="text-xs text-gray-400">
+                Gratuit · Sans engagement · 2 min
               </span>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight mb-5">
-              Monetisez votre portefeuille en{" "}
-              <span className="text-[#0A3855]">recommandant Qlower</span>{" "}
-              a vos clients
-            </h1>
-
-            <p className="text-base sm:text-lg text-gray-500 mb-8 max-w-lg leading-relaxed">
-              Rejoignez le programme partenaires Qlower et percevez des commissions sur
-              chaque client qui souscrit via votre lien.
-            </p>
-
-            {/* Checks */}
-            <ul className="space-y-3 mb-8">
-              {checks.map((c) => (
-                <li key={c} className="flex items-center gap-2.5 text-sm text-gray-700">
-                  <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                  {c}
-                </li>
+            {/* Trust signals */}
+            <div className="flex items-center gap-6 text-sm text-gray-500">
+              {[
+                { val: "100€", label: "par souscription" },
+                { val: "28+", label: "partenaires actifs" },
+                { val: "20%", label: "taux moyen" },
+              ].map((s) => (
+                <div key={s.label} className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-[#0A3855]">{s.val}</span>
+                  <span className="text-xs text-gray-400">{s.label}</span>
+                </div>
               ))}
-            </ul>
-
-            {/* CTAs */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <Button variant="primary" className="px-6 py-3 text-base shadow-lg shadow-[#0A3855]/30" onClick={onRegister}>
-                Devenir partenaire &mdash; gratuit
-              </Button>
-              <Button variant="outline" className="px-6 py-3 text-base" onClick={onLogin}>
-                J&apos;ai deja un compte
-              </Button>
             </div>
           </div>
 
-          {/* Visual mock dashboard */}
+          {/* Dashboard preview */}
           <div className="flex-1 max-w-md">
-            <Card className="shadow-xl border-0">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Revenus du mois</span>
-                  <span className="text-xs text-green-600 font-semibold">+24%</span>
-                </div>
-                <p className="text-3xl font-bold text-gray-900">2&nbsp;480 &euro;</p>
-                <div className="h-px bg-gray-100" />
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-gray-900">47</p>
-                    <p className="text-[10px] text-gray-400">Leads</p>
+            <div className="relative">
+              {/* Glow behind card */}
+              <div className="absolute -inset-4 bg-gradient-to-br from-[#0A3855]/10 to-[#F6CCA4]/10 rounded-3xl blur-2xl" />
+              <Card className="relative shadow-2xl shadow-black/5 border-0 bg-white">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Revenus du mois</span>
+                    <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">+24%</span>
                   </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-[#0A3855]">12</p>
-                    <p className="text-[10px] text-gray-400">Abonnes</p>
+                  <p className="text-3xl font-extrabold text-gray-900 mb-4">2&nbsp;480&nbsp;€</p>
+                  <Separator className="mb-4" />
+                  <div className="grid grid-cols-3 gap-3 mb-5">
+                    {[
+                      { val: "47", label: "Leads", color: "text-gray-900" },
+                      { val: "12", label: "Abonnés", color: "text-[#0A3855]" },
+                      { val: "8", label: "Payeurs", color: "text-green-600" },
+                    ].map((s) => (
+                      <div key={s.label} className="text-center">
+                        <p className={`text-xl font-bold ${s.color}`}>{s.val}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{s.label}</p>
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-green-600">8</p>
-                    <p className="text-[10px] text-gray-400">Payeurs</p>
+                  <div className="flex gap-[3px] h-16 items-end">
+                    {[30, 45, 35, 60, 50, 75, 65, 80, 70, 90, 85, 95].map((v, i) => (
+                      <div
+                        key={i}
+                        className="flex-1 rounded-t-sm bg-gradient-to-t from-[#0A3855]/30 to-[#0A3855]/10"
+                        style={{ height: `${v}%` }}
+                      />
+                    ))}
                   </div>
-                </div>
-                <div className="flex gap-1 h-20 items-end">
-                  {[30, 45, 35, 60, 50, 75, 65, 80, 70, 90, 85, 95].map((v, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 bg-[#0A3855]/20 rounded-t"
-                      style={{ height: `${v}%` }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Decorative blurred circles */}
-      <div className="absolute top-10 right-10 w-64 h-64 bg-[#0A3855]/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-10 left-10 w-48 h-48 bg-amber-200/20 rounded-full blur-3xl" />
     </section>
   );
 }
 
-/* ────────────────────────────────────────────────────────────── */
-/* SIMULATOR                                                     */
-/* ────────────────────────────────────────────────────────────── */
+/* ─── Logo bar ────────────────────────────────────────────────── */
+function LogoBar() {
+  const partners = ["Lybox", "CocoonR", "ImmoConsult", "Hestia", "Oqoro", "Gestin", "Lodgify", "Smartloc"];
+  return (
+    <section className="py-8 border-y border-gray-100 bg-gray-50/50">
+      <div className="max-w-6xl mx-auto px-6">
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest text-center mb-4">
+          Ils nous font déjà confiance
+        </p>
+        <div className="flex items-center justify-center gap-8 flex-wrap opacity-40">
+          {partners.map((p) => (
+            <span key={p} className="text-sm font-bold text-gray-900">{p}</span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Simulator ───────────────────────────────────────────────── */
 function SimulatorSection() {
   const [clients, setClients] = useState(20);
   const [convRate, setConvRate] = useState(20);
 
   const results = useMemo(() => {
     const abonnes = Math.round(clients * (convRate / 100));
-    const commission = abonnes * 120;
+    const commission = abonnes * 100;
     const annuel = commission * 12;
     return { abonnes, commission, annuel };
   }, [clients, convRate]);
 
   return (
-    <section className="py-20 bg-white">
+    <section className="py-24 bg-white" id="simulateur">
       <div className="max-w-4xl mx-auto px-6">
-        <div className="text-center mb-10">
+        <div className="text-center mb-12">
+          <Badge variant="secondary" className="mb-4 px-3 py-1 text-xs bg-[#F6CCA4]/20 text-[#0A3855] border-0">
+            Simulateur
+          </Badge>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-3">
-            Simulez vos revenus
+            Estimez vos revenus
           </h2>
           <p className="text-sm text-gray-500 max-w-md mx-auto">
-            Estimez vos commissions en fonction du nombre de clients que vous recommandez.
+            Déplacez les curseurs pour voir combien vous pouvez générer.
           </p>
         </div>
 
-        <Card className="shadow-lg" padding="lg">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Sliders */}
-            <div className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-semibold text-gray-700">
-                    Clients LMNP recommandes
-                  </label>
-                  <span className="text-sm font-bold text-[#0A3855] bg-[#0A3855]/10 px-2 py-0.5 rounded">
-                    {clients}
-                  </span>
-                </div>
-                <input
-                  type="range"
+        <Card className="shadow-xl shadow-black/5 border-0">
+          <CardContent className="p-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+              {/* Sliders */}
+              <div className="space-y-8">
+                <SliderField
+                  label="Clients LMNP dans votre portefeuille"
+                  value={clients}
+                  onChange={setClients}
                   min={1}
                   max={100}
-                  value={clients}
-                  onChange={(e) => setClients(Number(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0A3855]"
+                  display={String(clients)}
                 />
-                <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-                  <span>1</span>
-                  <span>50</span>
-                  <span>100</span>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-semibold text-gray-700">
-                    Taux de conversion (%)
-                  </label>
-                  <span className="text-sm font-bold text-[#0A3855] bg-[#0A3855]/10 px-2 py-0.5 rounded">
-                    {convRate}%
-                  </span>
-                </div>
-                <input
-                  type="range"
+                <SliderField
+                  label="Taux de conversion estimé"
+                  value={convRate}
+                  onChange={setConvRate}
                   min={5}
                   max={50}
-                  value={convRate}
-                  onChange={(e) => setConvRate(Number(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0A3855]"
+                  display={`${convRate}%`}
                 />
-                <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-                  <span>5%</span>
-                  <span>25%</span>
-                  <span>50%</span>
-                </div>
               </div>
-            </div>
 
-            {/* Result cards */}
-            <div className="grid grid-cols-1 gap-3">
-              <div className="bg-gray-50 rounded-xl p-4 text-center">
-                <p className="text-xs text-gray-400 font-medium mb-1">Abonnes estimes</p>
-                <p className="text-2xl font-bold text-gray-900">{results.abonnes}</p>
-              </div>
-              <div className="bg-[#0A3855]/5 rounded-xl p-4 text-center">
-                <p className="text-xs text-[#0A3855] font-medium mb-1">Commission mensuelle</p>
-                <p className="text-2xl font-bold text-[#0A3855]">
-                  {results.commission.toLocaleString("fr-FR")} &euro;
-                </p>
-              </div>
-              <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-4 text-center">
-                <p className="text-xs text-gray-400 font-medium mb-1">Revenu annuel estime</p>
-                <p className="text-2xl font-bold text-white">
-                  {results.annuel.toLocaleString("fr-FR")} &euro;
-                </p>
+              {/* Results */}
+              <div className="flex flex-col gap-3">
+                <ResultCard label="Clients convertis" value={String(results.abonnes)} variant="light" />
+                <ResultCard label="Commission mensuelle" value={`${results.commission.toLocaleString("fr-FR")} €`} variant="primary" />
+                <ResultCard label="Revenu annuel estimé" value={`${results.annuel.toLocaleString("fr-FR")} €`} variant="dark" />
               </div>
             </div>
-          </div>
+          </CardContent>
         </Card>
       </div>
     </section>
   );
 }
 
-/* ────────────────────────────────────────────────────────────── */
-/* WHY JOIN                                                      */
-/* ────────────────────────────────────────────────────────────── */
-function WhyJoinSection() {
+function SliderField({ label, value, onChange, min, max, display }: {
+  label: string; value: number; onChange: (v: number) => void; min: number; max: number; display: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <label className="text-sm font-semibold text-gray-700">{label}</label>
+        <span className="text-sm font-bold text-[#0A3855] bg-[#0A3855]/8 px-2.5 py-0.5 rounded-md">{display}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full"
+      />
+    </div>
+  );
+}
+
+function ResultCard({ label, value, variant }: { label: string; value: string; variant: "light" | "primary" | "dark" }) {
+  const styles = {
+    light: "bg-gray-50 text-gray-900",
+    primary: "bg-[#E5EDF1] text-[#0A3855]",
+    dark: "bg-gradient-to-br from-[#0A3855] to-[#0A3855]/90 text-white",
+  };
+  const labelColor = { light: "text-gray-400", primary: "text-[#0A3855]/60", dark: "text-white/60" };
+
+  return (
+    <div className={`rounded-xl p-5 text-center ${styles[variant]}`}>
+      <p className={`text-[11px] font-medium mb-1.5 ${labelColor[variant]}`}>{label}</p>
+      <p className="text-2xl font-extrabold">{value}</p>
+    </div>
+  );
+}
+
+/* ─── Features ────────────────────────────────────────────────── */
+function FeaturesSection() {
   const features = [
     {
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      title: "Commissions attractives",
-      description:
-        "Percevez des commissions recurrentes sur chaque client actif. Plus vos clients sont fideles, plus vos revenus augmentent.",
+      icon: "💰",
+      title: "Commission à la souscription",
+      desc: "100€ par client qui souscrit via votre lien. Versement annuel garanti.",
     },
     {
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-      title: "Dashboard en temps reel",
-      description:
-        "Suivez vos leads, conversions et revenus en direct. Visualisez vos performances et optimisez votre strategie.",
+      icon: "📊",
+      title: "Dashboard temps réel",
+      desc: "Suivez vos leads, conversions et commissions. Données synchronisées avec HubSpot.",
     },
     {
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-      ),
-      title: "Support dedie",
-      description:
-        "Un Customer Success Manager vous accompagne pour maximiser vos conversions avec des outils et conseils personnalises.",
+      icon: "🔗",
+      title: "3 façons de référer",
+      desc: "Lien d'inscription, formulaire de contact ou lien de prise de RDV. À vous de choisir.",
+    },
+    {
+      icon: "🧰",
+      title: "Kit marketing complet",
+      desc: "Templates email, argumentaire, code promo personnalisé et agenda fiscal.",
+    },
+    {
+      icon: "🤝",
+      title: "Support dédié",
+      desc: "Coline, votre contact partenariat, vous accompagne pour maximiser vos conversions.",
+    },
+    {
+      icon: "📈",
+      title: "Benchmark anonyme",
+      desc: "Comparez votre taux de conversion avec la moyenne de votre secteur d'activité.",
     },
   ];
 
   return (
-    <section className="py-20 bg-gray-50">
-      <div className="max-w-5xl mx-auto px-6">
-        <div className="text-center mb-12">
+    <section className="py-24 bg-gray-50/80">
+      <div className="max-w-6xl mx-auto px-6">
+        <div className="text-center mb-14">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-3">
-            Pourquoi rejoindre le programme ?
+            Tout ce dont vous avez besoin
           </h2>
           <p className="text-sm text-gray-500 max-w-md mx-auto">
-            Tout ce dont vous avez besoin pour generer des revenus complementaires.
+            Des outils pensés pour les professionnels de l&apos;immobilier.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((f) => (
-            <Card key={f.title} padding="lg" className="text-center hover:shadow-md transition-shadow">
-              <div className="w-12 h-12 rounded-xl bg-[#0A3855]/10 flex items-center justify-center text-[#0A3855] mx-auto mb-4">
-                {f.icon}
-              </div>
-              <h3 className="text-sm font-bold text-gray-900 mb-2">{f.title}</h3>
-              <p className="text-xs text-gray-500 leading-relaxed">{f.description}</p>
+            <Card key={f.title} className="group hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 border-0 shadow-sm">
+              <CardContent className="p-6">
+                <div className="text-2xl mb-4">{f.icon}</div>
+                <h3 className="text-sm font-bold text-gray-900 mb-2">{f.title}</h3>
+                <p className="text-xs text-gray-500 leading-relaxed">{f.desc}</p>
+              </CardContent>
             </Card>
           ))}
         </div>
@@ -312,40 +334,39 @@ function WhyJoinSection() {
   );
 }
 
-/* ────────────────────────────────────────────────────────────── */
-/* HOW IT WORKS                                                  */
-/* ────────────────────────────────────────────────────────────── */
+/* ─── How it works ────────────────────────────────────────────── */
 function HowItWorksSection() {
   const steps = [
-    { num: 1, title: "Inscription", desc: "Creez votre compte partenaire en 2 minutes. Coline vous contacte pour finaliser." },
-    { num: 2, title: "Recevez votre kit", desc: "Lien affilie, code promo, templates email — tout de suite apres signature." },
-    { num: 3, title: "Partagez", desc: "3 options : lien direct, formulaire de contact ou lien de RDV." },
-    { num: 4, title: "Gagnez", desc: "Commission fixe versee pour chaque 1re souscription de vos clients." },
+    { icon: "📝", title: "Inscrivez-vous", desc: "Créez votre compte en 2 minutes. Coline vous contacte sous 48h." },
+    { icon: "📦", title: "Recevez votre kit", desc: "Lien affilié, code promo, templates email — tout est prêt." },
+    { icon: "📤", title: "Partagez", desc: "Lien direct, formulaire ou RDV. 3 façons de référer vos clients." },
+    { icon: "💶", title: "Gagnez", desc: "100€ par 1ère souscription. Versement annuel automatique." },
   ];
 
   return (
-    <section className="py-20 bg-white">
+    <section className="py-24 bg-white">
       <div className="max-w-5xl mx-auto px-6">
-        <div className="text-center mb-12">
+        <div className="text-center mb-14">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-3">
-            Comment ca marche ?
+            Comment ça marche ?
           </h2>
-          <p className="text-sm text-gray-500 max-w-md mx-auto">
-            4 etapes simples pour commencer a generer des revenus.
+          <p className="text-sm text-gray-500">
+            4 étapes simples pour commencer à générer des revenus.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {steps.map((s) => (
-            <div key={s.num} className="relative text-center">
-              <div className="w-10 h-10 rounded-full bg-[#0A3855] text-white font-bold text-sm flex items-center justify-center mx-auto mb-4 shadow-md">
-                {s.num}
-              </div>
-              {/* Connector line between steps */}
-              {s.num < 4 && (
-                <div className="hidden lg:block absolute top-5 left-[calc(50%+24px)] w-[calc(100%-48px)] h-px bg-gray-200" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {steps.map((s, i) => (
+            <div key={i} className="relative text-center group">
+              {/* Connector */}
+              {i < 3 && (
+                <div className="hidden lg:block absolute top-7 left-[calc(50%+28px)] w-[calc(100%-56px)] border-t-2 border-dashed border-gray-200" />
               )}
-              <h3 className="text-sm font-bold text-gray-900 mb-1">{s.title}</h3>
+              <div className="w-14 h-14 rounded-2xl bg-[#0A3855] text-2xl flex items-center justify-center mx-auto mb-4 shadow-md shadow-[#0A3855]/20 group-hover:scale-105 transition-transform">
+                {s.icon}
+              </div>
+              <div className="text-[10px] font-bold text-[#0A3855] mb-2">ÉTAPE {i + 1}</div>
+              <h3 className="text-sm font-bold text-gray-900 mb-1.5">{s.title}</h3>
               <p className="text-xs text-gray-500 leading-relaxed">{s.desc}</p>
             </div>
           ))}
@@ -355,55 +376,69 @@ function HowItWorksSection() {
   );
 }
 
-/* ────────────────────────────────────────────────────────────── */
-/* TESTIMONIALS                                                  */
-/* ────────────────────────────────────────────────────────────── */
+/* ─── Testimonials ────────────────────────────────────────────── */
 function TestimonialsSection() {
   const testimonials = [
     {
-      quote: "Qlower Pro m'a permis de generer un revenu complementaire significatif tout en apportant une vraie valeur a mes clients investisseurs.",
+      quote: "Qlower Pro m'a permis de générer un revenu complémentaire significatif tout en apportant une vraie valeur à mes clients investisseurs.",
       name: "Marie D.",
-      role: "CGP - Paris",
+      role: "CGP",
+      city: "Paris",
+      metric: "12 clients référés",
     },
     {
-      quote: "Le dashboard est super clair, je suis mes conversions en temps reel. Le support est reactif et les commissions tombent chaque mois.",
+      quote: "Le dashboard est super clair, je suis mes conversions en temps réel. Le support est réactif et les commissions tombent chaque année.",
       name: "Thomas L.",
-      role: "Agent immobilier - Lyon",
+      role: "Agent immobilier",
+      city: "Lyon",
+      metric: "24% de conversion",
     },
     {
-      quote: "En 3 mois, j'ai deja 25 clients actifs sur Qlower. Le programme est simple et rentable.",
+      quote: "En 3 mois, j'ai déjà 25 clients actifs sur Qlower. Le programme est simple et rentable.",
       name: "Sophie M.",
-      role: "Courtiere - Bordeaux",
+      role: "Courtière",
+      city: "Bordeaux",
+      metric: "2 500€ de commissions",
     },
   ];
 
   return (
-    <section className="py-20 bg-gray-50">
-      <div className="max-w-5xl mx-auto px-6">
-        <div className="text-center mb-12">
+    <section className="py-24 bg-[#FFF5ED]/50">
+      <div className="max-w-6xl mx-auto px-6">
+        <div className="text-center mb-14">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-3">
             Ils nous font confiance
           </h2>
+          <p className="text-sm text-gray-500">Plus de 28 partenaires actifs dans toute la France.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {testimonials.map((t) => (
-            <Card key={t.name} padding="lg" className="hover:shadow-md transition-shadow">
-              {/* Stars */}
-              <div className="flex gap-0.5 mb-3 text-amber-400">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <svg key={i} className="w-4 h-4 fill-current" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-              <p className="text-sm text-gray-600 leading-relaxed mb-4 italic">
-                &ldquo;{t.quote}&rdquo;
-              </p>
-              <div>
-                <p className="text-sm font-bold text-gray-900">{t.name}</p>
-                <p className="text-xs text-gray-400">{t.role}</p>
-              </div>
+            <Card key={t.name} className="hover:shadow-lg transition-shadow border-0 shadow-sm">
+              <CardContent className="p-6 flex flex-col h-full">
+                {/* Stars */}
+                <div className="flex gap-0.5 mb-4 text-[#F6CCA4]">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <svg key={i} className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
+                </div>
+
+                <p className="text-sm text-gray-600 leading-relaxed mb-5 flex-1">
+                  &ldquo;{t.quote}&rdquo;
+                </p>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{t.name}</p>
+                    <p className="text-xs text-gray-400">{t.role} · {t.city}</p>
+                  </div>
+                  <Badge variant="secondary" className="text-[10px] bg-[#E5EDF1] text-[#0A3855] border-0">
+                    {t.metric}
+                  </Badge>
+                </div>
+              </CardContent>
             </Card>
           ))}
         </div>
@@ -412,38 +447,53 @@ function TestimonialsSection() {
   );
 }
 
-/* ────────────────────────────────────────────────────────────── */
-/* BOTTOM CTA                                                    */
-/* ────────────────────────────────────────────────────────────── */
-function BottomCTASection({ onLogin, onRegister }: { onLogin: () => void; onRegister: () => void }) {
+/* ─── CTA ─────────────────────────────────────────────────────── */
+function CtaSection({ onRegister }: { onRegister: () => void }) {
   return (
-    <section className="py-20 bg-gradient-to-br from-[#0A3855] to-[#3a7199]">
-      <div className="max-w-3xl mx-auto px-6 text-center">
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-4">
-          Rejoignez l&apos;ecosysteme Qlower
-        </h2>
-        <p className="text-sm text-white/80 mb-8 max-w-md mx-auto leading-relaxed">
-          Gestionnaire, conciergerie, agent, CGP, experts-comptables : aidons vos clients
-          a payer moins d&apos;impots.
-        </p>
-        <div className="flex gap-3 justify-center flex-wrap">
-          <button
-            onClick={onRegister}
-            className="px-8 py-3 rounded-xl bg-[#F6CCA4] text-[#1C1C1C] text-sm font-bold cursor-pointer hover:bg-[#F5C89A] transition shadow-lg"
-          >
-            Creer mon espace partenaire
-          </button>
-          <button
-            onClick={onLogin}
-            className="px-8 py-3 rounded-xl border border-white/50 bg-white/15 text-white text-sm font-medium cursor-pointer hover:bg-white/25 transition"
-          >
-            Se connecter
-          </button>
+    <section className="py-24">
+      <div className="max-w-4xl mx-auto px-6">
+        <div className="relative bg-[#0A3855] rounded-3xl px-8 py-16 sm:px-16 text-center overflow-hidden">
+          {/* Decorative */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#F6CCA4]/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+
+          <div className="relative">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-4">
+              Prêt à rejoindre l&apos;écosystème Qlower ?
+            </h2>
+            <p className="text-sm text-white/70 mb-8 max-w-md mx-auto leading-relaxed">
+              CGP, agents immobiliers, courtiers, conciergeries, experts-comptables — créez votre espace partenaire en 2 minutes.
+            </p>
+            <button
+              onClick={onRegister}
+              className="px-8 py-3.5 rounded-xl bg-[#F6CCA4] text-[#0A3855] text-sm font-bold cursor-pointer hover:bg-[#F5C89A] transition-all shadow-lg shadow-black/20 hover:shadow-xl hover:-translate-y-0.5"
+            >
+              Créer mon espace partenaire — gratuit
+            </button>
+            <p className="text-xs text-white/40 mt-5">
+              Inscription gratuite · Aucun engagement · Support inclus
+            </p>
+          </div>
         </div>
-        <p className="text-xs text-white/60 mt-5">
-          Inscription gratuite &middot; Aucun engagement &middot; Support inclus
-        </p>
       </div>
     </section>
+  );
+}
+
+/* ─── Footer ──────────────────────────────────────────────────── */
+function Footer() {
+  return (
+    <footer className="border-t border-gray-100 py-8">
+      <div className="max-w-6xl mx-auto px-6 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-[#0A3855] flex items-center justify-center text-white text-xs font-bold">Q</div>
+          <span className="text-xs text-gray-400">&copy; {new Date().getFullYear()} Qlower. Tous droits réservés.</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <Link href="/login" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Connexion</Link>
+          <Link href="/register" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Inscription</Link>
+        </div>
+      </div>
+    </footer>
   );
 }

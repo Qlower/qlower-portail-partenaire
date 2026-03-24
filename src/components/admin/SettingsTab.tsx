@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, Button, PasswordInput, Alert } from "@/components/ui";
+import { Card, Button, Input, Alert, AlertDescription, Label } from "@/components/ui";
 
 export default function SettingsTab() {
   const { supabase, user } = useAuth();
@@ -12,6 +12,9 @@ export default function SettingsTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,35 +58,59 @@ export default function SettingsTab() {
         <h4 className="font-semibold text-gray-900 mb-4">Changer le mot de passe</h4>
 
         {error && (
-          <Alert type="error" className="mb-4">
-            {error}
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
         {success && (
-          <Alert type="success" className="mb-4">
-            {success}
+          <Alert className="mb-4">
+            <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <PasswordInput
-            label="Mot de passe actuel"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            placeholder="Mot de passe actuel"
-          />
-          <PasswordInput
-            label="Nouveau mot de passe"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Minimum 8 caracteres"
-          />
-          <PasswordInput
-            label="Confirmer le mot de passe"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Confirmer le nouveau mot de passe"
-          />
+          <div className="flex flex-col gap-1">
+            <Label>Mot de passe actuel</Label>
+            <div className="relative">
+              <Input
+                type={showCurrent ? "text" : "password"}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Mot de passe actuel"
+              />
+              <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700">
+                {showCurrent ? "Masquer" : "Afficher"}
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label>Nouveau mot de passe</Label>
+            <div className="relative">
+              <Input
+                type={showNew ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Minimum 8 caracteres"
+              />
+              <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700">
+                {showNew ? "Masquer" : "Afficher"}
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label>Confirmer le mot de passe</Label>
+            <div className="relative">
+              <Input
+                type={showConfirm ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirmer le nouveau mot de passe"
+              />
+              <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700">
+                {showConfirm ? "Masquer" : "Afficher"}
+              </button>
+            </div>
+          </div>
 
           <Button type="submit" disabled={loading}>
             {loading ? "Mise a jour..." : "Mettre a jour le mot de passe"}

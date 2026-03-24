@@ -6,7 +6,14 @@ import { usePartner } from "@/hooks/usePartnerData";
 import { useAddReferral } from "@/hooks/useMutations";
 import { isValidEmail, buildRdvLink } from "@/services/links";
 import { calcCommission } from "@/services/commission";
-import { Button, Input, Select, Alert, Card, CopyButton } from "@/components/ui";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/CopyButton";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import type { Partner } from "@/types";
 
 interface ReferralFormProps {
@@ -71,101 +78,176 @@ export default function ReferralForm({ partner }: ReferralFormProps) {
   if (success) {
     const rdvLink = buildRdvLink(partner.utm);
     return (
-      <Card>
-        <div className="text-center py-6">
-          <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-7 h-7 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+      <Card className="border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-b from-green-50/80 to-white px-6 pt-8 pb-2">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center mb-4 shadow-sm">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Contact enregistre !</h3>
+            <p className="text-sm text-gray-500">
+              {prenom} {nom} a ete synchronise avec HubSpot.
+            </p>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">Contact enregistre !</h3>
-          <p className="text-sm text-gray-500 mb-6">
-            {prenom} {nom} a ete synchronise avec HubSpot.
-          </p>
-
-          <div className="bg-gray-50 rounded-xl p-4 mb-4">
-            <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">
+        </div>
+        <CardContent className="space-y-5 pt-5">
+          <div className="bg-[#E5EDF1]/40 border border-[#0A3855]/10 rounded-xl p-4">
+            <p className="text-[11px] text-[#0A3855]/60 font-semibold uppercase tracking-wider mb-2">
               Lien RDV personnalise
             </p>
             <div className="flex items-center gap-2">
-              <span className="flex-1 truncate text-sm text-gray-700 bg-white rounded-lg border border-gray-200 px-3 py-2">
+              <code className="flex-1 truncate text-sm text-[#0A3855] bg-white rounded-lg border border-[#0A3855]/10 px-3 py-2.5 font-mono">
                 {rdvLink}
-              </span>
+              </code>
               <CopyButton text={rdvLink} label="Copier" />
             </div>
           </div>
 
-          <Button
-            variant="outline"
-            onClick={() => {
-              setSuccess(false);
-              setPrenom("");
-              setNom("");
-              setEmail("");
-              setTel("");
-              setBiens("1");
-              setComment("");
-            }}
-          >
-            Ajouter un autre contact
-          </Button>
-        </div>
+          <Separator />
+
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSuccess(false);
+                setPrenom("");
+                setNom("");
+                setEmail("");
+                setTel("");
+                setBiens("1");
+                setComment("");
+              }}
+              className="border-[#0A3855]/20 text-[#0A3855] hover:bg-[#E5EDF1]/50"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Ajouter un autre contact
+            </Button>
+          </div>
+        </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
-      <h3 className="text-sm font-semibold text-gray-900 mb-4">Nouveau contact</h3>
-
-      {error && (
-        <Alert type="error" className="mb-4">
-          {error}
-        </Alert>
-      )}
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="Prenom" value={prenom} onChange={(e) => setPrenom(e.target.value)} placeholder="Prenom" />
-          <Input label="Nom" value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom" />
-        </div>
-        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" />
-        <Input label="Telephone (optionnel)" type="tel" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="06 12 34 56 78" />
-        <Select label="Nombre de biens" options={BIENS_OPTIONS} value={biens} onChange={(e) => setBiens(e.target.value)} />
-
-        <div>
-          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block">
-            Commentaire (optionnel)
-          </label>
-          <textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            rows={3}
-            placeholder="Informations complementaires..."
-            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0A3855]/30 focus:border-[#0A3855] transition resize-none"
-          />
-        </div>
-
-        {/* Commission estimate */}
-        {estimation.total > 0 && (
-          <div className="bg-[#0A3855]/5 border border-[#0A3855]/10 rounded-xl p-4">
-            <p className="text-xs text-gray-500 font-medium mb-1">Commission estimee</p>
-            <p className="text-xl font-bold text-[#0A3855]">{estimation.total} &euro;</p>
-            <div className="mt-2 space-y-1">
-              {estimation.detail.map((d, i) => (
-                <div key={i} className="flex justify-between text-xs text-gray-500">
-                  <span>{d.label}</span>
-                  <span className="font-medium text-gray-700">{d.calc}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+    <Card className="border-gray-200 shadow-sm">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-sm font-semibold text-gray-900">Nouveau contact</CardTitle>
+        <CardDescription className="text-xs text-gray-500">
+          Renseignez les informations de votre contact pour l&apos;ajouter au suivi.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {error && (
+          <Alert variant="destructive" className="mb-5 border-red-200 bg-red-50">
+            <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <AlertDescription className="text-red-700">{error}</AlertDescription>
+          </Alert>
         )}
 
-        <Button type="submit" disabled={addReferral.isPending} className="w-full mt-1">
-          {addReferral.isPending ? "Envoi en cours..." : "Envoyer le contact"}
-        </Button>
-      </form>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-gray-700">Prenom</Label>
+              <Input
+                value={prenom}
+                onChange={(e) => setPrenom(e.target.value)}
+                placeholder="Prenom"
+                className="border-gray-200 focus:border-[#0A3855] focus:ring-[#0A3855]/20"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-gray-700">Nom</Label>
+              <Input
+                value={nom}
+                onChange={(e) => setNom(e.target.value)}
+                placeholder="Nom"
+                className="border-gray-200 focus:border-[#0A3855] focus:ring-[#0A3855]/20"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-700">Email</Label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@example.com"
+              className="border-gray-200 focus:border-[#0A3855] focus:ring-[#0A3855]/20"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-700">Telephone (optionnel)</Label>
+            <Input
+              type="tel"
+              value={tel}
+              onChange={(e) => setTel(e.target.value)}
+              placeholder="06 12 34 56 78"
+              className="border-gray-200 focus:border-[#0A3855] focus:ring-[#0A3855]/20"
+            />
+          </div>
+
+          <Select label="Nombre de biens" options={BIENS_OPTIONS} value={biens} onChange={(e) => setBiens(e.target.value)} />
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-gray-700">Commentaire (optionnel)</Label>
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={3}
+              placeholder="Informations complementaires..."
+              className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 text-sm bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0A3855]/20 focus:border-[#0A3855] transition-all resize-none"
+            />
+          </div>
+
+          {/* Commission estimate */}
+          {estimation.total > 0 && (
+            <div className="relative overflow-hidden rounded-xl border border-green-200 bg-gradient-to-br from-green-50/80 to-emerald-50/50 p-4">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-green-100/30 rounded-full -translate-y-8 translate-x-8" />
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-xs font-semibold text-green-800">Commission estimee</p>
+                </div>
+                <p className="text-2xl font-bold text-green-700 mb-2">{estimation.total} &euro;</p>
+                <Separator className="bg-green-200/60 my-2" />
+                <div className="space-y-1">
+                  {estimation.detail.map((d, i) => (
+                    <div key={i} className="flex justify-between text-xs">
+                      <span className="text-green-700/70">{d.label}</span>
+                      <span className="font-semibold text-green-800">{d.calc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            disabled={addReferral.isPending}
+            className="w-full bg-[#0A3855] hover:bg-[#0A3855]/90 text-white shadow-sm mt-2"
+          >
+            {addReferral.isPending ? (
+              <span className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Envoi en cours...
+              </span>
+            ) : (
+              "Envoyer le contact"
+            )}
+          </Button>
+        </form>
+      </CardContent>
     </Card>
   );
 }

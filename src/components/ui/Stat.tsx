@@ -1,5 +1,7 @@
+import { ReactNode } from "react";
+
 interface StatProps {
-  icon: string;
+  icon: ReactNode;
   value: string | number;
   label: string;
   color?: string;
@@ -8,11 +10,17 @@ interface StatProps {
 
 export function Stat({ icon, value, label, subtitle }: StatProps) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
-      <div className="text-xl mb-1">{icon}</div>
-      <div className="text-2xl font-bold text-gray-900">{value}</div>
-      <div className="text-xs text-gray-500 mt-1 leading-tight">{label}</div>
-      {subtitle && <div className="text-[10px] text-gray-400 mt-1">{subtitle}</div>}
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-lg bg-[#E5EDF1] flex items-center justify-center text-[#0A3855] shrink-0">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xl font-bold text-gray-900 leading-tight">{value}</p>
+          <p className="text-xs text-gray-500 truncate">{label}</p>
+          {subtitle && <p className="text-[10px] text-gray-400">{subtitle}</p>}
+        </div>
+      </div>
     </div>
   );
 }
