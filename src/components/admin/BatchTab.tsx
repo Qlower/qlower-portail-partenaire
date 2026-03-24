@@ -5,11 +5,11 @@ import type { PartnerType, ContratType } from "@/types";
 import { PARTNER_TYPES } from "@/services/constants";
 import { useBatchCreatePartners } from "@/hooks/useAdminData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Select } from "@/components/ui/Select";
+import { Select } from "@/components/ui/select-custom";
 import {
   Upload,
   Plus,

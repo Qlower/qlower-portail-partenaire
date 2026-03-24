@@ -2,9 +2,9 @@
 
 import { useInvoices, useLeads } from "@/hooks/usePartnerData";
 import { calcCommission, COMM_LABELS } from "@/services/commission";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Stat } from "@/components/ui/Stat";
+import { Stat } from "@/components/ui/stat";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { Partner, Invoice } from "@/types";

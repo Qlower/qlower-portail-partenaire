@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { CommissionRule, Tranche } from "@/types";
 import { COMM_LABELS, DEFAULT_TRANCHES, calcCommission } from "@/services/commission";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/Input";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Plus,

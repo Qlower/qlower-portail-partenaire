@@ -4,7 +4,7 @@ import { calcCommission } from "@/services/commission";
 import { useAdminPartners } from "@/hooks/useAdminData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Stat } from "@/components/ui/Stat";
+import { Stat } from "@/components/ui/stat";
 import { Loader2, Handshake, Users, UserCheck, Coins } from "lucide-react";
 
 export default function StatsTab() {

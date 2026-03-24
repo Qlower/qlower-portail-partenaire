@@ -5,7 +5,7 @@ import type { Partner } from "@/types";
 import { calcCommission, COMM_LABELS } from "@/services/commission";
 import { useAdminPartners } from "@/hooks/useAdminData";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {

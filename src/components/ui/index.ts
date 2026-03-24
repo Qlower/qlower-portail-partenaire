@@ -1,11 +1,11 @@
-export { Button, buttonVariants } from "./Button";
+export { Button, buttonVariants } from "./button";
 export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./card";
-export { Input } from "./Input";
+export { Input } from "./input";
 export { Label } from "./label";
 export { Badge, badgeVariants } from "./badge";
 export { Alert, AlertTitle, AlertDescription } from "./alert";
 export { Separator } from "./separator";
-export { Select } from "./Select";
-export { Stat } from "./Stat";
-export { PageHeader } from "./PageHeader";
-export { CopyButton } from "./CopyButton";
+export { Select } from "./select-custom";
+export { Stat } from "./stat";
+export { PageHeader } from "./page-header";
+export { CopyButton } from "./copy-button";

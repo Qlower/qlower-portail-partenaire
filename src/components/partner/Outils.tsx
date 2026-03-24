@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { buildSignupLink } from "@/services/links";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CopyButton } from "@/components/ui/CopyButton";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { Partner } from "@/types";

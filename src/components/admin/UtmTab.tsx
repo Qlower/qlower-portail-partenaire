@@ -5,12 +5,12 @@ import type { Partner, PartnerType } from "@/types";
 import { PARTNER_TYPES } from "@/services/constants";
 import { useAdminPartners } from "@/hooks/useAdminData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/Select";
-import { CopyButton } from "@/components/ui/CopyButton";
+import { Select } from "@/components/ui/select-custom";
+import { CopyButton } from "@/components/ui/copy-button";
 import {
   Loader2,
   Link2,
