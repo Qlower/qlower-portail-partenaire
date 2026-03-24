@@ -37,9 +37,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const partner = partnerById || partnerByUser;
   const partnerLoading = (partnerIdFromMeta ? loadingById : false) || (!partnerIdFromMeta && user?.id ? loadingByUser : false);
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
   }, [authLoading, user, router]);
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   // Derive active module from pathname
   const segments = pathname.split("/");
@@ -70,13 +77,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
     );
   }
-
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // Close sidebar on route change (mobile)
-  useEffect(() => {
-    setSidebarOpen(false);
-  }, [pathname]);
 
   const handleNavigate = (key: string) => {
     router.push(key === "dashboard" ? "/dashboard" : `/dashboard/${key}`);
