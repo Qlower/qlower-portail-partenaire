@@ -1,33 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
-import crypto from "crypto";
 
-const HS_CLIENT_SECRET = process.env.HUBSPOT_CLIENT_SECRET || "";
 const HS_TOKEN = process.env.HUBSPOT_TOKEN!;
 const HS_BASE = "https://api.hubapi.com";
 
-// ── Verify HubSpot signature ─────────────────────────────────
-// v2: SHA-256(clientSecret + requestBody)
-// v3: SHA-256(clientSecret + method + url + body) — only for public apps
-function verifySignature(body: string, request: NextRequest): boolean {
-  if (!HS_CLIENT_SECRET) return true; // no secret = skip verification
+// ── Verify webhook authenticity ──────────────────────────────
+// Uses a shared secret token in the URL: ?token=WEBHOOK_SECRET
+// HubSpot signature verification is unreliable with Private Apps
+// because the URL seen by Vercel differs from what HubSpot uses for signing.
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
 
-  // Try v3 first (x-hubspot-signature-v3)
-  const sigV3 = request.headers.get("x-hubspot-signature-v3");
-  if (sigV3) {
-    const src = HS_CLIENT_SECRET + "POST" + request.url + body;
-    return crypto.createHash("sha256").update(src).digest("hex") === sigV3;
-  }
+function verifyRequest(request: NextRequest): boolean {
+  // If no secret configured, allow all (dev mode)
+  if (!WEBHOOK_SECRET) return true;
 
-  // Try v2 (x-hubspot-signature)
-  const sigV2 = request.headers.get("x-hubspot-signature");
-  if (sigV2) {
-    const src = HS_CLIENT_SECRET + body;
-    return crypto.createHash("sha256").update(src).digest("hex") === sigV2;
-  }
-
-  // No signature header — allow in dev, reject in prod
-  return process.env.NODE_ENV === "development";
+  // Check ?token= query param
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token");
+  return token === WEBHOOK_SECRET;
 }
 
 // ── Fetch full contact from HubSpot ─────────────────────────
@@ -137,8 +127,8 @@ async function upsertLead(
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
 
-  // Verify signature
-  if (!verifySignature(rawBody, request)) {
+  // Verify request authenticity
+  if (!verifyRequest(request)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
