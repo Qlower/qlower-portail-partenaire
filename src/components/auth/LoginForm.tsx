@@ -30,8 +30,9 @@ export default function LoginForm() {
 
     setLoading(true);
     try {
-      await signIn(email, password);
-      router.push("/dashboard");
+      const { session } = await signIn(email, password);
+      const role = session?.user?.user_metadata?.role;
+      router.push(role === "admin" ? "/admin" : "/dashboard");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Erreur de connexion.";
       setError(message === "Invalid login credentials" ? "Email ou mot de passe incorrect." : message);

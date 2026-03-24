@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import AdminPanel from "@/components/admin/AdminPanel";
+import { Loader2, ShieldAlert } from "lucide-react";
 
 export default function AdminPage() {
   const { user, loading } = useAuth();
@@ -19,8 +20,9 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A3855]" />
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <Loader2 className="size-6 text-[#0A3855] animate-spin" />
+        <p className="text-sm text-gray-400">Chargement...</p>
       </div>
     );
   }

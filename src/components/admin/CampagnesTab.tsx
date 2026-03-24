@@ -1,9 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { Partner, ContratType } from "@/types";
-import { api } from "@/lib/axios";
-import { Card, Button, Select, Badge, Alert, AlertDescription } from "@/components/ui";
+import { useAdminPartners } from "@/hooks/useAdminData";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select } from "@/components/ui/Select";
+import {
+  Loader2,
+  Target,
+  FileText,
+  Send,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  Clock,
+  Info,
+  Mail,
+} from "lucide-react";
 
 type Audience = "tous" | "affiliation" | "marque_blanche";
 
@@ -51,21 +67,12 @@ const TEMPLATES: EmailTemplate[] = [
 ];
 
 export default function CampagnesTab() {
-  const [partners, setPartners] = useState<Partner[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: partners = [], isLoading: loading } = useAdminPartners();
   const [audience, setAudience] = useState<Audience>("tous");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [sentPartners, setSentPartners] = useState<Set<string>>(new Set());
   const [allSent, setAllSent] = useState(false);
-
-  useEffect(() => {
-    api
-      .get("/admin/partners")
-      .then((res) => setPartners(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
 
   const targeted = partners.filter((p) => {
     if (!p.active) return false;
@@ -84,141 +91,220 @@ export default function CampagnesTab() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A3855]" />
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <Loader2 className="size-6 text-[#0A3855] animate-spin" />
+        <p className="text-sm text-gray-400">Chargement des campagnes...</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Ciblage */}
         <Card>
-          <h4 className="font-semibold text-gray-900 mb-3">Ciblage</h4>
-          <Select
-            label="Audience"
-            value={audience}
-            onChange={(e) => {
-              setAudience(e.target.value as Audience);
-              setAllSent(false);
-              setSentPartners(new Set());
-            }}
-            options={[
-              { value: "tous", label: "Tous les partenaires actifs" },
-              { value: "affiliation", label: "Affiliation uniquement" },
-              { value: "marque_blanche", label: "Marque blanche uniquement" },
-            ]}
-          />
-          <div className="mt-3">
-            <p className="text-xs text-gray-500 mb-2">
-              {targeted.length} partenaire(s) cible(s)
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {targeted.map((p) => (
-                <Badge key={p.id} variant="secondary" className={sentPartners.has(p.id) ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"}>
-                  {p.nom}
-                </Badge>
-              ))}
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <Target className="size-4 text-[#0A3855]" />
+              Ciblage
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4">
+            <Select
+              label="Audience"
+              value={audience}
+              onChange={(e) => {
+                setAudience(e.target.value as Audience);
+                setAllSent(false);
+                setSentPartners(new Set());
+              }}
+              options={[
+                { value: "tous", label: "Tous les partenaires actifs" },
+                { value: "affiliation", label: "Affiliation uniquement" },
+                { value: "marque_blanche", label: "Marque blanche uniquement" },
+              ]}
+            />
+            <div>
+              <p className="text-xs text-gray-500 mb-2">
+                {targeted.length} partenaire(s) cible(s)
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {targeted.map((p) => (
+                  <Badge
+                    key={p.id}
+                    variant="secondary"
+                    className={
+                      sentPartners.has(p.id)
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-[#E5EDF1] text-[#0A3855] border border-[#0A3855]/10"
+                    }
+                  >
+                    {sentPartners.has(p.id) && (
+                      <CheckCircle2 className="size-3 mr-0.5" />
+                    )}
+                    {p.nom}
+                  </Badge>
+                ))}
+              </div>
             </div>
-          </div>
+          </CardContent>
         </Card>
 
         {/* Template */}
         <Card>
-          <h4 className="font-semibold text-gray-900 mb-3">Template</h4>
-          <div className="grid grid-cols-2 gap-2">
-            {TEMPLATES.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => {
-                  setSelectedTemplate(t.key);
-                  setShowPreview(false);
-                  setAllSent(false);
-                  setSentPartners(new Set());
-                }}
-                className={`text-left p-3 rounded-lg border-2 transition-all ${
-                  selectedTemplate === t.key
-                    ? "border-[#0A3855] bg-blue-50/50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <p className="text-sm font-medium text-gray-900">{t.title}</p>
-                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{t.description}</p>
-              </button>
-            ))}
-          </div>
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="size-4 text-[#0A3855]" />
+              Template
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-2 gap-3">
+              {TEMPLATES.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => {
+                    setSelectedTemplate(t.key);
+                    setShowPreview(false);
+                    setAllSent(false);
+                    setSentPartners(new Set());
+                  }}
+                  className={`text-left p-3.5 rounded-lg border-2 transition-all ${
+                    selectedTemplate === t.key
+                      ? "border-[#0A3855] bg-[#E5EDF1]/30 ring-1 ring-[#0A3855]/10"
+                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Mail className={`size-3.5 ${selectedTemplate === t.key ? "text-[#0A3855]" : "text-gray-400"}`} />
+                    <p className={`text-sm font-medium ${selectedTemplate === t.key ? "text-[#0A3855]" : "text-gray-900"}`}>
+                      {t.title}
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-500 line-clamp-2 ml-5.5">
+                    {t.description}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </CardContent>
         </Card>
       </div>
 
       {/* Preview & Send */}
       <Card>
-        <h4 className="font-semibold text-gray-900 mb-3">Previsualisation et envoi</h4>
-
-        {!selectedTemplate ? (
-          <Alert><AlertDescription>Selectionnez un template pour previsualiser.</AlertDescription></Alert>
-        ) : (
-          <>
-            <div className="flex gap-3 mb-4">
-              <Button
-                variant="secondary"
-                onClick={() => setShowPreview(!showPreview)}
-                disabled={!previewPartner}
-              >
-                {showPreview ? "Masquer apercu" : "Previsualiser"}
-              </Button>
-              <Button
-                className="bg-[#F6CCA4] text-[#1C1C1C] hover:bg-[#F5C89A]"
-                onClick={handleSendAll}
-                disabled={targeted.length === 0 || allSent}
-              >
-                {allSent
-                  ? `Envoye a ${targeted.length} partenaire(s)`
-                  : `Envoyer a ${targeted.length} partenaire(s)`}
-              </Button>
-            </div>
-
-            {/* Preview */}
-            {showPreview && template && previewPartner && (
-              <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-xs text-gray-400 mb-1">Apercu pour : {previewPartner.nom}</p>
-                <p className="text-sm font-semibold text-gray-900 mb-2">
-                  Objet : {template.subject(previewPartner)}
-                </p>
-                <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">
-                  {template.body(previewPartner)}
-                </pre>
-              </div>
-            )}
-
-            {/* Per-partner status */}
-            <div className="space-y-1.5">
-              {targeted.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between py-1.5 px-3 rounded bg-white border border-gray-100"
+        <CardHeader className="border-b">
+          <CardTitle className="flex items-center gap-2">
+            <Send className="size-4 text-[#0A3855]" />
+            Previsualisation et envoi
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {!selectedTemplate ? (
+            <Alert>
+              <Info className="size-4" />
+              <AlertDescription>
+                Selectionnez un template pour previsualiser.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPreview(!showPreview)}
+                  disabled={!previewPartner}
                 >
-                  <span className="text-sm text-gray-700">{p.nom}</span>
-                  <div className="flex items-center gap-2">
-                    {template && (
-                      <button
-                        onClick={() => setShowPreview(true)}
-                        className="text-xs text-[#0A3855] hover:underline"
-                      >
-                        Apercu
-                      </button>
-                    )}
-                    {sentPartners.has(p.id) ? (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800">Envoye</Badge>
-                    ) : (
-                      <Badge variant="secondary" className="bg-gray-100 text-gray-800">En attente</Badge>
-                    )}
+                  {showPreview ? (
+                    <>
+                      <EyeOff className="size-4 mr-1.5" />
+                      Masquer apercu
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="size-4 mr-1.5" />
+                      Previsualiser
+                    </>
+                  )}
+                </Button>
+                <Button
+                  className="bg-[#F6CCA4] text-[#6B4D2D] hover:bg-[#F0BF8E] border border-[#E8B88A]"
+                  onClick={handleSendAll}
+                  disabled={targeted.length === 0 || allSent}
+                >
+                  {allSent ? (
+                    <>
+                      <CheckCircle2 className="size-4 mr-1.5" />
+                      Envoye a {targeted.length} partenaire(s)
+                    </>
+                  ) : (
+                    <>
+                      <Send className="size-4 mr-1.5" />
+                      Envoyer a {targeted.length} partenaire(s)
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Preview */}
+              {showPreview && template && previewPartner && (
+                <Card className="bg-[#F8FAFB] border-dashed">
+                  <CardContent>
+                    <p className="text-xs text-gray-400 mb-2">
+                      Apercu pour : {previewPartner.nom}
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900 mb-3">
+                      Objet : {template.subject(previewPartner)}
+                    </p>
+                    <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed bg-white rounded-lg border border-gray-200 p-4">
+                      {template.body(previewPartner)}
+                    </pre>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Per-partner status */}
+              <div className="space-y-2">
+                {targeted.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between py-2.5 px-4 rounded-lg bg-white border border-gray-100 hover:border-gray-200 transition-colors"
+                  >
+                    <span className="text-sm text-gray-700 font-medium">{p.nom}</span>
+                    <div className="flex items-center gap-3">
+                      {template && (
+                        <button
+                          onClick={() => setShowPreview(true)}
+                          className="flex items-center gap-1 text-xs text-[#0A3855] hover:underline"
+                        >
+                          <Eye className="size-3" />
+                          Apercu
+                        </button>
+                      )}
+                      {sentPartners.has(p.id) ? (
+                        <Badge
+                          variant="secondary"
+                          className="bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        >
+                          <CheckCircle2 className="size-3 mr-0.5" />
+                          Envoye
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className="bg-gray-50 text-gray-500 border border-gray-200"
+                        >
+                          <Clock className="size-3 mr-0.5" />
+                          En attente
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </>
-        )}
+          )}
+        </CardContent>
       </Card>
     </div>
   );

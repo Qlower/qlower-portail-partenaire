@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { PartnerType, ContratType } from "@/types";
 import { PARTNER_TYPES } from "@/services/constants";
-import { api } from "@/lib/axios";
+import { useBatchCreatePartners } from "@/hooks/useAdminData";
 import { Card, Button, Input, Select, Badge, Alert, AlertDescription } from "@/components/ui";
 
 interface BatchRow {
@@ -62,15 +62,17 @@ export default function BatchTab() {
 
   const validRows = rows.filter((r) => r.nom.trim());
 
+  const batchMutation = useBatchCreatePartners();
+
   const handleCreate = async () => {
     if (validRows.length === 0) return;
     setCreating(true);
     setError("");
     try {
-      const res = await api.post("/admin/batch", { partners: validRows });
-      setCreated(res.data.created || []);
+      const result = await batchMutation.mutateAsync(validRows);
+      setCreated((result.created || []) as unknown as CreatedPartner[]);
     } catch {
-      setError("Erreur lors de la creation batch");
+      setError("Erreur lors de la création batch");
     } finally {
       setCreating(false);
     }

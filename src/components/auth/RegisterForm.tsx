@@ -9,7 +9,7 @@ import { useOnboardPartner } from "@/hooks/useMutations";
 import { isValidEmail, slug } from "@/services/links";
 import { METIERS } from "@/services/constants";
 import { DEFAULT_TRANCHES } from "@/services/commission";
-import { api } from "@/lib/axios";
+import { useCreatePartner } from "@/hooks/useAdminData";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +39,7 @@ const initial: FormData = {
 export default function RegisterForm() {
   const { signUp, supabase } = useAuth();
   const onboard = useOnboardPartner();
+  const createPartner = useCreatePartner();
   const router = useRouter();
 
   const [step, setStep] = useState<StepIndex>(0);
@@ -90,7 +91,7 @@ export default function RegisterForm() {
         company: form.company, metier: form.metier, partner_id: partnerId,
       });
 
-      await api.post("/admin/partners", {
+      await createPartner.mutateAsync({
         id: partnerId, nom: form.company || `${form.prenom} ${form.nom}`,
         email: form.email, type: "autre", contrat: "affiliation", code, utm,
         comm_rules: [

@@ -10,7 +10,10 @@ export default function Page() {
   const router = useRouter();
 
   useEffect(() => {
-    if (user) router.replace("/dashboard");
+    if (user) {
+      const role = user.user_metadata?.role;
+      router.replace(role === "admin" ? "/admin" : "/dashboard");
+    }
   }, [user, router]);
 
   if (loading) {

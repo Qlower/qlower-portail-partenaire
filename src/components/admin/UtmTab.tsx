@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { Partner, PartnerType } from "@/types";
 import { PARTNER_TYPES } from "@/services/constants";
-import { api } from "@/lib/axios";
+import { useAdminPartners } from "@/hooks/useAdminData";
 import { Card, Button, Input, Select, CopyButton, Badge, Label } from "@/components/ui";
 
 const BASE_URLS = [
@@ -22,8 +22,7 @@ interface SavedLink {
 }
 
 export default function UtmTab() {
-  const [partners, setPartners] = useState<Partner[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: partners = [], isLoading: loading } = useAdminPartners();
   const [partnerSearch, setPartnerSearch] = useState("");
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [type, setType] = useState<PartnerType>("cgp");
@@ -32,14 +31,6 @@ export default function UtmTab() {
   const [customUrl, setCustomUrl] = useState("");
   const [savedLinks, setSavedLinks] = useState<SavedLink[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<"generator" | "saved">("generator");
-
-  useEffect(() => {
-    api
-      .get("/admin/partners")
-      .then((res) => setPartners(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
 
   const filteredPartners = partners.filter(
     (p) =>
