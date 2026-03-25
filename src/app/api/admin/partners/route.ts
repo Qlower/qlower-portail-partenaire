@@ -77,25 +77,51 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Sync UTM value to HubSpot partenaire__lead_ enum
+  // Sync to HubSpot: add enum value + create automation workflow
   const HS_TOKEN = process.env.HUBSPOT_TOKEN;
   if (HS_TOKEN && utm) {
+    const HS_BASE = "https://api.hubapi.com";
+    const hsHeaders = { Authorization: `Bearer ${HS_TOKEN}`, "Content-Type": "application/json" };
+
     try {
-      const propRes = await fetch("https://api.hubapi.com/crm/v3/properties/contacts/partenaire__lead_", {
-        headers: { Authorization: `Bearer ${HS_TOKEN}` },
+      // 1. Add UTM value to partenaire__lead_ enum
+      const propRes = await fetch(`${HS_BASE}/crm/v3/properties/contacts/partenaire__lead_`, {
+        headers: hsHeaders,
       });
       if (propRes.ok) {
         const propData = await propRes.json();
         const options = propData.options || [];
         if (!options.some((o: { value: string }) => o.value === utm)) {
           options.push({ label: nom, value: utm, displayOrder: -1, hidden: false });
-          await fetch("https://api.hubapi.com/crm/v3/properties/contacts/partenaire__lead_", {
+          await fetch(`${HS_BASE}/crm/v3/properties/contacts/partenaire__lead_`, {
             method: "PATCH",
-            headers: { Authorization: `Bearer ${HS_TOKEN}`, "Content-Type": "application/json" },
+            headers: hsHeaders,
             body: JSON.stringify({ options }),
           });
         }
       }
+
+      // 2. Create automation workflow to auto-tag contacts with this partner's UTM
+      await fetch(`${HS_BASE}/automation/v4/flows`, {
+        method: "POST",
+        headers: hsHeaders,
+        body: JSON.stringify({
+          name: `Auto-tag partenaire: ${nom}`,
+          type: "CONTACT",
+          enabled: true,
+          triggers: [{
+            filterBranch: {
+              filterBranchType: "AND",
+              filters: [{ property: "utm_source", operator: "EQ", value: utm }],
+            },
+          }],
+          actions: [{
+            type: "SET_CONTACT_PROPERTY",
+            propertyName: "partenaire__lead_",
+            propertyValue: utm,
+          }],
+        }),
+      }).catch(() => {}); // Non-blocking if workflow creation fails
     } catch (e) {
       console.error("HubSpot sync error on partner create:", e);
     }
