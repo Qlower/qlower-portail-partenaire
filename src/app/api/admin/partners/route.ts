@@ -77,6 +77,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Sync UTM value to HubSpot partenaire__lead_ enum
+  const HS_TOKEN = process.env.HUBSPOT_TOKEN;
+  if (HS_TOKEN && utm) {
+    try {
+      const propRes = await fetch("https://api.hubapi.com/crm/v3/properties/contacts/partenaire__lead_", {
+        headers: { Authorization: `Bearer ${HS_TOKEN}` },
+      });
+      if (propRes.ok) {
+        const propData = await propRes.json();
+        const options = propData.options || [];
+        if (!options.some((o: { value: string }) => o.value === utm)) {
+          options.push({ label: nom, value: utm, displayOrder: -1, hidden: false });
+          await fetch("https://api.hubapi.com/crm/v3/properties/contacts/partenaire__lead_", {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${HS_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ options }),
+          });
+        }
+      }
+    } catch (e) {
+      console.error("HubSpot sync error on partner create:", e);
+    }
+  }
+
   return NextResponse.json(data, { status: 201 });
 }
 
@@ -90,6 +114,9 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
 
+  // Get current partner to detect UTM/name changes
+  const { data: current } = await supabase.from("partners").select("utm, nom").eq("id", id).single();
+
   const { data, error } = await supabase
     .from("partners")
     .update(updates)
@@ -99,6 +126,40 @@ export async function PATCH(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Sync to HubSpot if UTM or name changed
+  const HS_TOKEN = process.env.HUBSPOT_TOKEN;
+  const newUtm = updates.utm || current?.utm;
+  const newNom = updates.nom || current?.nom;
+  const utmChanged = updates.utm && updates.utm !== current?.utm;
+  const nomChanged = updates.nom && updates.nom !== current?.nom;
+
+  if (HS_TOKEN && (utmChanged || nomChanged)) {
+    try {
+      // Fetch current enum options
+      const propRes = await fetch("https://api.hubapi.com/crm/v3/properties/contacts/partenaire__lead_", {
+        headers: { Authorization: `Bearer ${HS_TOKEN}` },
+      });
+      if (propRes.ok) {
+        const propData = await propRes.json();
+        const options = propData.options || [];
+        const exists = options.some((o: { value: string }) => o.value === newUtm);
+
+        if (!exists) {
+          // Add new UTM value to enum
+          options.push({ label: newNom, value: newUtm, displayOrder: -1, hidden: false });
+          await fetch("https://api.hubapi.com/crm/v3/properties/contacts/partenaire__lead_", {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${HS_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ options }),
+          });
+        }
+      }
+    } catch (e) {
+      // Don't fail the update if HubSpot sync fails
+      console.error("HubSpot sync error on partner update:", e);
+    }
   }
 
   return NextResponse.json(data);
