@@ -177,8 +177,8 @@ function SimulatorSection() {
 
   const results = useMemo(() => {
     const abonnes = Math.round(clients * (convRate / 100));
-    const commission = abonnes * 100;
-    const annuel = commission * 12;
+    const annuel = abonnes * 100;
+    const commission = Math.round(annuel / 12);
     return { abonnes, commission, annuel };
   }, [clients, convRate]);
 
