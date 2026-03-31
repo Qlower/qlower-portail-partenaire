@@ -23,7 +23,7 @@ function verifyRequest(request: NextRequest): boolean {
 // ── Fetch full contact from HubSpot ─────────────────────────
 async function fetchContact(contactId: string) {
   const res = await fetch(
-    `${HS_BASE}/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,phone,partenaire__lead_,utm_source,hs_lifecyclestage,lifecyclestage,date_premier_paiement_abonnement`,
+    `${HS_BASE}/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,phone,partenaire__lead_,utm_source,hs_lifecyclestage,lifecyclestage,hs_v2_date_entered_999998694`,
     { headers: { Authorization: `Bearer ${HS_TOKEN}` } }
   );
   if (!res.ok) return null;
@@ -69,8 +69,9 @@ async function upsertLead(
   const nom = [props.firstname, props.lastname].filter(Boolean).join(" ") || props.email || "Inconnu";
   const email = props.email || "";
   const stage = mapStage(props);
-  // Commission due if HubSpot has a first subscription payment date (set once, never reset)
-  const commissionDue = !!props.date_premier_paiement_abonnement;
+  // Commission due if contact has ever entered the "User abonné" lifecycle stage (hs_v2_date_entered_999998694)
+  // This date is set by HubSpot on first entry and never reset, even after churn + re-subscription
+  const commissionDue = !!props.hs_v2_date_entered_999998694;
 
   // Check if lead already exists
   const { data: existing } = await supabase
