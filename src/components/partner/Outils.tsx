@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { buildSignupLink } from "@/services/links";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
@@ -83,8 +82,6 @@ export default function Outils({ partner }: OutilsProps) {
   const [tab, setTab] = useState<Tab>("kit");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const signupLink = buildSignupLink(partner.utm, partner.code);
-
   const tabs: { key: Tab; label: string }[] = [
     { key: "kit", label: "Mon kit" },
     { key: "agenda", label: "Agenda fiscal" },
@@ -123,44 +120,26 @@ export default function Outils({ partner }: OutilsProps) {
         <div className="space-y-4">
           <button
             onClick={() => router.push("/dashboard/kit")}
-            className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-[#0A3855] to-[#0A3855]/80 rounded-xl text-white hover:opacity-90 transition-opacity shadow-md shadow-[#0A3855]/20"
+            className="group w-full flex items-center justify-between p-5 bg-gradient-to-r from-[#0A3855] to-[#0A3855]/80 rounded-xl text-white hover:from-[#0c4a6e] hover:to-[#0c4a6e]/80 transition-all duration-200 shadow-md shadow-[#0A3855]/20 cursor-pointer"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               </div>
               <div className="text-left">
                 <p className="text-sm font-semibold">Kit partenaire complet</p>
-                <p className="text-xs text-white/60">Ressources, guides, templates, RDV</p>
+                <p className="text-xs text-white/60">Logos, guides, templates, prise de RDV</p>
+                <p className="text-xs text-[#F6CCA4] font-medium mt-1">Accéder au kit →</p>
               </div>
             </div>
-            <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            <div className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center transition-colors flex-shrink-0">
+              <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
           </button>
-
-          <Card className="border-gray-200 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <svg className="w-4 h-4 text-[#0A3855]/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
-                </svg>
-                Lien d&apos;inscription
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0">
-                  <code className="block truncate text-sm text-[#0A3855] bg-[#E5EDF1]/40 rounded-lg border border-[#0A3855]/10 px-4 py-3 font-mono">
-                    {signupLink}
-                  </code>
-                </div>
-                <CopyButton text={signupLink} />
-              </div>
-            </CardContent>
-          </Card>
 
           <Card className="border-gray-200 shadow-sm overflow-hidden">
             <CardHeader className="pb-3">
