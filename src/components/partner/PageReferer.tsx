@@ -161,7 +161,7 @@ export default function PageReferer({ partner }: PageRefererProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold text-gray-900">
-              Historique des referrals
+              Historique de vos contacts
             </CardTitle>
             {referrals && referrals.length > 0 && (
               <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855] text-xs">
@@ -183,7 +183,7 @@ export default function PageReferer({ partner }: PageRefererProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
-              <p className="text-sm font-medium text-gray-500">Aucun referral pour le moment</p>
+              <p className="text-sm font-medium text-gray-500">Aucun contact pour le moment</p>
               <p className="text-xs text-gray-400 mt-1">Vos contacts appara&icirc;tront ici une fois envoy&eacute;s</p>
             </div>
           ) : (

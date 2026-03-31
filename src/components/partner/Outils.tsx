@@ -32,7 +32,7 @@ const FISCAL_CALENDAR = [
 const FAQ_ITEMS = [
   {
     q: "Comment sont calculées mes commissions ?",
-    a: "Votre commission est fixe : 100 € par client qui souscrit à Qlower via votre lien ou formulaire. Elle est versée annuellement, pour chaque client actif sur l'année.",
+    a: "Votre commission est fixe : 100 € par client abonné qui souscrit à Qlower via votre lien ou formulaire. Elle est versée annuellement, pour chaque client abonné actif sur l'année.",
   },
   {
     q: "Quand suis-je payé ?",
@@ -40,7 +40,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Comment suivre mes contacts ?",
-    a: "Rendez-vous dans l'onglet 'Recommander' pour voir l'historique complet de vos contacts et leur statut (inscrit, abonné, payeur). Le tableau de bord se met à jour automatiquement.",
+    a: "Rendez-vous dans l'onglet 'Recommander' pour voir l'historique complet de vos contacts et leur statut (inscrit, abonné, payeur). Note : si un contact envoyé n'apparaît pas, contactez votre responsable partenariat pour vérification.",
   },
   {
     q: "Puis-je personnaliser mon lien d'inscription ?",
@@ -52,7 +52,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Comment fonctionne le programme de parrainage ?",
-    a: "Vous recevez 100 € de commission fixe pour chaque client qui souscrit à Qlower via votre lien ou formulaire de recommandation. Le suivi est automatique et visible en temps réel dans votre tableau de bord.",
+    a: "Vous recevez 100 € de commission fixe pour chaque client abonné qui souscrit à Qlower via votre lien ou formulaire de recommandation. Le suivi est visible dans votre tableau de bord.",
   },
   {
     q: "Est-il possible de passer en marque blanche ?",

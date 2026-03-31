@@ -38,16 +38,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const partnerLoading = (partnerIdFromMeta ? loadingById : false) || (!partnerIdFromMeta && user?.id ? loadingByUser : false);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [guideDone, setGuideDone] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
   }, [authLoading, user, router]);
 
-  // Close sidebar on route change (mobile)
+  // Close sidebar on route change (mobile) + check guide completion
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSidebarOpen(false);
-  }, [pathname]);
+    const done = localStorage.getItem("guide_completed") === "true";
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGuideDone(done);
+    if (!done && pathname === "/dashboard") {
+      router.replace("/dashboard/guide");
+    }
+  }, [pathname, router]);
 
   // Derive active module from pathname
   const segments = pathname.split("/");
@@ -114,7 +121,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               activeModule={activeModule}
               onNavigate={handleNavigate}
               showGuide={true}
-              guideDone={false}
+              guideDone={guideDone}
               contrat={partner.contrat}
             />
           </div>

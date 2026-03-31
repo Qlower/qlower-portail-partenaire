@@ -14,11 +14,11 @@ interface RevenusProps {
 }
 
 const TIMELINE_STEPS = [
-  { label: "Inscription partenaire", desc: "Compte cree et valide" },
-  { label: "Premier referral", desc: "Contact envoye via le portail" },
-  { label: "Premier abonne", desc: "Client ayant souscrit a Qlower" },
-  { label: "Premiere commission", desc: "Versement de la premiere commission" },
-  { label: "Objectif annuel", desc: "Atteinte de l'objectif fixe" },
+  { label: "Inscription partenaire", desc: "Compte créé et validé" },
+  { label: "Premier contact", desc: "Contact envoyé via le portail" },
+  { label: "Premier abonné", desc: "Client ayant souscrit à Qlower" },
+  { label: "Première commission", desc: "Versement de la première commission" },
+  { label: "Objectif annuel", desc: "Atteinte de l'objectif fixé" },
 ];
 
 function statusBadge(statut: Invoice["statut"]) {
@@ -38,7 +38,7 @@ export default function Revenus({ partner }: RevenusProps) {
   // Count actifs from real leads data
   const abonnes = leads?.filter((l) => l.stage === "Abonne").length || 0;
   const payeurs = leads?.filter((l) => l.stage === "Payeur").length || 0;
-  const actifs = abonnes + payeurs;
+  const actifs = abonnes;
 
   const commission = calcCommission(
     partner.comm_rules,
@@ -82,7 +82,7 @@ export default function Revenus({ partner }: RevenusProps) {
           <div className="flex items-start justify-between mb-5">
             <div>
               <p className="text-[11px] text-white/50 uppercase tracking-widest font-semibold mb-1.5">
-                Commission totale estimee
+                Commission totale estimée
               </p>
               <p className="text-4xl font-bold tracking-tight">{commission.total.toLocaleString("fr-FR")} &euro;</p>
             </div>
@@ -133,7 +133,7 @@ export default function Revenus({ partner }: RevenusProps) {
               <div>
                 <p className="text-xs text-gray-500 font-medium">En attente</p>
                 <p className="text-xl font-bold text-gray-900">{pendingTotal.toLocaleString("fr-FR")} &euro;</p>
-                <p className="text-[11px] text-gray-400">A verser</p>
+                <p className="text-[11px] text-gray-400">À verser</p>
               </div>
             </div>
           </CardContent>
@@ -166,7 +166,7 @@ export default function Revenus({ partner }: RevenusProps) {
                 </svg>
               </div>
               <div>
-                <p className="text-xs text-gray-500 font-medium">Total verse</p>
+                <p className="text-xs text-gray-500 font-medium">Total versé</p>
                 <p className="text-xl font-bold text-gray-900">{paidTotal.toLocaleString("fr-FR")} &euro;</p>
                 <p className="text-[11px] text-gray-400">Cumul</p>
               </div>

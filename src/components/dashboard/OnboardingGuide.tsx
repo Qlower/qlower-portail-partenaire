@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, Button } from "@/components/ui";
 import { buildSignupLink } from "@/services/links";
@@ -22,10 +22,24 @@ interface Step {
 
 export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGuideProps) {
   const router = useRouter();
-  const [doneSteps, setDoneSteps] = useState<Set<string>>(new Set());
+  const [doneSteps, setDoneSteps] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = localStorage.getItem("guide_done_steps");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
   const [expandedStep, setExpandedStep] = useState<string>("kit");
 
   const signupLink = buildSignupLink(utm, code);
+
+  // Persist doneSteps to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem("guide_done_steps", JSON.stringify([...doneSteps]));
+    if (doneSteps.size === 4) {
+      localStorage.setItem("guide_completed", "true");
+    }
+  }, [doneSteps]);
 
   const markDone = useCallback(
     (stepId: string) => {
@@ -113,12 +127,12 @@ export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGu
     },
     {
       id: "rdv",
-      title: "Prendre un RDV avec Coline",
+      title: "Prendre un premier rendez-vous",
       description: "Planifier un appel pour optimiser votre stratégie",
       content: (
         <div className="space-y-4">
           <p className="text-sm text-gray-600 leading-relaxed">
-            Planifiez un appel de 15 min avec Coline, votre Customer Success Manager, pour
+            Planifiez un appel avec notre responsable des partenariats pour
             personnaliser votre approche et maximiser vos conversions.
           </p>
           <div className="flex items-center gap-3 flex-wrap">

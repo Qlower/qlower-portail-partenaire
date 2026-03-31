@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import PartnersTab from "./PartnersTab";
 import CampagnesTab from "./CampagnesTab";
 import BatchTab from "./BatchTab";
@@ -8,6 +8,7 @@ import UtmTab from "./UtmTab";
 import StatsTab from "./StatsTab";
 import FacturationTab from "./FacturationTab";
 import SettingsTab from "./SettingsTab";
+import { useAdminPartners } from "@/hooks/useAdminData";
 import {
   Users,
   Megaphone,
@@ -32,6 +33,12 @@ type TabKey = (typeof TABS)[number]["key"];
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<TabKey>("partenaires");
+  const { data: partners = [] } = useAdminPartners();
+
+  const newPartnersCount = useMemo(() => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return partners.filter((p) => new Date(p.created_at) >= sevenDaysAgo).length;
+  }, [partners]);
 
   return (
     <div className="space-y-6">
@@ -40,11 +47,12 @@ export default function AdminPanel() {
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
+          const badge = tab.key === "partenaires" && newPartnersCount > 0 ? newPartnersCount : 0;
           return (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 isActive
                   ? "bg-[#0A3855] text-white shadow-sm"
                   : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
@@ -52,6 +60,11 @@ export default function AdminPanel() {
             >
               <Icon className="size-4" />
               {tab.label}
+              {badge > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                  {badge}
+                </span>
+              )}
             </button>
           );
         })}
