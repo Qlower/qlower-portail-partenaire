@@ -53,6 +53,7 @@ export interface Lead {
   mois: string | null;
   biens: number;
   hs_contact_id: string | null;
+  commission_due: boolean;
   created_at: string;
 }
 

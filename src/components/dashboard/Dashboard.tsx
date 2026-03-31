@@ -44,7 +44,7 @@ export function Dashboard({
   // Computed values
   const abonnes = leads.filter((l) => l.stage === "Abonne").length;
   const payeurs = leads.filter((l) => l.stage === "Payeur").length;
-  const actifs = abonnes;
+  const actifs = leads.filter((l) => l.commission_due).length;
   const commission = calcCommission(commRules, actifs, biensMoyens, caParClient);
 
   // Filtered leads

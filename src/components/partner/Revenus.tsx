@@ -38,7 +38,7 @@ export default function Revenus({ partner }: RevenusProps) {
   // Count actifs from real leads data
   const abonnes = leads?.filter((l) => l.stage === "Abonne").length || 0;
   const payeurs = leads?.filter((l) => l.stage === "Payeur").length || 0;
-  const actifs = abonnes;
+  const actifs = leads?.filter((l) => l.commission_due).length || 0;
 
   const commission = calcCommission(
     partner.comm_rules,

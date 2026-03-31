@@ -23,7 +23,7 @@ function verifyRequest(request: NextRequest): boolean {
 // ── Fetch full contact from HubSpot ─────────────────────────
 async function fetchContact(contactId: string) {
   const res = await fetch(
-    `${HS_BASE}/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,phone,partenaire__lead_,utm_source,hs_lifecyclestage,lifecyclestage`,
+    `${HS_BASE}/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,phone,partenaire__lead_,utm_source,hs_lifecyclestage,lifecyclestage,date_premier_paiement_abonnement`,
     { headers: { Authorization: `Bearer ${HS_TOKEN}` } }
   );
   if (!res.ok) return null;
@@ -69,24 +69,30 @@ async function upsertLead(
   const nom = [props.firstname, props.lastname].filter(Boolean).join(" ") || props.email || "Inconnu";
   const email = props.email || "";
   const stage = mapStage(props);
+  // Commission due if HubSpot has a first subscription payment date (set once, never reset)
+  const commissionDue = !!props.date_premier_paiement_abonnement;
 
   // Check if lead already exists
   const { data: existing } = await supabase
     .from("leads")
-    .select("id, stage")
+    .select("id, stage, commission_due")
     .eq("partner_id", partner.id)
     .eq("email", email)
     .maybeSingle();
 
   if (existing) {
-    // Update stage + hs_contact_id
+    // Update stage, hs_contact_id, and commission_due (only set to true, never back to false)
     await supabase
       .from("leads")
-      .update({ stage, hs_contact_id: contactId })
+      .update({
+        stage,
+        hs_contact_id: contactId,
+        commission_due: existing.commission_due || commissionDue,
+      })
       .eq("id", existing.id);
 
-    // If stage changed to Payeur, increment abonnes count
-    if (existing.stage !== "Payeur" && stage === "Payeur") {
+    // If stage changed to Abonné for the first time, increment partner abonnes counter
+    if (existing.stage !== "Abonne" && stage === "Abonne") {
       await supabase.rpc("increment_partner_abonnes", { p_id: partner.id });
     }
 
@@ -106,6 +112,7 @@ async function upsertLead(
     mois,
     biens: 0,
     hs_contact_id: contactId,
+    commission_due: commissionDue,
   });
 
   // Increment partner lead count
