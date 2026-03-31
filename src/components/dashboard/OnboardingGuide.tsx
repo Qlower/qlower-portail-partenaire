@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, Button } from "@/components/ui";
 import { buildSignupLink } from "@/services/links";
 import { CopyButton } from "@/components/ui";
@@ -20,6 +21,7 @@ interface Step {
 }
 
 export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGuideProps) {
+  const router = useRouter();
   const [doneSteps, setDoneSteps] = useState<Set<string>>(new Set());
   const [expandedStep, setExpandedStep] = useState<string>("kit");
 
@@ -48,8 +50,8 @@ export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGu
             présentation et les templates d&apos;emails pour contacter vos clients.
           </p>
           <div className="flex items-center gap-3 flex-wrap">
-            <Button variant="default" className="text-xs">
-              Télécharger le kit
+            <Button variant="default" className="text-xs" onClick={() => router.push("/dashboard/kit")}>
+              Accéder au kit
             </Button>
             <button
               className="text-xs text-[#0A3855]/60 hover:text-[#0A3855] underline underline-offset-2 transition-colors"
