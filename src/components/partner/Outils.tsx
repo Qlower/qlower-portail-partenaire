@@ -16,42 +16,42 @@ interface OutilsProps {
 }
 
 const FISCAL_CALENDAR = [
-  { date: "Janvier", label: "Bilan N-1 : cloture des comptes", urgency: "amber" as const },
-  { date: "Fevrier", label: "Reception des IFU et releves bancaires", urgency: "blue" as const },
-  { date: "Mars", label: "Ouverture declarations revenus fonciers", urgency: "amber" as const },
-  { date: "Avril", label: "Ouverture declaration IR (formulaire 2042)", urgency: "red" as const },
-  { date: "Mai", label: "Date limite zone 1 (departements 01-19)", urgency: "red" as const },
-  { date: "Juin", label: "Date limite zone 2 et 3", urgency: "red" as const },
+  { date: "Janvier", label: "Bilan N-1 : clôture des comptes", urgency: "amber" as const },
+  { date: "Février", label: "Réception des IFU et relevés bancaires", urgency: "blue" as const },
+  { date: "Mars", label: "Ouverture déclarations revenus fonciers", urgency: "amber" as const },
+  { date: "Avril", label: "Ouverture déclaration IR (formulaire 2042)", urgency: "red" as const },
+  { date: "Mai", label: "Date limite zone 1 (départements 01-19)", urgency: "red" as const },
+  { date: "Juin", label: "Date limite zones 2 et 3", urgency: "red" as const },
   { date: "Juillet", label: "Avis d'imposition disponible", urgency: "blue" as const },
   { date: "Septembre", label: "Paiement solde IR si applicable", urgency: "amber" as const },
-  { date: "Octobre", label: "Declaration CFE pour nouveaux biens", urgency: "blue" as const },
-  { date: "Decembre", label: "Anticipation bilan N : provisions, amortissements", urgency: "blue" as const },
+  { date: "Octobre", label: "Déclaration CFE pour nouveaux biens", urgency: "blue" as const },
+  { date: "Décembre", label: "Anticipation bilan N : provisions, amortissements", urgency: "blue" as const },
 ];
 
 const FAQ_ITEMS = [
   {
-    q: "Comment sont calculees mes commissions ?",
-    a: "Vos commissions dependent de votre contrat partenaire. Elles peuvent inclure un fixe a la souscription, une commission annuelle recurrente, un variable selon le nombre de biens du client, ou un pourcentage du chiffre d'affaires genere.",
+    q: "Comment sont calculées mes commissions ?",
+    a: "Vos commissions dépendent de votre contrat partenaire. Elles peuvent inclure un fixe à la souscription, une commission annuelle récurrente, un variable selon le nombre de biens du client, ou un pourcentage du chiffre d'affaires généré.",
   },
   {
-    q: "Quand suis-je paye ?",
-    a: "Les commissions sont versees trimestriellement par virement sur le RIB que vous avez fourni lors de votre inscription. Un recapitulatif vous est envoye par email avant chaque versement.",
+    q: "Quand suis-je payé ?",
+    a: "Les commissions sont versées trimestriellement par virement sur le RIB que vous avez fourni lors de votre inscription. Un récapitulatif vous est envoyé par email avant chaque versement.",
   },
   {
     q: "Comment suivre mes referrals ?",
-    a: "Rendez-vous dans l'onglet 'Referer' pour voir l'historique complet de vos contacts et leur statut (inscrit, abonne, payeur). Chaque changement de statut est synchronise automatiquement.",
+    a: "Rendez-vous dans l'onglet 'Référer' pour voir l'historique complet de vos contacts et leur statut (inscrit, abonné, payeur). Chaque changement de statut est synchronisé automatiquement.",
   },
   {
     q: "Puis-je personnaliser mon lien d'inscription ?",
-    a: "Votre lien contient deja votre UTM et code promo personnalises. Pour une offre marque blanche avec votre logo et couleurs, contactez votre responsable partenariat.",
+    a: "Votre lien contient déjà votre UTM et code promo personnalisés. Pour une offre marque blanche avec votre logo et couleurs, contactez votre responsable partenariat.",
   },
   {
-    q: "Un de mes contacts a un probleme technique, que faire ?",
-    a: "Orientez-le vers le support Qlower via le chat integre dans l'application, ou contactez directement votre interlocutrice partenariat qui pourra escalader la demande.",
+    q: "Un de mes contacts a un problème technique, que faire ?",
+    a: "Orientez-le vers le support Qlower via le chat intégré dans l'application, ou contactez directement votre interlocutrice partenariat qui pourra escalader la demande.",
   },
   {
     q: "Comment fonctionne le programme de parrainage ?",
-    a: "Vous recevez une commission pour chaque client qui souscrit a un abonnement Qlower via votre lien ou formulaire de referral. Le suivi est automatique grace a l'UTM tracking et la synchronisation HubSpot.",
+    a: "Vous recevez une commission pour chaque client qui souscrit à un abonnement Qlower via votre lien ou formulaire de referral. Le suivi est automatique grâce à l'UTM tracking et la synchronisation HubSpot.",
   },
 ];
 
@@ -88,7 +88,7 @@ export default function Outils({ partner }: OutilsProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Boite a outils"
+        title="Boîte à outils"
         subtitle="Ressources, calendrier fiscal et FAQ"
       />
 

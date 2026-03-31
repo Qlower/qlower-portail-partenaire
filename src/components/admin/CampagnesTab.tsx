@@ -34,35 +34,35 @@ interface EmailTemplate {
 const TEMPLATES: EmailTemplate[] = [
   {
     key: "presentation",
-    title: "Presentation du programme",
-    description: "Email de bienvenue presentant le programme partenaire et les avantages.",
-    subject: (p) => `Bienvenue dans le programme partenaire Qlower, ${p.nom} !`,
+    title: "Présentation du programme",
+    description: "Email de bienvenue présentant le programme partenaire et ses avantages.",
+    subject: (p) => `${p.nom}, découvrez votre espace partenaire Qlower !`,
     body: (p) =>
-      `Bonjour ${p.nom},\n\nNous sommes ravis de vous accueillir dans le programme partenaire Qlower.\n\nVotre lien d'inscription personnalise : https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}\n\nVotre identifiant partenaire : ${p.code}\n\nN'hesitez pas a nous contacter pour toute question.\n\nL'equipe Qlower`,
+      `Bonjour ${p.nom},\n\nBienvenue dans le programme partenaire Qlower !\n\nNous sommes ravis de vous accueillir dans notre réseau de professionnels qui accompagnent leurs clients investisseurs LMNP vers une gestion fiscale simplifiée et optimisée.\n\nEn tant que partenaire Qlower, vous bénéficiez de :\n- 100 € de commission par client abonné chaque année\n- Un tableau de bord dédié pour suivre vos leads en temps réel\n- Des supports de communication personnalisés\n- Un interlocuteur dédié pour vous accompagner\n\nVotre lien d'inscription personnalisé :\n👉 https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}\n\nVotre code partenaire : ${p.code}\n\nPour toute question, répondez simplement à cet email.\n\nÀ très vite,\nL'équipe Qlower`,
   },
   {
     key: "relance",
     title: "Relance activation",
-    description: "Relance pour les partenaires qui n'ont pas encore genere de leads.",
+    description: "Relance pour les partenaires qui n'ont pas encore généré de leads.",
     subject: (p) => `${p.nom}, activez votre partenariat Qlower`,
     body: (p) =>
-      `Bonjour ${p.nom},\n\nNous avons remarque que votre lien partenaire n'a pas encore ete utilise.\n\nRappel de votre lien : https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}\n\nN'hesitez pas a le partager avec vos clients proprietaires bailleurs.\n\nL'equipe Qlower`,
+      `Bonjour ${p.nom},\n\nNous avons remarqué que votre lien partenaire n'a pas encore été utilisé.\n\nC'est tout à fait normal au démarrage — voici quelques idées pour commencer :\n\n• Partagez votre lien avec vos clients propriétaires bailleurs lors de vos prochains rendez-vous\n• Mentionnez Qlower dans votre prochaine newsletter ou communication client\n• Utilisez les supports du kit partenaire disponibles dans votre espace\n\nVotre lien personnalisé :\n👉 https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}\n\nBesoin d'un coup de pouce ? Répondez à cet email, nous sommes là pour vous aider à démarrer.\n\nÀ bientôt,\nL'équipe Qlower`,
   },
   {
     key: "performance",
     title: "Bilan de performance",
-    description: "Bilan mensuel avec les metriques cles du partenaire.",
-    subject: (p) => `Bilan partenaire Qlower -- ${p.nom}`,
+    description: "Bilan mensuel avec les métriques clés du partenaire.",
+    subject: (p) => `Bilan partenaire Qlower — ${p.nom}`,
     body: (p) =>
-      `Bonjour ${p.nom},\n\nVoici votre bilan de performance :\n- Leads generes : ${p.leads}\n- Abonnes convertis : ${p.abonnes}\n- Taux de conversion : ${p.leads > 0 ? ((p.abonnes / p.leads) * 100).toFixed(1) : "0"}%\n\nContinuez vos efforts !\n\nL'equipe Qlower`,
+      `Bonjour ${p.nom},\n\nVoici votre bilan de performance Qlower :\n\n📊 Résumé\n- Leads générés : ${p.leads}\n- Abonnés convertis : ${p.abonnes}\n- Taux de conversion : ${p.leads > 0 ? ((p.abonnes / p.leads) * 100).toFixed(1) : "0"}%\n- Commission estimée : ${p.abonnes * 100} € / an\n\n${p.leads > 0 ? "Bravo pour votre implication ! Continuez sur cette lancée." : "Vous n'avez pas encore généré de leads ce mois-ci. N'hésitez pas à partager votre lien avec vos contacts."}\n\nRappel de votre lien partenaire :\n👉 https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}\n\nÀ très vite,\nL'équipe Qlower`,
   },
   {
     key: "nouveaute",
-    title: "Annonce nouveaute",
-    description: "Annonce d'une nouvelle fonctionnalite ou mise a jour du programme.",
-    subject: () => `Nouveaute Qlower -- Programme partenaire`,
+    title: "Annonce nouveauté",
+    description: "Annonce d'une nouvelle fonctionnalité ou mise à jour du programme.",
+    subject: () => `Nouveauté Qlower — Programme partenaire`,
     body: (p) =>
-      `Bonjour ${p.nom},\n\nNous avons le plaisir de vous annoncer une nouveaute dans notre programme partenaire.\n\n[Contenu de l'annonce a personnaliser]\n\nVotre lien reste inchange : https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}\n\nL'equipe Qlower`,
+      `Bonjour ${p.nom},\n\nNous avons le plaisir de vous annoncer une nouveauté dans notre programme partenaire.\n\n[À compléter avant envoi : décrivez ici la nouveauté ou la mise à jour à communiquer]\n\nVotre lien reste inchangé :\n👉 https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}\n\nÀ très vite,\nL'équipe Qlower`,
   },
 ];
 
@@ -126,7 +126,7 @@ export default function CampagnesTab() {
             />
             <div>
               <p className="text-xs text-gray-500 mb-2">
-                {targeted.length} partenaire(s) cible(s)
+                {targeted.length} partenaire(s) ciblé(s)
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {targeted.map((p) => (
@@ -196,7 +196,7 @@ export default function CampagnesTab() {
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
             <Send className="size-4 text-[#0A3855]" />
-            Previsualisation et envoi
+            Prévisualisation et envoi
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
@@ -204,7 +204,7 @@ export default function CampagnesTab() {
             <Alert>
               <Info className="size-4" />
               <AlertDescription>
-                Selectionnez un template pour previsualiser.
+                Sélectionnez un template pour prévisualiser.
               </AlertDescription>
             </Alert>
           ) : (
@@ -218,12 +218,12 @@ export default function CampagnesTab() {
                   {showPreview ? (
                     <>
                       <EyeOff className="size-4 mr-1.5" />
-                      Masquer apercu
+                      Masquer aperçu
                     </>
                   ) : (
                     <>
                       <Eye className="size-4 mr-1.5" />
-                      Previsualiser
+                      Prévisualiser
                     </>
                   )}
                 </Button>
@@ -235,12 +235,12 @@ export default function CampagnesTab() {
                   {allSent ? (
                     <>
                       <CheckCircle2 className="size-4 mr-1.5" />
-                      Envoye a {targeted.length} partenaire(s)
+                      Envoyé à {targeted.length} partenaire(s)
                     </>
                   ) : (
                     <>
                       <Send className="size-4 mr-1.5" />
-                      Envoyer a {targeted.length} partenaire(s)
+                      Envoyer à {targeted.length} partenaire(s)
                     </>
                   )}
                 </Button>
@@ -251,7 +251,7 @@ export default function CampagnesTab() {
                 <Card className="bg-[#F8FAFB] border-dashed">
                   <CardContent>
                     <p className="text-xs text-gray-400 mb-2">
-                      Apercu pour : {previewPartner.nom}
+                      Aperçu pour : {previewPartner.nom}
                     </p>
                     <p className="text-sm font-semibold text-gray-900 mb-3">
                       Objet : {template.subject(previewPartner)}
@@ -287,7 +287,7 @@ export default function CampagnesTab() {
                           className="bg-emerald-50 text-emerald-700 border border-emerald-200"
                         >
                           <CheckCircle2 className="size-3 mr-0.5" />
-                          Envoye
+                          Envoyé
                         </Badge>
                       ) : (
                         <Badge

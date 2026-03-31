@@ -90,7 +90,7 @@ export function Dashboard({
 
   const tabs: { key: FilterTab; label: string; count?: number }[] = [
     { key: "all", label: "Tous", count: leads.length },
-    { key: "Abonne", label: "Abonnes", count: abonnes },
+    { key: "Abonne", label: "Abonnés", count: abonnes },
     { key: "Payeur", label: "Payeurs ponctuels", count: payeurs },
     { key: "Non payeur", label: "Non payeurs", count: leads.length - actifs },
   ];
@@ -127,7 +127,7 @@ export function Dashboard({
     <div className="space-y-6">
       <PageHeader
         title="Tableau de bord"
-        subtitle="Suivez vos leads, conversions et commissions en temps reel"
+        subtitle="Suivez vos leads, conversions et commissions en temps réel"
       />
 
       {/* Revenue Card */}
@@ -135,7 +135,7 @@ export function Dashboard({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
             <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-2">
-              Commission estimee
+              Commission estimée
             </p>
             <p className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
               {commission.total.toLocaleString("fr-FR")}&nbsp;&euro;
@@ -181,7 +181,7 @@ export function Dashboard({
       {/* Chart */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-bold text-gray-900">Evolution mensuelle</CardTitle>
+          <CardTitle className="text-sm font-bold text-gray-900">Évolution mensuelle</CardTitle>
         </CardHeader>
         <CardContent>
           <BarChart data={chartData} />

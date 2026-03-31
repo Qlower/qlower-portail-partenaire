@@ -39,17 +39,17 @@ export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGu
   const steps: Step[] = [
     {
       id: "kit",
-      title: "Telecharger le kit partenaire",
-      description: "Logos, presentations et supports de communication",
+      title: "Télécharger le kit partenaire",
+      description: "Logos, présentations et supports de communication",
       content: (
         <div className="space-y-4">
           <p className="text-sm text-gray-600 leading-relaxed">
-            Telechargez votre kit de communication contenant les logos Qlower, les slides de
-            presentation et les templates d&apos;emails pour contacter vos clients.
+            Téléchargez votre kit de communication contenant les logos Qlower, les slides de
+            présentation et les templates d&apos;emails pour contacter vos clients.
           </p>
           <div className="flex items-center gap-3 flex-wrap">
             <Button variant="default" className="text-xs">
-              Telecharger le kit
+              Télécharger le kit
             </Button>
             <button
               className="text-xs text-[#0A3855]/60 hover:text-[#0A3855] underline underline-offset-2 transition-colors"
@@ -63,12 +63,12 @@ export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGu
     },
     {
       id: "video",
-      title: "Regarder la video de presentation",
-      description: "3 min pour comprendre Qlower et savoir le presenter",
+      title: "Regarder la vidéo de présentation",
+      description: "3 min pour comprendre Qlower et savoir le présenter",
       content: (
         <div className="space-y-4">
           <p className="text-sm text-gray-600 leading-relaxed">
-            Decouvrez en 3 minutes comment Qlower aide vos clients a gerer leur fiscalite immobiliere
+            Découvrez en 3 minutes comment Qlower aide vos clients à gérer leur fiscalité immobilière
             et comment en parler efficacement.
           </p>
           <div className="bg-gradient-to-br from-[#E5EDF1] to-[#E5EDF1]/40 rounded-xl h-40 flex items-center justify-center mb-3 border border-[#E5EDF1]">
@@ -90,11 +90,11 @@ export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGu
     {
       id: "referral",
       title: "Partager votre lien d'inscription",
-      description: "Envoyez votre lien unique a votre premier contact",
+      description: "Envoyez votre lien unique à votre premier contact",
       content: (
         <div className="space-y-4">
           <p className="text-sm text-gray-600 leading-relaxed">
-            Copiez votre lien et partagez-le a un contact pour commencer a generer des leads.
+            Copiez votre lien et partagez-le à un contact pour commencer à générer des leads.
           </p>
           <div className="bg-[#E5EDF1]/40 border border-[#E5EDF1] rounded-xl p-3.5 flex items-center gap-3 flex-wrap">
             <code className="text-xs text-[#0A3855]/70 break-all flex-1 min-w-0">{signupLink}</code>
@@ -112,7 +112,7 @@ export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGu
     {
       id: "rdv",
       title: "Prendre un RDV avec Coline",
-      description: "Planifier un appel pour optimiser votre strategie",
+      description: "Planifier un appel pour optimiser votre stratégie",
       content: (
         <div className="space-y-4">
           <p className="text-sm text-gray-600 leading-relaxed">
@@ -155,7 +155,7 @@ export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGu
               {partnerName}
             </h1>
             <p className="text-sm text-white/60">
-              Suivez ces etapes pour bien demarrer votre partenariat Qlower.
+              Suivez ces étapes pour bien démarrer votre partenariat Qlower.
             </p>
           </div>
           <div className="flex flex-col items-center gap-1.5">
@@ -175,7 +175,7 @@ export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGu
                 {progressPct}%
               </span>
             </div>
-            <span className="text-[10px] text-white/40 font-medium">{completedCount}/{totalSteps} etapes</span>
+            <span className="text-[10px] text-white/40 font-medium">{completedCount}/{totalSteps} étapes</span>
           </div>
         </div>
         {/* Animated progress bar */}
@@ -202,9 +202,9 @@ export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGu
             <div className="absolute top-0 -right-3 w-2.5 h-2.5 rounded-full bg-emerald-300 animate-bounce" style={{ animationDelay: "300ms" }} />
             <div className="absolute -bottom-1 -left-1 w-1.5 h-1.5 rounded-full bg-[#F6CCA4]/60 animate-bounce" style={{ animationDelay: "200ms" }} />
           </div>
-          <h2 className="text-lg font-bold text-emerald-800 mb-1">Felicitations !</h2>
+          <h2 className="text-lg font-bold text-emerald-800 mb-1">Félicitations !</h2>
           <p className="text-sm text-emerald-700/80 mb-5 max-w-sm mx-auto">
-            Vous avez complete toutes les etapes. Vous etes pret a suivre vos leads.
+            Vous avez complété toutes les étapes. Vous êtes prêt à suivre vos leads.
           </p>
           <Button className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 shadow-md shadow-emerald-600/20" onClick={onDone}>
             Acceder au tableau de bord
