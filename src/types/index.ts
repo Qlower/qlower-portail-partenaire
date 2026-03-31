@@ -1,6 +1,6 @@
 // ── Partner ───────────────────────────────────────────────────
 export type ContratType = "affiliation" | "marque_blanche";
-export type PartnerType = "cgp" | "agence-immo" | "apporteur" | "courtier" | "conciergerie" | "influenceur" | "autre";
+export type PartnerType = "cgp" | "agence-immo" | "apporteur" | "courtier" | "conciergerie" | "proptech" | "banque" | "influenceur" | "autre";
 export type LeadStage = "Abonne" | "Payeur" | "Non payeur";
 export type LeadSource = "UTM" | "Manuel" | "Promo";
 export type CommissionType = "souscription" | "annuelle" | "biens" | "pct_ca";

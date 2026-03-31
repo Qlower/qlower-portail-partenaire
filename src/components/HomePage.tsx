@@ -79,9 +79,21 @@ function HeroSection({ onRegister }: { onRegister: () => void }) {
               à vos clients
             </h1>
 
-            <p className="text-lg text-gray-500 mb-10 max-w-lg leading-relaxed">
+            <p className="text-lg text-gray-500 mb-4 max-w-lg leading-relaxed">
               Rejoignez le programme partenaires et percevez une commission sur chaque client qui souscrit à Qlower via votre lien.
             </p>
+
+            <div className="bg-[#E5EDF1]/60 border border-[#0A3855]/10 rounded-xl px-5 py-4 mb-6 max-w-lg">
+              <p className="text-xs font-semibold text-[#0A3855] mb-1.5 uppercase tracking-wider">Qu'est-ce que Qlower ?</p>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Qlower est la solution de gestion fiscale et comptable dédiée aux investisseurs immobiliers LMNP, SCI et revenus fonciers. Elle automatise les déclarations, calcule les amortissements et accompagne chaque bailleur tout au long de l'année — sans expertise comptable requise.
+              </p>
+            </div>
+
+            <div className="inline-flex items-center gap-2 bg-[#FFF5ED] border border-[#F6CCA4]/40 rounded-xl px-4 py-2.5 mb-6 text-sm">
+              <span className="text-[#F6CCA4] text-base">🎁</span>
+              <span className="text-gray-700">Vos clients bénéficient de <strong className="text-[#0A3855]">−20€</strong> à l'inscription via votre code promo</span>
+            </div>
 
             <div className="flex items-center gap-4 flex-wrap mb-10">
               <Button onClick={onRegister} size="lg" className="px-8 py-3 text-base shadow-lg shadow-[#0A3855]/20">
@@ -96,7 +108,7 @@ function HeroSection({ onRegister }: { onRegister: () => void }) {
             <div className="flex items-center gap-6 text-sm text-gray-500">
               {[
                 { val: "100€", label: "par souscription" },
-                { val: "28+", label: "partenaires actifs" },
+                { val: "100+", label: "partenaires actifs" },
                 { val: "20%", label: "taux moyen" },
               ].map((s) => (
                 <div key={s.label} className="flex items-center gap-2">
@@ -153,18 +165,15 @@ function HeroSection({ onRegister }: { onRegister: () => void }) {
 
 /* ─── Logo bar ────────────────────────────────────────────────── */
 function LogoBar() {
-  const partners = ["Lybox", "CocoonR", "ImmoConsult", "Hestia", "Oqoro", "Gestin", "Lodgify", "Smartloc"];
   return (
     <section className="py-8 border-y border-gray-100 bg-gray-50/50">
-      <div className="max-w-6xl mx-auto px-6">
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest text-center mb-4">
-          Ils nous font déjà confiance
+      <div className="max-w-6xl mx-auto px-6 text-center">
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
+          Déjà plus de
         </p>
-        <div className="flex items-center justify-center gap-8 flex-wrap opacity-40">
-          {partners.map((p) => (
-            <span key={p} className="text-sm font-bold text-gray-900">{p}</span>
-          ))}
-        </div>
+        <p className="text-3xl font-extrabold text-[#0A3855] mb-1">100+</p>
+        <p className="text-sm text-gray-500">partenaires actifs partout en France</p>
+        <p className="text-xs text-gray-400 mt-1">CGP · Agents immobiliers · Courtiers · Conciergeries · Proptech · Banques</p>
       </div>
     </section>
   );
@@ -223,8 +232,8 @@ function SimulatorSection() {
               {/* Results */}
               <div className="flex flex-col gap-3">
                 <ResultCard label="Clients convertis" value={String(results.abonnes)} variant="light" />
-                <ResultCard label="Commission mensuelle" value={`${results.commission.toLocaleString("fr-FR")} €`} variant="primary" />
-                <ResultCard label="Revenu annuel estimé" value={`${results.annuel.toLocaleString("fr-FR")} €`} variant="dark" />
+                <ResultCard label="Équivalent mensuel" value={`${results.commission.toLocaleString("fr-FR")} €`} variant="primary" />
+                <ResultCard label="Commission annuelle estimée" value={`${results.annuel.toLocaleString("fr-FR")} €`} variant="dark" />
               </div>
             </div>
           </CardContent>
@@ -409,7 +418,7 @@ function TestimonialsSection() {
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-3">
             Ils nous font confiance
           </h2>
-          <p className="text-sm text-gray-500">Plus de 28 partenaires actifs dans toute la France.</p>
+          <p className="text-sm text-gray-500">Plus de 100 partenaires actifs dans toute la France.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -462,7 +471,7 @@ function CtaSection({ onRegister }: { onRegister: () => void }) {
               Prêt à rejoindre l&apos;écosystème Qlower ?
             </h2>
             <p className="text-sm text-white/70 mb-8 max-w-md mx-auto leading-relaxed">
-              CGP, agents immobiliers, courtiers, conciergeries, experts-comptables — créez votre espace partenaire en 2 minutes.
+              CGP, agents immobiliers, courtiers, conciergeries, proptech, banques, experts-comptables — créez votre espace partenaire en 2 minutes.
             </p>
             <button
               onClick={onRegister}

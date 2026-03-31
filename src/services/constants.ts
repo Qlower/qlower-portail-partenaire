@@ -8,17 +8,20 @@ export const BENCHMARK: Record<string, { taux: number; label: string }> = {
 };
 
 export const METIERS = [
-  "Agent immobilier",
   "CGP",
+  "Agent immobilier",
   "Expert-comptable",
-  "Syndic",
-  "Conciergerie",
   "Courtier",
+  "Conciergerie",
+  "Proptech",
+  "Banque",
+  "Syndic",
+  "Influenceur",
   "Autre",
 ] as const;
 
 export const PARTNER_TYPES: PartnerType[] = [
-  "cgp", "agence-immo", "apporteur", "courtier", "conciergerie", "influenceur", "autre",
+  "cgp", "agence-immo", "apporteur", "courtier", "conciergerie", "proptech", "banque", "influenceur", "autre",
 ];
 
 export const STAGE_STYLES: Record<string, { text: string; bg: string }> = {

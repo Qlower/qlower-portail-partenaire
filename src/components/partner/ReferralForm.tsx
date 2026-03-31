@@ -1,11 +1,8 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { usePartner } from "@/hooks/usePartnerData";
 import { useAddReferral } from "@/hooks/useMutations";
 import { isValidEmail, buildRdvLink } from "@/services/links";
-import { calcCommission } from "@/services/commission";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select-custom";
@@ -39,9 +36,6 @@ export default function ReferralForm({ partner }: ReferralFormProps) {
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-
-  const biensCount = biens === "5+" ? 5 : parseInt(biens, 10);
-  const estimation = calcCommission(partner.comm_rules, 1, biensCount);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -86,9 +80,9 @@ export default function ReferralForm({ partner }: ReferralFormProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Contact enregistre !</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Contact enregistré !</h3>
             <p className="text-sm text-gray-500">
-              {prenom} {nom} a ete synchronise avec HubSpot.
+              {prenom} {nom} a bien été ajouté à votre suivi.
             </p>
           </div>
         </div>
@@ -207,30 +201,9 @@ export default function ReferralForm({ partner }: ReferralFormProps) {
             />
           </div>
 
-          {/* Commission estimate */}
-          {estimation.total > 0 && (
-            <div className="relative overflow-hidden rounded-xl border border-green-200 bg-gradient-to-br from-green-50/80 to-emerald-50/50 p-4">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-green-100/30 rounded-full -translate-y-8 translate-x-8" />
-              <div className="relative">
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-xs font-semibold text-green-800">Commission estimee</p>
-                </div>
-                <p className="text-2xl font-bold text-green-700 mb-2">{estimation.total} &euro;</p>
-                <Separator className="bg-green-200/60 my-2" />
-                <div className="space-y-1">
-                  {estimation.detail.map((d, i) => (
-                    <div key={i} className="flex justify-between text-xs">
-                      <span className="text-green-700/70">{d.label}</span>
-                      <span className="font-semibold text-green-800">{d.calc}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="rounded-xl border border-[#0A3855]/10 bg-[#E5EDF1]/30 px-4 py-3 text-xs text-[#0A3855]/70 leading-relaxed">
+            💡 Si ce contact souscrit à Qlower, vous percevrez <strong className="text-[#0A3855]">100&nbsp;€</strong> de commission, versée annuellement.
+          </div>
 
           <Button
             type="submit"

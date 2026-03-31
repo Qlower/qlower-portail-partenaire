@@ -62,8 +62,8 @@ export default function PageReferer({ partner }: PageRefererProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Referer un contact"
-        subtitle="Partagez Qlower et generez des commissions"
+        title="Recommander Qlower"
+        subtitle="Partagez Qlower et générez des commissions"
       />
 
       {/* Mode selector cards */}

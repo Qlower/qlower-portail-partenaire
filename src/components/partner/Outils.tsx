@@ -32,19 +32,19 @@ const FISCAL_CALENDAR = [
 const FAQ_ITEMS = [
   {
     q: "Comment sont calculées mes commissions ?",
-    a: "Vos commissions dépendent de votre contrat partenaire. Elles peuvent inclure un fixe à la souscription, une commission annuelle récurrente, un variable selon le nombre de biens du client, ou un pourcentage du chiffre d'affaires généré.",
+    a: "Votre commission est fixe : 100 € par client qui souscrit à Qlower via votre lien ou formulaire. Elle est versée annuellement, pour chaque client actif sur l'année.",
   },
   {
     q: "Quand suis-je payé ?",
-    a: "Les commissions sont versées trimestriellement par virement sur le RIB que vous avez fourni lors de votre inscription. Un récapitulatif vous est envoyé par email avant chaque versement.",
+    a: "Les commissions sont versées annuellement par virement sur le RIB fourni lors de votre inscription. Un récapitulatif vous est envoyé par email avant chaque versement.",
   },
   {
-    q: "Comment suivre mes referrals ?",
-    a: "Rendez-vous dans l'onglet 'Référer' pour voir l'historique complet de vos contacts et leur statut (inscrit, abonné, payeur). Chaque changement de statut est synchronisé automatiquement.",
+    q: "Comment suivre mes contacts ?",
+    a: "Rendez-vous dans l'onglet 'Recommander' pour voir l'historique complet de vos contacts et leur statut (inscrit, abonné, payeur). Le tableau de bord se met à jour automatiquement.",
   },
   {
     q: "Puis-je personnaliser mon lien d'inscription ?",
-    a: "Votre lien contient déjà votre UTM et code promo personnalisés. Pour une offre marque blanche avec votre logo et couleurs, contactez votre responsable partenariat.",
+    a: "Votre lien contient déjà votre code partenaire et vos paramètres de suivi. Il n'est pas recommandé de le modifier manuellement sous peine de perdre l'attribution de vos leads.",
   },
   {
     q: "Un de mes contacts a un problème technique, que faire ?",
@@ -52,7 +52,11 @@ const FAQ_ITEMS = [
   },
   {
     q: "Comment fonctionne le programme de parrainage ?",
-    a: "Vous recevez une commission pour chaque client qui souscrit à un abonnement Qlower via votre lien ou formulaire de referral. Le suivi est automatique grâce à l'UTM tracking et la synchronisation HubSpot.",
+    a: "Vous recevez 100 € de commission fixe pour chaque client qui souscrit à Qlower via votre lien ou formulaire de recommandation. Le suivi est automatique et visible en temps réel dans votre tableau de bord.",
+  },
+  {
+    q: "Est-il possible de passer en marque blanche ?",
+    a: "Oui. À partir de 50 clients apportés annuellement, nous pouvons étudier ensemble une formule en marque blanche (votre logo, vos couleurs, votre domaine). Contactez votre responsable partenariat pour en discuter.",
   },
 ];
 
@@ -181,26 +185,6 @@ export default function Outils({ partner }: OutilsProps) {
             </CardContent>
           </Card>
 
-          <Card className="border-gray-200 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <svg className="w-4 h-4 text-[#0A3855]/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                UTM de tracking
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0">
-                  <code className="block text-sm text-[#0A3855] bg-[#E5EDF1]/40 rounded-lg border border-[#0A3855]/10 px-4 py-3 font-mono">
-                    {partner.utm}
-                  </code>
-                </div>
-                <CopyButton text={partner.utm} />
-              </div>
-            </CardContent>
-          </Card>
         </div>
       )}
 
