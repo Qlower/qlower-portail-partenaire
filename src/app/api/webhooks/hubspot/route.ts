@@ -82,18 +82,20 @@ async function upsertLead(
     .maybeSingle();
 
   if (existing) {
+    const newCommissionDue = existing.commission_due || commissionDue;
+
     // Update stage, hs_contact_id, and commission_due (only set to true, never back to false)
     await supabase
       .from("leads")
       .update({
         stage,
         hs_contact_id: contactId,
-        commission_due: existing.commission_due || commissionDue,
+        commission_due: newCommissionDue,
       })
       .eq("id", existing.id);
 
-    // If stage changed to Abonné for the first time, increment partner abonnes counter
-    if (existing.stage !== "Abonne" && stage === "Abonne") {
+    // Increment partner abonnes counter only when commission_due goes from false to true (first time)
+    if (!existing.commission_due && newCommissionDue) {
       await supabase.rpc("increment_partner_abonnes", { p_id: partner.id });
     }
 
