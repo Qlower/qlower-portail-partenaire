@@ -68,7 +68,7 @@ export default function UtmTab() {
   const handleSave = () => {
     if (!generatedUrl) return;
     const link: SavedLink = {
-      id: Date.now().toString(),
+      id: `${Date.now()}`, // eslint-disable-line react-hooks/purity
       partner: selectedPartner?.nom || partnerSearch || "Inconnu",
       url: generatedUrl,
       campaign: utmCampaign,

@@ -84,15 +84,15 @@ function HeroSection({ onRegister }: { onRegister: () => void }) {
             </p>
 
             <div className="bg-[#E5EDF1]/60 border border-[#0A3855]/10 rounded-xl px-5 py-4 mb-6 max-w-lg">
-              <p className="text-xs font-semibold text-[#0A3855] mb-1.5 uppercase tracking-wider">Qu'est-ce que Qlower ?</p>
+              <p className="text-xs font-semibold text-[#0A3855] mb-1.5 uppercase tracking-wider">Qu&apos;est-ce que Qlower&nbsp;?</p>
               <p className="text-sm text-gray-600 leading-relaxed">
-                Qlower est la solution de gestion fiscale et comptable dédiée aux investisseurs immobiliers LMNP, SCI et revenus fonciers. Elle automatise les déclarations, calcule les amortissements et accompagne chaque bailleur tout au long de l'année — sans expertise comptable requise.
+                Qlower est la solution de gestion fiscale et comptable dédiée aux investisseurs immobiliers LMNP, SCI et revenus fonciers. Elle automatise les déclarations, calcule les amortissements et accompagne chaque bailleur tout au long de l&apos;année — sans expertise comptable requise.
               </p>
             </div>
 
             <div className="inline-flex items-center gap-2 bg-[#FFF5ED] border border-[#F6CCA4]/40 rounded-xl px-4 py-2.5 mb-6 text-sm">
               <span className="text-[#F6CCA4] text-base">🎁</span>
-              <span className="text-gray-700">Vos clients bénéficient de <strong className="text-[#0A3855]">−20€</strong> à l'inscription via votre code promo</span>
+              <span className="text-gray-700">Vos clients bénéficient de <strong className="text-[#0A3855]">−20€</strong> à l&apos;inscription via votre code promo</span>
             </div>
 
             <div className="flex items-center gap-4 flex-wrap mb-10">
