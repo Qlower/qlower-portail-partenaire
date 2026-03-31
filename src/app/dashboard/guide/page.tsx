@@ -12,10 +12,7 @@ export default function GuidePage() {
       partnerName={partner.nom}
       code={partner.code}
       utm={partner.utm}
-      onDone={() => {
-        const done = localStorage.getItem("guide_completed") === "true";
-        router.push(done ? "/dashboard" : "/dashboard/revenus");
-      }}
+      onDone={() => router.push("/dashboard")}
     />
   );
 }

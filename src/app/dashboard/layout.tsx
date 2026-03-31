@@ -44,17 +44,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!authLoading && !user) router.replace("/login");
   }, [authLoading, user, router]);
 
-  // Close sidebar on route change (mobile) + check guide completion
+  // Close sidebar on route change (mobile) + sync guide state
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSidebarOpen(false);
-    const done = localStorage.getItem("guide_completed") === "true";
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setGuideDone(done);
+    setGuideDone(localStorage.getItem("guide_completed") === "true");
+  }, [pathname]);
+
+  // One-time redirect to guide on initial load if guide not completed
+  useEffect(() => {
+    const done = localStorage.getItem("guide_completed") === "true";
     if (!done && pathname === "/dashboard") {
       router.replace("/dashboard/guide");
     }
-  }, [pathname, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Derive active module from pathname
   const segments = pathname.split("/");
