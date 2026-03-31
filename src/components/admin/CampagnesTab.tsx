@@ -83,10 +83,20 @@ export default function CampagnesTab() {
   const template = TEMPLATES.find((t) => t.key === selectedTemplate);
   const previewPartner = targeted[0];
 
-  const handleSendAll = () => {
-    const ids = new Set(targeted.map((p) => p.id));
-    setSentPartners(ids);
-    setAllSent(true);
+  const handleSendAll = async () => {
+    try {
+      const res = await fetch("/api/admin/send-campaign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateKey: selectedTemplate, audience }),
+      });
+      if (!res.ok) throw new Error("Erreur serveur");
+      const ids = new Set(targeted.map((p) => p.id));
+      setSentPartners(ids);
+      setAllSent(true);
+    } catch {
+      alert("Erreur lors de l'envoi des emails. Vérifiez la configuration Resend.");
+    }
   };
 
   if (loading) {

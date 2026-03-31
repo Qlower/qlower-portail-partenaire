@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import PDFDocument from "pdfkit";
 
-// Generate a simple invoice PDF as HTML-to-PDF
-// Using a lightweight approach without puppeteer for serverless compatibility
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const invoiceId = searchParams.get("id");
@@ -22,33 +21,67 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
 
-  // Return invoice data as JSON for now — PDF generation can be added
-  // with @react-pdf/renderer or an external service
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Facture ${invoice.id}</title>
-<style>
-  body { font-family: Inter, sans-serif; padding: 40px; color: #1a2e44; }
-  .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
-  .logo { font-size: 24px; font-weight: 700; color: #0A3855; }
-  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-  th { background: #0A3855; color: white; padding: 10px; text-align: left; }
-  td { padding: 10px; border-bottom: 1px solid #e5e7eb; }
-  .total { font-size: 20px; font-weight: 700; text-align: right; margin-top: 20px; }
-</style></head><body>
-  <div class="header">
-    <div><div class="logo">Qlower</div><div>Appel de facturation partenaire</div></div>
-    <div style="text-align:right"><strong>${invoice.id}</strong><br>${invoice.date}<br>Statut: ${invoice.statut}</div>
-  </div>
-  <div><strong>Partenaire:</strong> ${invoice.partners?.nom || "N/A"}</div>
-  <table><tr><th>Description</th><th>Montant</th></tr>
-  <tr><td>Commission partenaire — ${invoice.partners?.nom}</td><td>${invoice.montant} €</td></tr></table>
-  <div class="total">Total: ${invoice.montant} €</div>
-</body></html>`;
+  const partner = invoice.partners as { nom: string; email: string } | null;
 
-  return new NextResponse(html, {
+  const chunks: Buffer[] = [];
+  await new Promise<void>((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50, size: "A4" });
+
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    doc.on("end", resolve);
+    doc.on("error", reject);
+
+    // Header
+    doc.fontSize(22).fillColor("#0A3855").text("Qlower", 50, 50);
+    doc.fontSize(10).fillColor("#6b7280").text("Programme partenaire", 50, 78);
+
+    doc.fontSize(10).fillColor("#111827")
+      .text(`Facture n° ${invoice.id}`, 350, 50, { align: "right" })
+      .text(`Date : ${new Date(invoice.date).toLocaleDateString("fr-FR")}`, 350, 65, { align: "right" })
+      .text(`Statut : ${invoice.statut}`, 350, 80, { align: "right" });
+
+    // Divider
+    doc.moveTo(50, 110).lineTo(545, 110).strokeColor("#e5e7eb").stroke();
+
+    // Partner info
+    doc.fontSize(10).fillColor("#6b7280").text("Partenaire", 50, 130);
+    doc.fontSize(12).fillColor("#111827").text(partner?.nom ?? "N/A", 50, 148);
+    if (partner?.email) {
+      doc.fontSize(10).fillColor("#6b7280").text(partner.email, 50, 165);
+    }
+
+    // Table header
+    doc.rect(50, 220, 495, 28).fillColor("#0A3855").fill();
+    doc.fontSize(10).fillColor("#ffffff")
+      .text("Description", 60, 230)
+      .text("Montant", 470, 230, { align: "right", width: 65 });
+
+    // Table row
+    doc.rect(50, 248, 495, 36).fillColor("#f9fafb").fill();
+    doc.fontSize(10).fillColor("#111827")
+      .text(`Commission partenaire — ${partner?.nom ?? ""}`, 60, 258)
+      .text(`${invoice.montant.toLocaleString("fr-FR")} €`, 470, 258, { align: "right", width: 65 });
+
+    // Total
+    doc.moveTo(50, 295).lineTo(545, 295).strokeColor("#e5e7eb").stroke();
+    doc.fontSize(13).fillColor("#0A3855")
+      .text("Total", 350, 310)
+      .text(`${invoice.montant.toLocaleString("fr-FR")} €`, 470, 310, { align: "right", width: 65 });
+
+    // Footer
+    doc.fontSize(9).fillColor("#9ca3af")
+      .text("Qlower — Programme partenaire", 50, 750, { align: "center", width: 495 });
+
+    doc.end();
+  });
+
+  const pdfBuffer = Buffer.concat(chunks);
+
+  return new NextResponse(pdfBuffer, {
     status: 200,
     headers: {
-      "Content-Type": "text/html; charset=utf-8",
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="facture-${invoice.id}.pdf"`,
     },
   });
 }

@@ -103,6 +103,26 @@ export default function RegisterForm() {
       });
 
       await supabase.auth.updateUser({ data: { partner_id: partnerId } });
+
+      // Upload KBIS and notify Coline (non-blocking)
+      if (form.kbisFile) {
+        const { data: kbisData } = await supabase.storage
+          .from("kbis")
+          .upload(`${partnerId}/${form.kbisFile.name}`, form.kbisFile, { upsert: true });
+        if (kbisData?.path) {
+          const { data: urlData } = supabase.storage.from("kbis").getPublicUrl(kbisData.path);
+          fetch("/api/admin/notify-kbis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              partnerName: form.company,
+              partnerEmail: form.email,
+              kbisUrl: urlData.publicUrl,
+            }),
+          }).catch(() => {});
+        }
+      }
+
       onboard.mutateAsync({ partnerName: form.company, utmValue: utm }).catch(() => {});
       router.push("/dashboard");
     } catch (err: unknown) {

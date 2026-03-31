@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { buildSignupLink } from "@/services/links";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,6 +75,7 @@ const TAB_ICONS: Record<Tab, React.ReactNode> = {
 };
 
 export default function Outils({ partner }: OutilsProps) {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("kit");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -115,6 +117,26 @@ export default function Outils({ partner }: OutilsProps) {
       {/* Kit tab */}
       {tab === "kit" && (
         <div className="space-y-4">
+          <button
+            onClick={() => router.push("/dashboard/kit")}
+            className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-[#0A3855] to-[#0A3855]/80 rounded-xl text-white hover:opacity-90 transition-opacity shadow-md shadow-[#0A3855]/20"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-semibold">Kit partenaire complet</p>
+                <p className="text-xs text-white/60">Ressources, guides, templates, RDV</p>
+              </div>
+            </div>
+            <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
           <Card className="border-gray-200 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold text-gray-900 flex items-center gap-2">
