@@ -114,6 +114,43 @@ export function useReferrals(partnerId: string | undefined) {
   });
 }
 
+export interface CommissionData {
+  year: number;
+  partnerId: string;
+  montantParAbonne: number;
+  totalSubscribers: number;
+  totalCommission: number;
+  previousYear: {
+    year: number;
+    totalSubscribers: number;
+    totalCommission: number;
+  };
+  months: Array<{
+    month: number;
+    label: string;
+    subscribers: number;
+    commission: number;
+    subscriberNames: string[];
+    previousYear: number;
+    previousYearCommission: number;
+  }>;
+  totalContacts: number;
+}
+
+export function useCommissions(partnerId: string | undefined, year?: number) {
+  const currentYear = year || new Date().getFullYear();
+  return useQuery<CommissionData>({
+    queryKey: ["commissions", partnerId, currentYear],
+    queryFn: async () => {
+      const res = await fetch(`/api/partner/commissions?partner_id=${partnerId}&year=${currentYear}`);
+      if (!res.ok) throw new Error("Failed to fetch commissions");
+      return res.json();
+    },
+    enabled: !!partnerId,
+    staleTime: 5 * 60 * 1000, // Cache 5 min (HubSpot data doesn't change frequently)
+  });
+}
+
 export function useInvoices(partnerId: string | undefined) {
   return useQuery<Invoice[]>({
     queryKey: ["invoices", partnerId],

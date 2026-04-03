@@ -9,9 +9,6 @@ export default function DashboardPage() {
     <Dashboard
       partnerId={partner.id}
       partnerType={partner.type}
-      commRules={partner.comm_rules}
-      biensMoyens={partner.biens_moyens}
-      caParClient={partner.ca_par_client}
       code={partner.code}
       utm={partner.utm}
       onNavigate={(key) => window.location.href = key === "dashboard" ? "/dashboard" : `/dashboard/${key}`}

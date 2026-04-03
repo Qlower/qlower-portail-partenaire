@@ -3,22 +3,17 @@
 import { useState, useMemo } from "react";
 import { Users, UserCheck, CreditCard } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Stat, PageHeader } from "@/components/ui";
-import { useLeads, useMonthlyStats, useActions } from "@/hooks/usePartnerData";
-import { calcCommission } from "@/services/commission";
-import { buildSignupLink } from "@/services/links";
+import { useLeads, useMonthlyStats, useActions, useCommissions } from "@/hooks/usePartnerData";
 import { STAGE_STYLES, SOURCE_STYLES } from "@/services/constants";
 import { BarChart } from "./BarChart";
 import { EmptyDashboard } from "./EmptyDashboard";
-import type { CommissionRule, Lead, LeadStage } from "@/types";
+import type { LeadStage } from "@/types";
 
 type FilterTab = "all" | "Abonne" | "Payeur" | "Non payeur";
 
 interface DashboardProps {
   partnerId: string;
   partnerType: string;
-  commRules: CommissionRule[];
-  biensMoyens: number;
-  caParClient: number;
   code?: string;
   utm?: string;
   onNavigate: (module: string) => void;
@@ -27,9 +22,6 @@ interface DashboardProps {
 export function Dashboard({
   partnerId,
   partnerType,
-  commRules,
-  biensMoyens,
-  caParClient,
   code = "",
   utm = "",
   onNavigate,
@@ -37,6 +29,8 @@ export function Dashboard({
   const { data: leads = [], isLoading: leadsLoading } = useLeads(partnerId);
   const { data: monthlyStats = [], isLoading: statsLoading } = useMonthlyStats(partnerId);
   const { data: actions = [] } = useActions(partnerId);
+  const currentYear = new Date().getFullYear();
+  const { data: commissionData } = useCommissions(partnerId, currentYear);
 
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
@@ -44,8 +38,7 @@ export function Dashboard({
   // Computed values
   const abonnes = leads.filter((l) => l.stage === "Abonne").length;
   const payeurs = leads.filter((l) => l.stage === "Payeur").length;
-  const actifs = leads.filter((l) => l.commission_due).length;
-  const commission = calcCommission(commRules, actifs, biensMoyens, caParClient);
+  const nonPayeurs = leads.filter((l) => l.stage === "Non payeur").length;
 
   // Filtered leads
   const filteredLeads = useMemo(() => {
@@ -92,7 +85,7 @@ export function Dashboard({
     { key: "all", label: "Tous", count: leads.length },
     { key: "Abonne", label: "Abonnés", count: abonnes },
     { key: "Payeur", label: "Payeurs ponctuels", count: payeurs },
-    { key: "Non payeur", label: "Non payeurs", count: leads.length - actifs },
+    { key: "Non payeur", label: "Non payeurs", count: nonPayeurs },
   ];
 
   const stageBadge = (stage: LeadStage) => {
@@ -135,23 +128,26 @@ export function Dashboard({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
             <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-2">
-              Commission estimée
+              Commission {currentYear}
             </p>
             <p className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
-              {commission.total.toLocaleString("fr-FR")}&nbsp;&euro;
+              {(commissionData?.totalCommission ?? 0).toLocaleString("fr-FR")}&nbsp;&euro;
+            </p>
+            <p className="text-xs text-white/40 mt-1">
+              {commissionData?.totalSubscribers ?? 0} abonné{(commissionData?.totalSubscribers ?? 0) > 1 ? "s" : ""} × {commissionData?.montantParAbonne ?? 100}&nbsp;&euro;
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            {commission.detail.map((d, i) => (
-              <div
-                key={i}
-                className="bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-xl px-4 py-3 min-w-[140px]"
-              >
-                <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">{d.label}</p>
-                <p className="text-lg font-bold text-white">{d.montant.toLocaleString("fr-FR")}&nbsp;&euro;</p>
-                <p className="text-[10px] text-white/40 mt-0.5">{d.calc}</p>
-              </div>
-            ))}
+            <div className="bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-xl px-4 py-3 min-w-[140px]">
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Abonnés {currentYear}</p>
+              <p className="text-lg font-bold text-white">{commissionData?.totalSubscribers ?? 0}</p>
+              <p className="text-[10px] text-white/40 mt-0.5">sur {commissionData?.totalContacts ?? 0} contacts</p>
+            </div>
+            <div className="bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-xl px-4 py-3 min-w-[140px]">
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Année {currentYear - 1}</p>
+              <p className="text-lg font-bold text-white">{(commissionData?.previousYear.totalCommission ?? 0).toLocaleString("fr-FR")}&nbsp;&euro;</p>
+              <p className="text-[10px] text-white/40 mt-0.5">{commissionData?.previousYear.totalSubscribers ?? 0} abonné{(commissionData?.previousYear.totalSubscribers ?? 0) > 1 ? "s" : ""}</p>
+            </div>
           </div>
         </div>
       </div>
