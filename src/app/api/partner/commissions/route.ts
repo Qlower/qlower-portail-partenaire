@@ -10,6 +10,7 @@ const PROPERTIES = [
   "email",
   "partenaire__lead_",
   "hs_v2_date_entered_999998694",
+  "hs_v2_date_exited_999998694",
   "lifecyclestage",
 ];
 
@@ -88,7 +89,15 @@ export async function GET(request: NextRequest) {
 
   for (const contact of contacts) {
     const dateStr = contact.properties.hs_v2_date_entered_999998694;
-    if (!dateStr) continue; // Not a subscriber
+    if (!dateStr) continue; // Never entered subscriber stage
+
+    // Skip churned contacts: if they exited the subscriber stage, they're not active subscribers
+    const exitDateStr = contact.properties.hs_v2_date_exited_999998694;
+    const currentLifecycle = (contact.properties.lifecyclestage || "").toLowerCase();
+    const isCurrentlySubscriber = currentLifecycle === "999998694";
+
+    // Only count if currently in subscriber stage (not churned)
+    if (!isCurrentlySubscriber && exitDateStr) continue;
 
     const subDate = new Date(dateStr);
     const subYear = subDate.getFullYear();

@@ -30,10 +30,12 @@ export function Dashboard({
   const { data: monthlyStats = [], isLoading: statsLoading } = useMonthlyStats(partnerId);
   const { data: actions = [] } = useActions(partnerId);
   const currentYear = new Date().getFullYear();
-  const { data: commissionData } = useCommissions(partnerId, currentYear);
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const { data: commissionData } = useCommissions(partnerId, selectedYear);
 
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
+  const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
 
   // Computed values
   const abonnes = leads.filter((l) => l.stage === "Abonne").length;
@@ -127,9 +129,20 @@ export function Dashboard({
       <div className="rounded-2xl bg-gradient-to-br from-[#0A3855] to-[#0A3855]/80 p-6 sm:p-8 shadow-lg shadow-[#0A3855]/10">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
-            <p className="text-xs text-white/60 font-semibold uppercase tracking-widest mb-2">
-              Commission {currentYear}
-            </p>
+            <div className="flex items-center gap-3 mb-2">
+              <p className="text-xs text-white/60 font-semibold uppercase tracking-widest">
+                Commission
+              </p>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="bg-white/10 backdrop-blur-sm rounded-lg px-2.5 py-1 border border-white/10 text-xs font-bold text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/20"
+              >
+                {yearOptions.map((y) => (
+                  <option key={y} value={y} className="bg-[#0A3855] text-white">{y}</option>
+                ))}
+              </select>
+            </div>
             <p className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
               {(commissionData?.totalCommission ?? 0).toLocaleString("fr-FR")}&nbsp;&euro;
             </p>
@@ -139,12 +152,12 @@ export function Dashboard({
           </div>
           <div className="flex flex-wrap gap-3">
             <div className="bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-xl px-4 py-3 min-w-[140px]">
-              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Abonnés {currentYear}</p>
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Abonnés {selectedYear}</p>
               <p className="text-lg font-bold text-white">{commissionData?.totalSubscribers ?? 0}</p>
               <p className="text-[10px] text-white/40 mt-0.5">sur {commissionData?.totalContacts ?? 0} contacts</p>
             </div>
             <div className="bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-xl px-4 py-3 min-w-[140px]">
-              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Année {currentYear - 1}</p>
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Année {selectedYear - 1}</p>
               <p className="text-lg font-bold text-white">{(commissionData?.previousYear.totalCommission ?? 0).toLocaleString("fr-FR")}&nbsp;&euro;</p>
               <p className="text-[10px] text-white/40 mt-0.5">{commissionData?.previousYear.totalSubscribers ?? 0} abonné{(commissionData?.previousYear.totalSubscribers ?? 0) > 1 ? "s" : ""}</p>
             </div>
