@@ -8,7 +8,7 @@ import UtmTab from "./UtmTab";
 import StatsTab from "./StatsTab";
 import FacturationTab from "./FacturationTab";
 import SettingsTab from "./SettingsTab";
-import { useAdminPartners } from "@/hooks/useAdminData";
+import { useAdminPartners, useSyncHubspot } from "@/hooks/useAdminData";
 import {
   Users,
   Megaphone,
@@ -17,6 +17,7 @@ import {
   BarChart3,
   Receipt,
   Settings,
+  RefreshCw,
 } from "lucide-react";
 
 const TABS = [
@@ -34,6 +35,8 @@ type TabKey = (typeof TABS)[number]["key"];
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<TabKey>("partenaires");
   const { data: partners = [] } = useAdminPartners();
+  const syncHubspot = useSyncHubspot();
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const newPartnersCount = useMemo(() => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -42,6 +45,38 @@ export default function AdminPanel() {
 
   return (
     <div className="space-y-6">
+      {/* Header with sync button */}
+      <div className="flex items-center justify-between">
+        <div />
+        <div className="flex items-center gap-3">
+          {syncMessage && (
+            <span className="text-sm text-green-600 font-medium">
+              {syncMessage}
+            </span>
+          )}
+          <button
+            onClick={async () => {
+              setSyncMessage(null);
+              try {
+                const result = await syncHubspot.mutateAsync();
+                setSyncMessage(
+                  `Sync OK : ${result.synced} nouveaux, ${result.updated} mis a jour, ${result.skipped} ignores`
+                );
+              } catch {
+                setSyncMessage("Erreur lors de la synchronisation");
+              }
+            }}
+            disabled={syncHubspot.isPending}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#0A3855] text-white hover:bg-[#0A3855]/90 disabled:opacity-50 transition-all"
+          >
+            <RefreshCw
+              className={`size-4 ${syncHubspot.isPending ? "animate-spin" : ""}`}
+            />
+            {syncHubspot.isPending ? "Sync en cours..." : "Sync HubSpot"}
+          </button>
+        </div>
+      </div>
+
       {/* Tab navigation */}
       <nav className="flex flex-wrap gap-1 p-1 bg-white rounded-xl border border-gray-200/80 shadow-sm">
         {TABS.map((tab) => {

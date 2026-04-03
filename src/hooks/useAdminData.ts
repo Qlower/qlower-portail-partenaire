@@ -59,3 +59,20 @@ export function useOnboardPartnerAdmin() {
     },
   });
 }
+
+export function useSyncHubspot() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post("/admin/sync-hubspot");
+      return data as {
+        synced: number;
+        updated: number;
+        skipped: number;
+        errors: number;
+        total: number;
+      };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin"] }),
+  });
+}
