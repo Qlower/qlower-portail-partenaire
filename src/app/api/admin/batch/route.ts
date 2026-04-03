@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyAdmin } from "@/lib/admin-auth";
 import { randomUUID } from "crypto";
 
 const HS_TOKEN = process.env.HUBSPOT_TOKEN!;
@@ -133,6 +134,9 @@ async function syncContactsForPartner(
 
 // POST batch create partners (admin only)
 export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
+
   const supabase = createServiceClient();
   const { partners: partnersList } = await request.json();
 

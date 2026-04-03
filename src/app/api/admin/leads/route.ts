@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 // GET /api/admin/leads?partner_id=xxx
 export async function GET(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
+
   const { searchParams } = new URL(request.url);
   const partnerId = searchParams.get("partner_id");
 

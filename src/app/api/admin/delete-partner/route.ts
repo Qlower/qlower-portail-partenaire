@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 // POST /api/admin/delete-partner  { id: "xxx", move_to?: "yyy" }
 export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
+
   const supabase = createServiceClient();
   const { id, move_to: moveTo } = await request.json();
 

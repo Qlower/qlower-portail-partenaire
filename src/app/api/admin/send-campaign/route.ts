@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { resend, FROM } from "@/lib/resend";
 import { getEmailContent, type TemplateKey } from "@/services/emailTemplates";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
+
   const body = await request.json();
   const { templateKey, audience } = body as { templateKey: TemplateKey; audience: string };
 

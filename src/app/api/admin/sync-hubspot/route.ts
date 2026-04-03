@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 const HS_TOKEN = process.env.HUBSPOT_TOKEN!;
 const HS_BASE = "https://api.hubapi.com";
@@ -192,7 +193,10 @@ async function fetchAllPartnerContacts() {
 }
 
 // ── POST handler ────────────────────────────────────────────
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
+
   try {
     const contacts = await fetchAllPartnerContacts();
     const supabase = createServiceClient();

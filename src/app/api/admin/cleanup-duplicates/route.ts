@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 // POST /api/admin/cleanup-duplicates
 // Finds duplicate partners (same UTM) and keeps only the one with the most leads/data.
 // Moves leads from the duplicate to the kept partner, then deletes the duplicate.
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
+
   const supabase = createServiceClient();
 
   const { data: partners, error } = await supabase

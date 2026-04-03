@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 // GET all partners (admin only - service_role bypasses RLS)
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
+
   const supabase = createServiceClient();
 
   const { data, error } = await supabase
@@ -19,6 +23,9 @@ export async function GET() {
 
 // POST create new partner (admin only)
 export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
+
   const supabase = createServiceClient();
   const body = await request.json();
 
@@ -189,6 +196,9 @@ export async function POST(request: NextRequest) {
 
 // DELETE partner (admin only) — moves leads to another partner with same UTM if exists
 export async function DELETE(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
+
   const supabase = createServiceClient();
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
@@ -255,6 +265,9 @@ export async function DELETE(request: NextRequest) {
 
 // PATCH update partner (admin only)
 export async function PATCH(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
+
   const supabase = createServiceClient();
   const body = await request.json();
   const { id, ...updates } = body;

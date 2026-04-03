@@ -1,8 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 // POST /api/admin/recount — Recount leads and abonnes for all partners
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
   const supabase = createServiceClient();
 
   const { data: partners } = await supabase.from("partners").select("id");
