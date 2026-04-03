@@ -1,10 +1,9 @@
 "use client";
 
-import { useInvoices, useLeads } from "@/hooks/usePartnerData";
-import { calcCommission, COMM_LABELS } from "@/services/commission";
+import { useState } from "react";
+import { useInvoices, useLeads, useCommissions } from "@/hooks/usePartnerData";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Stat } from "@/components/ui/stat";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { Partner, Invoice } from "@/types";
@@ -32,20 +31,11 @@ function statusBadge(statut: Invoice["statut"]) {
 }
 
 export default function Revenus({ partner }: RevenusProps) {
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
   const { data: invoices, isLoading } = useInvoices(partner.id);
   const { data: leads } = useLeads(partner.id);
-
-  // Count actifs from real leads data
-  const abonnes = leads?.filter((l) => l.stage === "Abonne").length || 0;
-  const payeurs = leads?.filter((l) => l.stage === "Payeur").length || 0;
-  const actifs = leads?.filter((l) => l.commission_due).length || 0;
-
-  const commission = calcCommission(
-    partner.comm_rules,
-    actifs,
-    partner.biens_moyens,
-    partner.ca_par_client,
-  );
+  const { data: commissionData, isLoading: commLoading } = useCommissions(partner.id, selectedYear);
 
   const paidTotal = invoices
     ? invoices.filter((i) => i.statut === "Payee").reduce((sum, i) => sum + i.montant, 0)
@@ -58,17 +48,21 @@ export default function Revenus({ partner }: RevenusProps) {
   const nextPayment = invoices?.find((i) => i.statut === "En attente");
 
   const objectifAnnuel = partner.comm_obj_annuel || 10000;
-  const progressPct = Math.min(Math.round((paidTotal / objectifAnnuel) * 100), 100);
+  const totalCommission = commissionData?.totalCommission ?? 0;
+  const progressPct = Math.min(Math.round((totalCommission / objectifAnnuel) * 100), 100);
 
   // Determine how far along timeline based on data
   const totalLeads = leads?.length || 0;
+  const totalSubscribers = commissionData?.totalSubscribers ?? 0;
   const timelineProgress = paidTotal > 0
     ? (paidTotal >= objectifAnnuel ? 4 : 3)
-    : actifs > 0
+    : totalSubscribers > 0
       ? 2
       : totalLeads > 0
         ? 1
         : 0;
+
+  const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
 
   return (
     <div className="space-y-6">
@@ -82,33 +76,54 @@ export default function Revenus({ partner }: RevenusProps) {
           <div className="flex items-start justify-between mb-5">
             <div>
               <p className="text-[11px] text-white/50 uppercase tracking-widest font-semibold mb-1.5">
-                Commission totale estimée
+                Commission {selectedYear}
               </p>
-              <p className="text-4xl font-bold tracking-tight">{commission.total.toLocaleString("fr-FR")} &euro;</p>
+              <p className="text-4xl font-bold tracking-tight">
+                {commLoading ? "..." : `${totalCommission.toLocaleString("fr-FR")} €`}
+              </p>
+              <p className="text-xs text-white/40 mt-1">
+                {totalSubscribers} abonné{totalSubscribers > 1 ? "s" : ""} × {commissionData?.montantParAbonne ?? 100} €
+              </p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-white/10">
-              <span className="text-xs font-medium text-white/80">{actifs} actif{actifs > 1 ? "s" : ""}</span>
+            <div className="flex items-center gap-2">
+              {/* Year selector */}
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-white/10 text-xs font-medium text-white/80 cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/20"
+              >
+                {yearOptions.map((y) => (
+                  <option key={y} value={y} className="bg-[#0A3855] text-white">
+                    {y}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Commission breakdown */}
-          {commission.detail.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {commission.detail.map((d, i) => (
-                <div key={i} className="bg-white/[0.07] backdrop-blur-sm rounded-xl px-4 py-3 border border-white/[0.08]">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">{d.label}</p>
-                  <p className="text-base font-bold text-white mt-1">{d.montant.toLocaleString("fr-FR")} &euro;</p>
-                  <p className="text-[10px] text-white/30 mt-0.5">{d.calc}</p>
-                </div>
-              ))}
+          {/* Commission breakdown cards */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="bg-white/[0.07] backdrop-blur-sm rounded-xl px-4 py-3 border border-white/[0.08]">
+              <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">Abonnés {selectedYear}</p>
+              <p className="text-base font-bold text-white mt-1">{totalSubscribers}</p>
+              <p className="text-[10px] text-white/30 mt-0.5">sur {commissionData?.totalContacts ?? 0} contacts total</p>
             </div>
-          )}
+            <div className="bg-white/[0.07] backdrop-blur-sm rounded-xl px-4 py-3 border border-white/[0.08]">
+              <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">Année {selectedYear - 1}</p>
+              <p className="text-base font-bold text-white mt-1">
+                {(commissionData?.previousYear.totalCommission ?? 0).toLocaleString("fr-FR")} €
+              </p>
+              <p className="text-[10px] text-white/30 mt-0.5">
+                {commissionData?.previousYear.totalSubscribers ?? 0} abonné{(commissionData?.previousYear.totalSubscribers ?? 0) > 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
 
           {/* Progress bar */}
           <div>
             <div className="flex items-center justify-between text-xs mb-2.5">
               <span className="text-white/50 font-medium">Objectif annuel</span>
-              <span className="font-bold text-white">{progressPct}% &mdash; {objectifAnnuel.toLocaleString("fr-FR")} &euro;</span>
+              <span className="font-bold text-white">{progressPct}% &mdash; {objectifAnnuel.toLocaleString("fr-FR")} €</span>
             </div>
             <div className="h-3 bg-white/10 rounded-full overflow-hidden backdrop-blur-sm">
               <div
@@ -119,6 +134,109 @@ export default function Revenus({ partner }: RevenusProps) {
           </div>
         </div>
       </div>
+
+      {/* Monthly breakdown table */}
+      <Card className="border-gray-200 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold text-gray-900">
+              Détail mensuel {selectedYear}
+            </CardTitle>
+            <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855] text-xs shadow-none">
+              {totalSubscribers} abonné{totalSubscribers > 1 ? "s" : ""} · {totalCommission.toLocaleString("fr-FR")} €
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {commLoading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="w-8 h-8 border-2 border-[#0A3855] border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-gray-400 mt-3">Chargement...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-6">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 pb-3">Mois</th>
+                    <th className="text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 pb-3">Abonnés</th>
+                    <th className="text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 pb-3">Commission</th>
+                    <th className="text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 pb-3">N-1</th>
+                    <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-6 pb-3">Détail</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {(commissionData?.months ?? []).map((m) => {
+                    const hasData = m.subscribers > 0;
+                    const diff = m.subscribers - m.previousYear;
+                    return (
+                      <tr
+                        key={m.month}
+                        className={`transition-colors ${hasData ? "bg-emerald-50/30 hover:bg-emerald-50/50" : "hover:bg-gray-50/50"}`}
+                      >
+                        <td className="px-6 py-3 font-medium text-gray-700">{m.label}</td>
+                        <td className="px-6 py-3 text-right tabular-nums">
+                          {hasData ? (
+                            <span className="font-semibold text-[#0A3855]">{m.subscribers}</span>
+                          ) : (
+                            <span className="text-gray-300">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3 text-right tabular-nums">
+                          {hasData ? (
+                            <span className="font-bold text-[#0A3855]">{m.commission.toLocaleString("fr-FR")} €</span>
+                          ) : (
+                            <span className="text-gray-300">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3 text-right tabular-nums">
+                          {m.previousYear > 0 ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span className="text-gray-400 text-xs">{m.previousYear}</span>
+                              {diff !== 0 && (
+                                <span className={`text-[10px] font-semibold ${diff > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                  {diff > 0 ? "+" : ""}{diff}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-300 text-xs">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3">
+                          {m.subscriberNames.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {m.subscriberNames.map((name, i) => (
+                                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#E5EDF1] text-[#0A3855] text-[10px] font-medium">
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-gray-300 text-xs">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {/* Total row */}
+                <tfoot>
+                  <tr className="border-t-2 border-[#0A3855]/20 bg-[#E5EDF1]/30">
+                    <td className="px-6 py-3 font-bold text-gray-900">Total</td>
+                    <td className="px-6 py-3 text-right font-bold text-[#0A3855] tabular-nums">{totalSubscribers}</td>
+                    <td className="px-6 py-3 text-right font-bold text-[#0A3855] tabular-nums">{totalCommission.toLocaleString("fr-FR")} €</td>
+                    <td className="px-6 py-3 text-right text-gray-400 tabular-nums text-xs">
+                      {commissionData?.previousYear.totalSubscribers ?? 0} abonnés
+                    </td>
+                    <td className="px-6 py-3" />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -132,7 +250,7 @@ export default function Revenus({ partner }: RevenusProps) {
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-medium">En attente</p>
-                <p className="text-xl font-bold text-gray-900">{pendingTotal.toLocaleString("fr-FR")} &euro;</p>
+                <p className="text-xl font-bold text-gray-900">{pendingTotal.toLocaleString("fr-FR")} €</p>
                 <p className="text-[11px] text-gray-400">À verser</p>
               </div>
             </div>
@@ -167,7 +285,7 @@ export default function Revenus({ partner }: RevenusProps) {
               </div>
               <div>
                 <p className="text-xs text-gray-500 font-medium">Total versé</p>
-                <p className="text-xl font-bold text-gray-900">{paidTotal.toLocaleString("fr-FR")} &euro;</p>
+                <p className="text-xl font-bold text-gray-900">{paidTotal.toLocaleString("fr-FR")} €</p>
                 <p className="text-[11px] text-gray-400">Cumul</p>
               </div>
             </div>
@@ -255,7 +373,7 @@ export default function Revenus({ partner }: RevenusProps) {
                 </svg>
               </div>
               <p className="text-sm font-medium text-gray-500">Aucune facture pour le moment</p>
-              <p className="text-xs text-gray-400 mt-1">Vos factures appara&icirc;tront ici</p>
+              <p className="text-xs text-gray-400 mt-1">Vos factures apparaîtront ici</p>
             </div>
           ) : (
             <div className="overflow-x-auto -mx-6">
@@ -279,7 +397,7 @@ export default function Revenus({ partner }: RevenusProps) {
                         })}
                       </td>
                       <td className="px-6 py-3.5 font-bold text-gray-900 tabular-nums">
-                        {inv.montant.toLocaleString("fr-FR")} &euro;
+                        {inv.montant.toLocaleString("fr-FR")} €
                       </td>
                       <td className="px-6 py-3.5">{statusBadge(inv.statut)}</td>
                       <td className="px-6 py-3.5 text-right">

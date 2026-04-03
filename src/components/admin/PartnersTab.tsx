@@ -5,7 +5,9 @@ import type { Partner, CommissionRule, ContratType, PartnerType } from "@/types"
 import { PARTNER_TYPES } from "@/services/constants";
 import { calcCommission, DEFAULT_TRANCHES } from "@/services/commission";
 import { slug } from "@/services/links";
-import { useAdminPartners, useCreatePartner, useUpdatePartner } from "@/hooks/useAdminData";
+import { useAdminPartners, useCreatePartner, useUpdatePartner, useAdminLeads } from "@/hooks/useAdminData";
+import { STAGE_STYLES } from "@/services/constants";
+import type { LeadStage } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +29,7 @@ import {
   Check,
   AlertCircle,
   Info,
+  Eye,
 } from "lucide-react";
 
 const CONTRAT_OPTIONS = [
@@ -63,6 +66,72 @@ const emptyForm = (): NewPartnerForm => ({
   comm_rules: DEFAULT_COMM_RULES,
 });
 
+function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName: string }) {
+  const { data: leads = [], isLoading } = useAdminLeads(partnerId);
+
+  const stageBadge = (stage: LeadStage) => {
+    const s = STAGE_STYLES[stage] || STAGE_STYLES["Non payeur"];
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${s.bg} ${s.text}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${s.text === "text-green-700" ? "bg-green-500" : s.text === "text-blue-700" ? "bg-blue-500" : "bg-gray-400"}`} />
+        {stage}
+      </span>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="size-5 text-[#0A3855] animate-spin" />
+        <span className="ml-2 text-sm text-gray-400">Chargement des leads...</span>
+      </div>
+    );
+  }
+
+  if (leads.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-sm text-gray-400">Aucun lead pour {partnerName}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-gray-100">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-[#E5EDF1]/40">
+            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Nom</th>
+            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Email</th>
+            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Statut</th>
+            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Source</th>
+            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-center">Biens</th>
+            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Date</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {leads.map((lead) => (
+            <tr key={lead.id} className="hover:bg-[#E5EDF1]/20 transition-colors">
+              <td className="px-3 py-2 text-xs font-semibold text-gray-900">{lead.nom}</td>
+              <td className="px-3 py-2 text-xs text-gray-500">{lead.email}</td>
+              <td className="px-3 py-2">{stageBadge(lead.stage)}</td>
+              <td className="px-3 py-2">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600">
+                  {lead.source}
+                </span>
+              </td>
+              <td className="px-3 py-2 text-xs text-gray-500 text-center tabular-nums">{lead.biens}</td>
+              <td className="px-3 py-2 text-[10px] text-gray-400">
+                {new Date(lead.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function PartnersTab() {
   const { data: partners = [], isLoading: loading } = useAdminPartners();
   const createPartner = useCreatePartner();
@@ -71,6 +140,7 @@ export default function PartnersTab() {
   const [form, setForm] = useState<NewPartnerForm>(emptyForm());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Partner>>({});
+  const [viewingLeadsId, setViewingLeadsId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -347,6 +417,15 @@ export default function PartnersTab() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => setViewingLeadsId(viewingLeadsId === p.id ? null : p.id)}
+                        className={viewingLeadsId === p.id ? "bg-[#E5EDF1] text-[#0A3855]" : ""}
+                      >
+                        <Eye className="size-3.5 mr-1" />
+                        Leads
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => (isEditing ? setEditingId(null) : startEdit(p))}
                       >
                         {isEditing ? (
@@ -383,6 +462,20 @@ export default function PartnersTab() {
                       </Button>
                     </div>
                   </div>
+
+                  {/* Leads panel */}
+                  {viewingLeadsId === p.id && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Eye className="size-4 text-[#0A3855]" />
+                        <h4 className="text-sm font-semibold text-gray-900">Leads de {p.nom}</h4>
+                        <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855] text-[10px]">
+                          {p.leads} leads
+                        </Badge>
+                      </div>
+                      <LeadsPanel partnerId={p.id} partnerName={p.nom} />
+                    </div>
+                  )}
 
                   {/* Edit form */}
                   {isEditing && (

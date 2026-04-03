@@ -2,7 +2,8 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
-import type { Partner } from "@/types";
+import { createClient } from "@/lib/supabase-browser";
+import type { Partner, Lead } from "@/types";
 
 // ── Queries ──────────────────────────────────────────────────
 
@@ -57,6 +58,23 @@ export function useOnboardPartnerAdmin() {
       const { data } = await api.post("/hubspot/onboard-partner", payload);
       return data;
     },
+  });
+}
+
+export function useAdminLeads(partnerId: string | undefined) {
+  return useQuery<Lead[]>({
+    queryKey: ["admin", "leads", partnerId],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("leads")
+        .select("*")
+        .eq("partner_id", partnerId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Lead[];
+    },
+    enabled: !!partnerId,
   });
 }
 
