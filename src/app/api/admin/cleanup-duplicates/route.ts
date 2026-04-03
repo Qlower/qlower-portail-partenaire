@@ -100,7 +100,7 @@ export async function POST() {
       .from("leads")
       .select("id", { count: "exact", head: true })
       .eq("partner_id", keep.id)
-      .eq("commission_due", true);
+      .eq("stage", "Abonne");
 
     await supabase
       .from("partners")

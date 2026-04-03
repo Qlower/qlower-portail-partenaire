@@ -30,6 +30,7 @@ import {
   AlertCircle,
   Info,
   Eye,
+  Search,
 } from "lucide-react";
 
 const CONTRAT_OPTIONS = [
@@ -68,6 +69,13 @@ const emptyForm = (): NewPartnerForm => ({
 
 function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName: string }) {
   const { data: leads = [], isLoading } = useAdminLeads(partnerId);
+  const [leadSearch, setLeadSearch] = useState("");
+
+  const filteredLeads = leads.filter((l) => {
+    if (!leadSearch.trim()) return true;
+    const q = leadSearch.toLowerCase();
+    return l.nom.toLowerCase().includes(q) || l.email.toLowerCase().includes(q);
+  });
 
   const stageBadge = (stage: LeadStage) => {
     const s = STAGE_STYLES[stage] || STAGE_STYLES["Non payeur"];
@@ -97,37 +105,52 @@ function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-100">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-[#E5EDF1]/40">
-            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Nom</th>
-            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Email</th>
-            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Statut</th>
-            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Source</th>
-            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-center">Biens</th>
-            <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Date</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {leads.map((lead) => (
-            <tr key={lead.id} className="hover:bg-[#E5EDF1]/20 transition-colors">
-              <td className="px-3 py-2 text-xs font-semibold text-gray-900">{lead.nom}</td>
-              <td className="px-3 py-2 text-xs text-gray-500">{lead.email}</td>
-              <td className="px-3 py-2">{stageBadge(lead.stage)}</td>
-              <td className="px-3 py-2">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600">
-                  {lead.source}
-                </span>
-              </td>
-              <td className="px-3 py-2 text-xs text-gray-500 text-center tabular-nums">{lead.biens}</td>
-              <td className="px-3 py-2 text-[10px] text-gray-400">
-                {new Date(lead.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-              </td>
+    <div className="space-y-3">
+      <Input
+        placeholder="Rechercher un lead (nom, email)..."
+        value={leadSearch}
+        onChange={(e) => setLeadSearch(e.target.value)}
+        className="max-w-sm text-xs"
+      />
+      <div className="overflow-x-auto rounded-lg border border-gray-100">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-[#E5EDF1]/40">
+              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Nom</th>
+              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Email</th>
+              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Statut</th>
+              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Source</th>
+              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-center">Biens</th>
+              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Date HubSpot</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {filteredLeads.map((lead) => (
+              <tr key={lead.id} className="hover:bg-[#E5EDF1]/20 transition-colors">
+                <td className="px-3 py-2 text-xs font-semibold text-gray-900">{lead.nom}</td>
+                <td className="px-3 py-2 text-xs text-gray-500">{lead.email}</td>
+                <td className="px-3 py-2">{stageBadge(lead.stage)}</td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600">
+                    {lead.source}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-xs text-gray-500 text-center tabular-nums">{lead.biens}</td>
+                <td className="px-3 py-2 text-[10px] text-gray-400">
+                  {new Date(lead.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                </td>
+              </tr>
+            ))}
+            {filteredLeads.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-3 py-6 text-center text-xs text-gray-400">
+                  Aucun lead correspondant
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -141,8 +164,20 @@ export default function PartnersTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Partner>>({});
   const [viewingLeadsId, setViewingLeadsId] = useState<string | null>(null);
+  const [partnerSearch, setPartnerSearch] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const filteredPartners = partners.filter((p) => {
+    if (!partnerSearch.trim()) return true;
+    const q = partnerSearch.toLowerCase();
+    return (
+      p.nom.toLowerCase().includes(q) ||
+      (p.email || "").toLowerCase().includes(q) ||
+      (p.utm || "").toLowerCase().includes(q) ||
+      (p.code || "").toLowerCase().includes(q)
+    );
+  });
 
   const handleCreate = async () => {
     setError("");
@@ -218,13 +253,20 @@ export default function PartnersTab() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-semibold text-gray-900">Partenaires</h3>
           <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855]">
-            {partners.length}
+            {filteredPartners.length}/{partners.length}
           </Badge>
         </div>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Rechercher partenaire..."
+            value={partnerSearch}
+            onChange={(e) => setPartnerSearch(e.target.value)}
+            className="w-56 text-xs"
+          />
         <Button
           onClick={() => setShowCreate(!showCreate)}
           className={showCreate ? "bg-gray-100 text-gray-700 hover:bg-gray-200" : ""}
@@ -241,6 +283,7 @@ export default function PartnersTab() {
             </>
           )}
         </Button>
+        </div>
       </div>
 
       {/* Create form */}
@@ -344,7 +387,7 @@ export default function PartnersTab() {
         </div>
       ) : (
         <div className="space-y-3">
-          {partners.map((p) => {
+          {filteredPartners.map((p) => {
             const commission = calcCommission(p.comm_rules, p.abonnes, p.biens_moyens, p.ca_par_client);
             const isEditing = editingId === p.id;
 

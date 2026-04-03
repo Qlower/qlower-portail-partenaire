@@ -15,6 +15,7 @@ const PROPERTIES = [
   "hs_lifecyclestage",
   "lifecyclestage",
   "hs_v2_date_entered_999998694",
+  "createdate",
 ];
 
 // ── Map HubSpot lifecycle to our stage (same as sync-hubspot) ────
@@ -94,28 +95,35 @@ async function syncContactsForPartner(
 
     if (existing) {
       const newCommissionDue = existing.commission_due || commissionDue;
-      await supabase
-        .from("leads")
-        .update({ stage, hs_contact_id: contact.id, commission_due: newCommissionDue })
-        .eq("id", existing.id);
+      const updateFields: Record<string, unknown> = {
+        stage, hs_contact_id: contact.id, commission_due: newCommissionDue,
+      };
+      if (props.createdate) {
+        updateFields.created_at = new Date(props.createdate).toISOString();
+      }
+      await supabase.from("leads").update(updateFields).eq("id", existing.id);
       if (!existing.commission_due && newCommissionDue) {
         await supabase.rpc("increment_partner_abonnes", { p_id: partnerId });
       }
       summary.updated++;
     } else {
-      const now = new Date();
+      const hsCreateDate = props.createdate ? new Date(props.createdate) : new Date();
       await supabase.from("leads").insert({
         partner_id: partnerId,
         nom,
         email,
         source: "UTM",
         stage,
-        mois: now.toLocaleDateString("fr-FR", { month: "short", year: "numeric" }),
+        mois: hsCreateDate.toLocaleDateString("fr-FR", { month: "short", year: "numeric" }),
         biens: 0,
         hs_contact_id: contact.id,
         commission_due: commissionDue,
+        created_at: hsCreateDate.toISOString(),
       });
       await supabase.rpc("increment_partner_leads", { p_id: partnerId });
+      if (commissionDue) {
+        await supabase.rpc("increment_partner_abonnes", { p_id: partnerId });
+      }
       summary.synced++;
     }
   }
@@ -315,6 +323,15 @@ export async function POST(request: NextRequest) {
         console.error(`Sync error for ${putm}:`, e);
       }
     }
+  }
+
+  // Recount leads/abonnes for all synced partners
+  for (const partner of allPartners) {
+    const pid = partner.id as string;
+    if (!pid) continue;
+    const { count: leadCount } = await supabase.from("leads").select("id", { count: "exact", head: true }).eq("partner_id", pid);
+    const { count: abonnesCount } = await supabase.from("leads").select("id", { count: "exact", head: true }).eq("partner_id", pid).eq("stage", "Abonne");
+    await supabase.from("partners").update({ leads: leadCount || 0, abonnes: abonnesCount || 0 }).eq("id", pid);
   }
 
   return NextResponse.json({

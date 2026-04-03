@@ -23,7 +23,7 @@ function verifyRequest(request: NextRequest): boolean {
 // ── Fetch full contact from HubSpot ─────────────────────────
 async function fetchContact(contactId: string) {
   const res = await fetch(
-    `${HS_BASE}/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,phone,partenaire__lead_,utm_source,hs_lifecyclestage,lifecyclestage,hs_v2_date_entered_999998694`,
+    `${HS_BASE}/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,phone,partenaire__lead_,utm_source,hs_lifecyclestage,lifecyclestage,hs_v2_date_entered_999998694,createdate`,
     { headers: { Authorization: `Bearer ${HS_TOKEN}` } }
   );
   if (!res.ok) return null;
@@ -84,14 +84,18 @@ async function upsertLead(
   if (existing) {
     const newCommissionDue = existing.commission_due || commissionDue;
 
-    // Update stage, hs_contact_id, and commission_due (only set to true, never back to false)
+    const updateFields: Record<string, unknown> = {
+      stage,
+      hs_contact_id: contactId,
+      commission_due: newCommissionDue,
+    };
+    if (props.createdate) {
+      updateFields.created_at = new Date(props.createdate).toISOString();
+    }
+
     await supabase
       .from("leads")
-      .update({
-        stage,
-        hs_contact_id: contactId,
-        commission_due: newCommissionDue,
-      })
+      .update(updateFields)
       .eq("id", existing.id);
 
     // Increment partner abonnes counter only when commission_due goes from false to true (first time)
@@ -103,8 +107,8 @@ async function upsertLead(
   }
 
   // Insert new lead
-  const now = new Date();
-  const mois = now.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
+  const hsCreateDate = props.createdate ? new Date(props.createdate) : new Date();
+  const mois = hsCreateDate.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
 
   await supabase.from("leads").insert({
     partner_id: partner.id,
@@ -116,10 +120,16 @@ async function upsertLead(
     biens: 0,
     hs_contact_id: contactId,
     commission_due: commissionDue,
+    created_at: hsCreateDate.toISOString(),
   });
 
   // Increment partner lead count
   await supabase.rpc("increment_partner_leads", { p_id: partner.id });
+
+  // Also increment abonnes if new lead has commission_due
+  if (commissionDue) {
+    await supabase.rpc("increment_partner_abonnes", { p_id: partner.id });
+  }
 
   // Log action
   await supabase.from("partner_actions").insert({

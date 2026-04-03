@@ -235,7 +235,7 @@ export async function DELETE(request: NextRequest) {
       .from("leads")
       .select("id", { count: "exact", head: true })
       .eq("partner_id", moveTo)
-      .eq("commission_due", true);
+      .eq("stage", "Abonne");
     await supabase.from("partners").update({ leads: leadCount || 0, abonnes: abonnesCount || 0 }).eq("id", moveTo);
   } else {
     // Delete all leads for this partner

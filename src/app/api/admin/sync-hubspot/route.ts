@@ -14,6 +14,7 @@ const PROPERTIES = [
   "hs_lifecyclestage",
   "lifecyclestage",
   "hs_v2_date_entered_999998694",
+  "createdate",
 ];
 
 // ── Map HubSpot lifecycle to our stage (same as webhook) ────
@@ -75,13 +76,19 @@ async function upsertLead(
   if (existing) {
     const newCommissionDue = existing.commission_due || commissionDue;
 
+    const updateFields: Record<string, unknown> = {
+      stage,
+      hs_contact_id: contactId,
+      commission_due: newCommissionDue,
+    };
+    // Update created_at with HubSpot createdate if available
+    if (props.createdate) {
+      updateFields.created_at = new Date(props.createdate).toISOString();
+    }
+
     await supabase
       .from("leads")
-      .update({
-        stage,
-        hs_contact_id: contactId,
-        commission_due: newCommissionDue,
-      })
+      .update(updateFields)
       .eq("id", existing.id);
 
     // Increment partner abonnes counter only when commission_due goes from false to true
@@ -93,8 +100,8 @@ async function upsertLead(
   }
 
   // Insert new lead
-  const now = new Date();
-  const mois = now.toLocaleDateString("fr-FR", {
+  const hsCreateDate = props.createdate ? new Date(props.createdate) : new Date();
+  const mois = hsCreateDate.toLocaleDateString("fr-FR", {
     month: "short",
     year: "numeric",
   });
@@ -109,10 +116,16 @@ async function upsertLead(
     biens: 0,
     hs_contact_id: contactId,
     commission_due: commissionDue,
+    created_at: hsCreateDate.toISOString(),
   });
 
   // Increment partner lead count (only for new leads)
   await supabase.rpc("increment_partner_leads", { p_id: partner.id });
+
+  // Also increment abonnes if new lead has commission_due
+  if (commissionDue) {
+    await supabase.rpc("increment_partner_abonnes", { p_id: partner.id });
+  }
 
   // Log action
   await supabase.from("partner_actions").insert({
@@ -201,6 +214,14 @@ export async function POST() {
           error: err instanceof Error ? err.message : String(err),
         });
       }
+    }
+
+    // Recount all partner leads/abonnes to fix any drift
+    const { data: allPartners } = await supabase.from("partners").select("id");
+    for (const p of allPartners || []) {
+      const { count: leadCount } = await supabase.from("leads").select("id", { count: "exact", head: true }).eq("partner_id", p.id);
+      const { count: abonnesCount } = await supabase.from("leads").select("id", { count: "exact", head: true }).eq("partner_id", p.id).eq("stage", "Abonne");
+      await supabase.from("partners").update({ leads: leadCount || 0, abonnes: abonnesCount || 0 }).eq("id", p.id);
     }
 
     return NextResponse.json({ ...summary, errors });
