@@ -87,23 +87,9 @@ export default function BatchTab() {
 
   const batchMutation = useBatchCreatePartners();
 
-  const handleCreate = async () => {
-    if (validRows.length === 0) return;
-    setCreating(true);
-    setError("");
-    try {
-      const result = await batchMutation.mutateAsync(validRows);
-      setCreated((result.created || []) as unknown as CreatedPartner[]);
-    } catch {
-      setError("Erreur lors de la creation batch");
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleExportCsv = () => {
+  const downloadCsv = (data: CreatedPartner[]) => {
     const header = "nom,email,utm,code_promo,mot_de_passe\n";
-    const body = created.map((p) => `${p.nom},${p.email},${p.utm || ""},${p.code || ""},${p.tempPassword}`).join("\n");
+    const body = data.map((p) => `${p.nom},${p.email},${p.utm || ""},${p.code || ""},${p.tempPassword}`).join("\n");
     const blob = new Blob([header + body], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -112,6 +98,26 @@ export default function BatchTab() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const handleCreate = async () => {
+    if (validRows.length === 0) return;
+    setCreating(true);
+    setError("");
+    try {
+      const result = await batchMutation.mutateAsync(validRows);
+      const createdList = (result.created || []) as unknown as CreatedPartner[];
+      setCreated(createdList);
+      if (createdList.length > 0) {
+        downloadCsv(createdList);
+      }
+    } catch {
+      setError("Erreur lors de la creation batch");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleExportCsv = () => downloadCsv(created);
 
   const afCount = validRows.filter((r) => r.contrat === "affiliation").length;
   const mbCount = validRows.filter((r) => r.contrat === "marque_blanche").length;
