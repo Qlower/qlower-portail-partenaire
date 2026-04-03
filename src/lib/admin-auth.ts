@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const ADMIN_EMAILS = ["alexandre@qlower.com"];
+const ADMIN_EMAILS = ["alexandre@qlower.com", "admin@qlower.com"];
 
 export async function verifyAdmin(
   request: NextRequest
