@@ -2,7 +2,6 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
-import { createClient } from "@/lib/supabase-browser";
 import type { Partner, Lead } from "@/types";
 
 // ── Queries ──────────────────────────────────────────────────
@@ -70,13 +69,7 @@ export function useAdminLeads(partnerId: string | undefined) {
   return useQuery<Lead[]>({
     queryKey: ["admin", "leads", partnerId],
     queryFn: async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("leads")
-        .select("*")
-        .eq("partner_id", partnerId!)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
+      const { data } = await api.get(`/admin/leads?partner_id=${partnerId}`);
       return data as Lead[];
     },
     enabled: !!partnerId,

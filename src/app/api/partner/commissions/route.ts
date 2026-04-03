@@ -91,13 +91,14 @@ export async function GET(request: NextRequest) {
     const dateStr = contact.properties.hs_v2_date_entered_999998694;
     if (!dateStr) continue; // Never entered subscriber stage
 
-    // Skip churned contacts: if they exited the subscriber stage, they're not active subscribers
+    // Check if currently subscriber OR entered and never exited
     const exitDateStr = contact.properties.hs_v2_date_exited_999998694;
     const currentLifecycle = (contact.properties.lifecyclestage || "").toLowerCase();
     const isCurrentlySubscriber = currentLifecycle === "999998694";
 
-    // Only count if currently in subscriber stage (not churned)
-    if (!isCurrentlySubscriber && exitDateStr) continue;
+    // Count if: lifecycle IS currently subscriber, OR entered and never exited
+    const enteredAndNeverExited = !exitDateStr;
+    if (!isCurrentlySubscriber && !enteredAndNeverExited) continue; // Churned: exited and no longer subscriber
 
     const subDate = new Date(dateStr);
     const subYear = subDate.getFullYear();

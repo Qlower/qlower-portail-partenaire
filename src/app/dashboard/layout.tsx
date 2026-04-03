@@ -30,12 +30,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const partnerIdFromMeta = user?.user_metadata?.partner_id as string | undefined;
   const { data: partnerById, isLoading: loadingById } = usePartner(partnerIdFromMeta);
+  // Fallback: also try user_id lookup if metadata partner not found (e.g. after duplicate cleanup)
+  const shouldFallback = !partnerIdFromMeta || (!loadingById && !partnerById);
   const { data: partnerByUser, isLoading: loadingByUser } = usePartnerByUserId(
-    !partnerIdFromMeta && user?.id ? user.id : undefined
+    shouldFallback && user?.id ? user.id : undefined
   );
 
   const partner = partnerById || partnerByUser;
-  const partnerLoading = (partnerIdFromMeta ? loadingById : false) || (!partnerIdFromMeta && user?.id ? loadingByUser : false);
+  const partnerLoading = (partnerIdFromMeta ? loadingById : false) || (shouldFallback && user?.id ? loadingByUser : false);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [guideDone, setGuideDone] = useState(false);
@@ -43,6 +45,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
   }, [authLoading, user, router]);
+
+  // Auto-fix: if partner found via user_id fallback but metadata has wrong partner_id, update it
+  useEffect(() => {
+    if (partnerByUser && partnerIdFromMeta && partnerIdFromMeta !== partnerByUser.id) {
+      // Metadata points to deleted partner, update it silently
+      const supabase = (async () => {
+        const { createClient: createBrowser } = await import("@/lib/supabase-browser");
+        const sb = createBrowser();
+        await sb.auth.updateUser({ data: { partner_id: partnerByUser.id } });
+      })();
+    }
+  }, [partnerByUser, partnerIdFromMeta]);
 
   // Close sidebar on route change (mobile) + sync guide state
   useEffect(() => {
