@@ -216,14 +216,6 @@ export async function POST() {
       }
     }
 
-    // Recount all partner leads/abonnes to fix any drift
-    const { data: allPartners } = await supabase.from("partners").select("id");
-    for (const p of allPartners || []) {
-      const { count: leadCount } = await supabase.from("leads").select("id", { count: "exact", head: true }).eq("partner_id", p.id);
-      const { count: abonnesCount } = await supabase.from("leads").select("id", { count: "exact", head: true }).eq("partner_id", p.id).eq("stage", "Abonne");
-      await supabase.from("partners").update({ leads: leadCount || 0, abonnes: abonnesCount || 0 }).eq("id", p.id);
-    }
-
     return NextResponse.json({ ...summary, errors });
   } catch (err) {
     return NextResponse.json(
