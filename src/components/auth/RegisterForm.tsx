@@ -62,7 +62,7 @@ export default function RegisterForm() {
     if (step === 1 && (!form.siret || !form.address || !form.city || !form.postalCode)) {
       return "Adresse complète et SIRET requis.";
     }
-    if (step === 2 && !form.promoCode) return "Code promo requis.";
+    // Code promo is now set by admin after contract signature
     if (step === 4 && (!form.iban || !form.bic)) return "IBAN et BIC requis.";
     return null;
   };
@@ -83,7 +83,7 @@ export default function RegisterForm() {
 
     const partnerId = slug(form.company || "nouveau") + "-" + Date.now().toString().slice(-4);
     const utm = slug(form.company || "nouveau");
-    const code = form.promoCode || (form.company.toUpperCase().replace(/\s/g, "").slice(0, 4) + "20");
+    const code = null; // Code promo set by admin after contract signature + Stripe setup
 
     try {
       await signUp(form.email, form.password, {
@@ -132,10 +132,7 @@ export default function RegisterForm() {
     }
   };
 
-  const autoCode = () => {
-    const b = (form.nom || form.company || "").toUpperCase().replace(/\s/g, "").slice(0, 4);
-    if (b) set("promoCode", b + "20");
-  };
+  // autoCode removed — code promo is now set by admin after contract signature
 
   // ── Progress ──────────────────────────────────────────────
   const renderProgress = () => (
@@ -240,18 +237,12 @@ export default function RegisterForm() {
               <input id="kbis-upload" type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => set("kbisFile", e.target.files?.[0] || null)} />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label>Code promo pour vos clients</Label>
-            <div className="flex gap-2">
-              <Input value={form.promoCode} onChange={(e) => set("promoCode", e.target.value)} placeholder="ex: DUPONT20" className="flex-1" />
-              <Button type="button" variant="outline" onClick={autoCode}>Générer</Button>
-            </div>
-            {form.promoCode && (
-              <p className="text-xs text-[#0A3855] bg-[#E5EDF1] rounded-lg px-3 py-2">
-                Code <strong>{form.promoCode}</strong> — -20 € pour vos clients
-              </p>
-            )}
-          </div>
+          <Alert>
+            <AlertDescription className="text-sm">
+              Votre code promo sera créé après la signature de votre contrat d&apos;affiliation.
+              Coline vous contactera sous 48h.
+            </AlertDescription>
+          </Alert>
         </div>
       );
       case 3: return (
@@ -302,9 +293,9 @@ export default function RegisterForm() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2 justify-center">
-            <Badge variant="secondary">Code : {form.promoCode}</Badge>
             <Badge variant="secondary">Affiliation</Badge>
             <Badge variant="secondary">{form.metier}</Badge>
+            <Badge variant="secondary">Code promo : attribué après signature</Badge>
           </div>
         </div>
       );

@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       .replace(/[^a-z0-9-]/g, "");
     const id = `${slug}-${Date.now().toString().slice(-4)}`;
     const utm = p.utm || slug;
-    const code = p.code || p.nom.toUpperCase().replace(/\s/g, "").slice(0, 4) + "20";
+    const code = p.code || null; // Code promo set by admin later (must match Stripe)
 
     // Create or reuse auth user if email provided
     let userId = null;
@@ -90,6 +90,37 @@ export async function POST(request: NextRequest) {
       errors.push({ nom: p.nom, error: error.message });
     } else {
       created.push({ ...data, tempPassword });
+    }
+  }
+
+  // Sync new UTM values to HubSpot partenaire__lead_ enum (non-blocking)
+  const HS_TOKEN = process.env.HUBSPOT_TOKEN;
+  if (HS_TOKEN && created.length > 0) {
+    try {
+      const HS_BASE = "https://api.hubapi.com";
+      const hsHeaders = { Authorization: `Bearer ${HS_TOKEN}`, "Content-Type": "application/json" };
+      const propRes = await fetch(`${HS_BASE}/crm/v3/properties/contacts/partenaire__lead_`, { headers: hsHeaders });
+      if (propRes.ok) {
+        const propData = await propRes.json();
+        const options = propData.options || [];
+        const existingValues = new Set(options.map((o: { value: string }) => o.value));
+        let changed = false;
+        for (const partner of created) {
+          if (partner.utm && !existingValues.has(partner.utm)) {
+            options.push({ label: partner.nom, value: partner.utm, displayOrder: -1, hidden: false });
+            changed = true;
+          }
+        }
+        if (changed) {
+          await fetch(`${HS_BASE}/crm/v3/properties/contacts/partenaire__lead_`, {
+            method: "PATCH",
+            headers: hsHeaders,
+            body: JSON.stringify({ options }),
+          });
+        }
+      }
+    } catch (e) {
+      console.error("HubSpot sync error on batch create:", e);
     }
   }
 

@@ -151,16 +151,23 @@ export default function Outils({ partner }: OutilsProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 relative overflow-hidden bg-gradient-to-r from-[#FFF5ED] to-[#FFF5ED]/50 border border-[#F6CCA4]/30 rounded-xl px-5 py-4">
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-[#F6CCA4]/10 rounded-full -translate-y-10 translate-x-10" />
-                  <p className="text-[11px] text-[#0A3855]/50 font-semibold uppercase tracking-wider mb-1">Votre code</p>
-                  <p className="text-2xl font-bold text-[#0A3855] tracking-[0.15em] font-mono">
-                    {partner.code}
-                  </p>
+              {partner.code ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 relative overflow-hidden bg-gradient-to-r from-[#FFF5ED] to-[#FFF5ED]/50 border border-[#F6CCA4]/30 rounded-xl px-5 py-4">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-[#F6CCA4]/10 rounded-full -translate-y-10 translate-x-10" />
+                    <p className="text-[11px] text-[#0A3855]/50 font-semibold uppercase tracking-wider mb-1">Votre code</p>
+                    <p className="text-2xl font-bold text-[#0A3855] tracking-[0.15em] font-mono">
+                      {partner.code}
+                    </p>
+                  </div>
+                  <CopyButton text={partner.code} label="Copier" />
                 </div>
-                <CopyButton text={partner.code} label="Copier" />
-              </div>
+              ) : (
+                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 text-center">
+                  <p className="text-sm text-gray-500">Code promo en attente de validation</p>
+                  <p className="text-xs text-gray-400 mt-1">Votre responsable partenariat vous le communiquera après la signature du contrat.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

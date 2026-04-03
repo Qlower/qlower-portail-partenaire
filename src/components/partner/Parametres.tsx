@@ -62,7 +62,7 @@ export default function Parametres({ partner, onRestartGuide }: ParametresProps)
     { label: "Email", value: user?.email ?? "-" },
     { label: "Societe", value: partner.nom },
     { label: "Type de contrat", value: partner.contrat.replace("_", " "), capitalize: true },
-    { label: "Code partenaire", value: partner.code, mono: true },
+    { label: "Code partenaire", value: partner.code || "En attente", mono: !!partner.code },
     {
       label: "Membre depuis",
       value: new Date(partner.created_at).toLocaleDateString("fr-FR", {

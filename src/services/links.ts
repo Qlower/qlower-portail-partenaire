@@ -9,8 +9,10 @@ export const slug = (s: string): string =>
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-]/g, "");
 
-export const buildSignupLink = (utm: string, code: string): string =>
-  `${SIGNUP_BASE}/signup?utm_source=${utm}&utm_medium=affiliation&utm_campaign=${code}`;
+export const buildSignupLink = (utm: string, code?: string | null): string => {
+  const base = `${SIGNUP_BASE}/signup?utm_source=${utm}&utm_medium=affiliation`;
+  return code ? `${base}&utm_campaign=${code}` : base;
+};
 
 export const buildRdvLink = (utm: string): string =>
   `${RDV_BASE}?utm_source=${utm}`;

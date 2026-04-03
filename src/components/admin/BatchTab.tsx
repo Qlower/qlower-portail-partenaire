@@ -25,6 +25,8 @@ import {
 interface BatchRow {
   nom: string;
   email: string;
+  utm: string;
+  code: string;
   type: PartnerType;
   contrat: ContratType;
 }
@@ -32,6 +34,7 @@ interface BatchRow {
 interface CreatedPartner {
   nom: string;
   code: string;
+  utm: string;
   email: string;
   tempPassword: string;
 }
@@ -41,7 +44,7 @@ const CONTRAT_OPTIONS = [
   { value: "marque_blanche", label: "Marque blanche" },
 ];
 
-const emptyRow = (): BatchRow => ({ nom: "", email: "", type: "cgp", contrat: "affiliation" });
+const emptyRow = (): BatchRow => ({ nom: "", email: "", utm: "", code: "", type: "cgp", contrat: "affiliation" });
 
 export default function BatchTab() {
   const [rows, setRows] = useState<BatchRow[]>([emptyRow()]);
@@ -70,8 +73,10 @@ export default function BatchTab() {
         parsed.push({
           nom: parts[0],
           email: parts[1] || "",
-          type: (PARTNER_TYPES.includes(parts[2] as PartnerType) ? parts[2] : "cgp") as PartnerType,
-          contrat: (parts[3] === "marque_blanche" ? "marque_blanche" : "affiliation") as ContratType,
+          utm: parts[2] || "",
+          code: parts[3] || "",
+          type: (PARTNER_TYPES.includes(parts[4] as PartnerType) ? parts[4] : "cgp") as PartnerType,
+          contrat: (parts[5] === "marque_blanche" ? "marque_blanche" : "affiliation") as ContratType,
         });
       }
     }
@@ -97,8 +102,8 @@ export default function BatchTab() {
   };
 
   const handleExportCsv = () => {
-    const header = "nom,code,email,mot_de_passe\n";
-    const body = created.map((p) => `${p.nom},${p.code},${p.email},${p.tempPassword}`).join("\n");
+    const header = "nom,email,utm,code_promo,mot_de_passe\n";
+    const body = created.map((p) => `${p.nom},${p.email},${p.utm || ""},${p.code || ""},${p.tempPassword}`).join("\n");
     const blob = new Blob([header + body], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -135,12 +140,12 @@ export default function BatchTab() {
               Collez votre CSV ici
             </p>
             <p className="text-xs text-gray-400 mb-4">
-              Format : nom, email, type, contrat
+              Format : nom, email, utm, code promo, type, contrat
             </p>
             <textarea
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
-              placeholder={"Cabinet Dupont,contact@dupont.fr,cgp,affiliation\nAgence Martin,martin@agence.fr,agence-immo,marque_blanche"}
+              placeholder={"Cabinet Dupont,contact@dupont.fr,Dupont,DUPONT20,cgp,affiliation\nAgence Martin,martin@agence.fr,Martin,MARTIN25,agence-immo,marque_blanche"}
               className="w-full h-24 p-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A3855]/20 focus:border-[#0A3855] resize-none font-mono bg-white"
             />
             <Button
@@ -176,6 +181,12 @@ export default function BatchTab() {
                     Email
                   </th>
                   <th className="text-left pb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    UTM
+                  </th>
+                  <th className="text-left pb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Code Promo
+                  </th>
+                  <th className="text-left pb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Type
                   </th>
                   <th className="text-left pb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -200,6 +211,20 @@ export default function BatchTab() {
                         value={row.email}
                         onChange={(e) => updateRow(i, { email: e.target.value })}
                         placeholder="email@partenaire.com"
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <Input
+                        value={row.utm}
+                        onChange={(e) => updateRow(i, { utm: e.target.value })}
+                        placeholder="utm (auto si vide)"
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <Input
+                        value={row.code}
+                        onChange={(e) => updateRow(i, { code: e.target.value })}
+                        placeholder="code promo (optionnel)"
                       />
                     </td>
                     <td className="py-2 pr-3">
@@ -303,10 +328,13 @@ export default function BatchTab() {
                       Nom
                     </th>
                     <th className="text-left pb-2 text-xs font-medium text-emerald-600 uppercase tracking-wider">
-                      Code
+                      Email
                     </th>
                     <th className="text-left pb-2 text-xs font-medium text-emerald-600 uppercase tracking-wider">
-                      Email
+                      UTM
+                    </th>
+                    <th className="text-left pb-2 text-xs font-medium text-emerald-600 uppercase tracking-wider">
+                      Code Promo
                     </th>
                     <th className="text-left pb-2 text-xs font-medium text-emerald-600 uppercase tracking-wider">
                       Mot de passe temp.
@@ -317,8 +345,9 @@ export default function BatchTab() {
                   {created.map((p, i) => (
                     <tr key={i}>
                       <td className="py-2 font-medium text-gray-900">{p.nom}</td>
-                      <td className="py-2 font-mono text-xs text-gray-600">{p.code}</td>
                       <td className="py-2 text-gray-600">{p.email}</td>
+                      <td className="py-2 font-mono text-xs text-gray-600">{p.utm}</td>
+                      <td className="py-2 font-mono text-xs text-gray-600">{p.code || <span className="text-gray-400 italic">—</span>}</td>
                       <td className="py-2 font-mono text-xs text-red-600 bg-red-50/50 rounded px-2">
                         {p.tempPassword}
                       </td>
