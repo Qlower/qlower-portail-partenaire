@@ -132,7 +132,7 @@ async function upsertLead(
     partner_id: partner.id,
     type: "contact" as const,
     label: `Nouveau lead UTM : ${nom} (${email})`,
-    date: now.toLocaleDateString("fr-FR", {
+    date: hsCreateDate.toLocaleDateString("fr-FR", {
       day: "2-digit",
       month: "short",
       year: "numeric",
