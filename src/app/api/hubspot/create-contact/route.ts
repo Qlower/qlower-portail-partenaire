@@ -35,7 +35,12 @@ export async function POST(request: NextRequest) {
   let contactResult = null;
   let referralResult = null;
 
-  // Step 1: Create contact in HubSpot
+  const hsHeaders = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+
+  // Step 1: Search for existing contact by email, then create or update
   try {
     const properties: Record<string, string> = {
       firstname: prenom || "",
@@ -48,24 +53,55 @@ export async function POST(request: NextRequest) {
       properties.partenaire__lead_ = partnerUtm;
     }
 
-    const res = await fetch(`${HUBSPOT_BASE}/crm/v3/objects/contacts`, {
+    // Search for existing contact by email
+    const searchRes = await fetch(`${HUBSPOT_BASE}/crm/v3/objects/contacts/search`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ properties }),
+      headers: hsHeaders,
+      body: JSON.stringify({
+        filterGroups: [{
+          filters: [{ propertyName: "email", operator: "EQ", value: email }],
+        }],
+      }),
     });
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      return NextResponse.json(
-        { error: `HubSpot error: ${res.status} ${errBody}` },
-        { status: res.status >= 400 && res.status < 500 ? res.status : 502 }
-      );
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      if (searchData.total > 0) {
+        // Contact exists — update with partner UTM if not already set
+        const existingId = searchData.results[0].id;
+        const updateProps: Record<string, string> = {};
+        if (partnerUtm && !searchData.results[0].properties?.partenaire__lead_) {
+          updateProps.partenaire__lead_ = partnerUtm;
+        }
+        if (Object.keys(updateProps).length > 0) {
+          await fetch(`${HUBSPOT_BASE}/crm/v3/objects/contacts/${existingId}`, {
+            method: "PATCH",
+            headers: hsHeaders,
+            body: JSON.stringify({ properties: updateProps }),
+          });
+        }
+        contactResult = searchData.results[0];
+      }
     }
 
-    contactResult = await res.json();
+    // Create new contact only if not found
+    if (!contactResult) {
+      const res = await fetch(`${HUBSPOT_BASE}/crm/v3/objects/contacts`, {
+        method: "POST",
+        headers: hsHeaders,
+        body: JSON.stringify({ properties }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        return NextResponse.json(
+          { error: `HubSpot error: ${res.status} ${errBody}` },
+          { status: res.status >= 400 && res.status < 500 ? res.status : 502 }
+        );
+      }
+
+      contactResult = await res.json();
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(
