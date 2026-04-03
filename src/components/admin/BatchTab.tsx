@@ -99,16 +99,30 @@ export default function BatchTab() {
     URL.revokeObjectURL(url);
   };
 
+  const [syncInfo, setSyncInfo] = useState("");
+  const [updatedCount, setUpdatedCount] = useState(0);
+
   const handleCreate = async () => {
     if (validRows.length === 0) return;
     setCreating(true);
     setError("");
+    setSyncInfo("");
     try {
       const result = await batchMutation.mutateAsync(validRows);
       const createdList = (result.created || []) as unknown as CreatedPartner[];
-      setCreated(createdList);
-      if (createdList.length > 0) {
-        downloadCsv(createdList);
+      const updatedList = (result.updated || []) as unknown as CreatedPartner[];
+      const allList = [...createdList, ...updatedList];
+      setCreated(allList);
+      setUpdatedCount(updatedList.length);
+      if (allList.length > 0) {
+        downloadCsv(allList);
+      }
+      // Show sync results
+      const syncResults = result.syncResults || {};
+      const totalSynced = Object.values(syncResults).reduce((s, r) => s + r.synced, 0);
+      const totalUpdated = Object.values(syncResults).reduce((s, r) => s + r.updated, 0);
+      if (totalSynced > 0 || totalUpdated > 0) {
+        setSyncInfo(`Sync HubSpot : ${totalSynced} nouveaux leads, ${totalUpdated} mis à jour`);
       }
     } catch {
       setError("Erreur lors de la creation batch");
@@ -317,12 +331,17 @@ export default function BatchTab() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-emerald-800">
                 <CheckCircle2 className="size-5" />
-                {created.length} partenaire(s) cree(s) avec succes
+                {created.length - updatedCount} créé(s), {updatedCount} mis à jour
               </CardTitle>
-              <Button variant="outline" size="sm" onClick={handleExportCsv}>
-                <Download className="size-4 mr-1.5" />
-                Export CSV
-              </Button>
+              <div className="flex items-center gap-3">
+                {syncInfo && (
+                  <span className="text-xs text-emerald-700 font-medium">{syncInfo}</span>
+                )}
+                <Button variant="outline" size="sm" onClick={handleExportCsv}>
+                  <Download className="size-4 mr-1.5" />
+                  Export CSV
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-4">

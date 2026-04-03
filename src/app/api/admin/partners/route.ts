@@ -127,6 +127,62 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // AUTO-SYNC: Fetch HubSpot contacts for this partner's UTM
+  if (HS_TOKEN && utm) {
+    try {
+      const SYNC_PROPERTIES = [
+        "firstname", "lastname", "email", "phone",
+        "partenaire__lead_", "utm_source",
+        "hs_lifecyclestage", "lifecyclestage",
+        "hs_v2_date_entered_999998694",
+      ];
+      const contacts: Array<{ id: string; properties: Record<string, string | null> }> = [];
+      let afterCursor: string | undefined;
+      do {
+        const searchBody: Record<string, unknown> = {
+          filterGroups: [{ filters: [{ propertyName: "partenaire__lead_", operator: "EQ", value: utm }] }],
+          properties: SYNC_PROPERTIES,
+          limit: 100,
+          ...(afterCursor ? { after: afterCursor } : {}),
+        };
+        const searchRes = await fetch(`https://api.hubapi.com/crm/v3/objects/contacts/search`, {
+          method: "POST",
+          headers: hsHeaders,
+          body: JSON.stringify(searchBody),
+        });
+        if (!searchRes.ok) break;
+        const searchData = await searchRes.json();
+        for (const c of searchData.results || []) {
+          contacts.push({ id: c.id, properties: c.properties });
+        }
+        afterCursor = searchData.paging?.next?.after;
+      } while (afterCursor);
+
+      for (const contact of contacts) {
+        const props = contact.properties;
+        const cNom = [props.firstname, props.lastname].filter(Boolean).join(" ") || props.email || "Inconnu";
+        const cEmail = props.email || "";
+        if (!cEmail) continue;
+        const lc = (props.lifecyclestage || props.hs_lifecyclestage || "").toLowerCase();
+        const stage = lc === "999998694" ? "Abonne" : ["customer", "evangelist"].includes(lc) ? "Payeur" : "Non payeur";
+        const commissionDue = !!props.hs_v2_date_entered_999998694;
+        const { data: existingLead } = await supabase.from("leads").select("id, commission_due").eq("partner_id", id).eq("email", cEmail).maybeSingle();
+        if (existingLead) {
+          await supabase.from("leads").update({ stage, hs_contact_id: contact.id, commission_due: existingLead.commission_due || commissionDue }).eq("id", existingLead.id);
+        } else {
+          await supabase.from("leads").insert({
+            partner_id: id, nom: cNom, email: cEmail, source: "UTM", stage,
+            mois: new Date().toLocaleDateString("fr-FR", { month: "short", year: "numeric" }),
+            biens: 0, hs_contact_id: contact.id, commission_due: commissionDue,
+          });
+          await supabase.rpc("increment_partner_leads", { p_id: id });
+        }
+      }
+    } catch (e) {
+      console.error("HubSpot contact sync error on partner create:", e);
+    }
+  }
+
   return NextResponse.json(data, { status: 201 });
 }
 

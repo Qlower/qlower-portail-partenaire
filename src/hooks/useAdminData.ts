@@ -46,7 +46,12 @@ export function useBatchCreatePartners() {
   return useMutation({
     mutationFn: async (partners: Array<Record<string, unknown> | { nom: string; type?: string; contrat?: string }>) => {
       const { data } = await api.post("/admin/batch", { partners });
-      return data as { created: Array<Record<string, unknown>>; errors: { nom: string; error: string }[] };
+      return data as {
+        created: Array<Record<string, unknown>>;
+        updated: Array<Record<string, unknown>>;
+        errors: { nom: string; error: string }[];
+        syncResults: Record<string, { synced: number; updated: number; skipped: number }>;
+      };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "partners"] }),
   });
