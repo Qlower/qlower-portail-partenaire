@@ -186,6 +186,72 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(data, { status: 201 });
 }
 
+// DELETE partner (admin only) — moves leads to another partner with same UTM if exists
+export async function DELETE(request: NextRequest) {
+  const supabase = createServiceClient();
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  const moveTo = searchParams.get("move_to"); // optional: partner ID to move leads to
+
+  if (!id) {
+    return NextResponse.json({ error: "id query param is required" }, { status: 400 });
+  }
+
+  let leadsMoved = 0;
+
+  if (moveTo) {
+    // Move leads from deleted partner to target partner (skip duplicates by email)
+    const { data: leads } = await supabase
+      .from("leads")
+      .select("id, email")
+      .eq("partner_id", id);
+
+    for (const lead of leads || []) {
+      const { data: existing } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("partner_id", moveTo)
+        .eq("email", lead.email)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase.from("leads").delete().eq("id", lead.id);
+      } else {
+        await supabase.from("leads").update({ partner_id: moveTo }).eq("id", lead.id);
+        leadsMoved++;
+      }
+    }
+
+    // Move partner_actions too
+    await supabase.from("partner_actions").update({ partner_id: moveTo }).eq("partner_id", id);
+
+    // Recount leads for target partner
+    const { count: leadCount } = await supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("partner_id", moveTo);
+    const { count: abonnesCount } = await supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("partner_id", moveTo)
+      .eq("commission_due", true);
+    await supabase.from("partners").update({ leads: leadCount || 0, abonnes: abonnesCount || 0 }).eq("id", moveTo);
+  } else {
+    // Delete all leads for this partner
+    await supabase.from("leads").delete().eq("partner_id", id);
+    await supabase.from("partner_actions").delete().eq("partner_id", id);
+  }
+
+  // Delete partner
+  const { error } = await supabase.from("partners").delete().eq("id", id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ deleted: id, leadsMoved });
+}
+
 // PATCH update partner (admin only)
 export async function PATCH(request: NextRequest) {
   const supabase = createServiceClient();
