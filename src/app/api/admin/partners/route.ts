@@ -130,6 +130,7 @@ export async function POST(request: NextRequest) {
   // AUTO-SYNC: Fetch HubSpot contacts for this partner's UTM
   if (HS_TOKEN && utm) {
     try {
+      const syncHeaders = { Authorization: `Bearer ${HS_TOKEN}`, "Content-Type": "application/json" };
       const SYNC_PROPERTIES = [
         "firstname", "lastname", "email", "phone",
         "partenaire__lead_", "utm_source",
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest) {
         };
         const searchRes = await fetch(`https://api.hubapi.com/crm/v3/objects/contacts/search`, {
           method: "POST",
-          headers: hsHeaders,
+          headers: syncHeaders,
           body: JSON.stringify(searchBody),
         });
         if (!searchRes.ok) break;
