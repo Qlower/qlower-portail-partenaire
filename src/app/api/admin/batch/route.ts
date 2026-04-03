@@ -11,6 +11,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "partners array is required" }, { status: 400 });
   }
 
+  // Pre-fetch existing users for dedup
+  const { data: existingUsers } = await supabase.auth.admin.listUsers();
+  const usersByEmail = new Map(
+    (existingUsers?.users || []).map((u) => [u.email, u])
+  );
+
   const created = [];
   const errors = [];
 
@@ -32,21 +38,31 @@ export async function POST(request: NextRequest) {
     const utm = p.utm || slug;
     const code = p.code || p.nom.toUpperCase().replace(/\s/g, "").slice(0, 4) + "20";
 
-    // Create auth user if email provided
+    // Create or reuse auth user if email provided
     let userId = null;
     if (p.email) {
-      const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-        email: p.email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: { nom: p.nom, partner_id: id },
-      });
+      const existing = usersByEmail.get(p.email);
+      if (existing) {
+        // Reuse existing user, update metadata and reset password
+        userId = existing.id;
+        await supabase.auth.admin.updateUserById(existing.id, {
+          password: tempPassword,
+          user_metadata: { ...existing.user_metadata, nom: p.nom, partner_id: id },
+        });
+      } else {
+        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+          email: p.email,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: { nom: p.nom, partner_id: id },
+        });
 
-      if (authError) {
-        errors.push({ nom: p.nom, error: authError.message });
-        continue;
+        if (authError) {
+          errors.push({ nom: p.nom, error: authError.message });
+          continue;
+        }
+        userId = authUser.user.id;
       }
-      userId = authUser.user.id;
     }
 
     const { data, error } = await supabase

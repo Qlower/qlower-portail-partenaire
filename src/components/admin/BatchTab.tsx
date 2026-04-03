@@ -24,6 +24,7 @@ import {
 
 interface BatchRow {
   nom: string;
+  email: string;
   type: PartnerType;
   contrat: ContratType;
 }
@@ -32,7 +33,7 @@ interface CreatedPartner {
   nom: string;
   code: string;
   email: string;
-  temp_password: string;
+  tempPassword: string;
 }
 
 const CONTRAT_OPTIONS = [
@@ -40,7 +41,7 @@ const CONTRAT_OPTIONS = [
   { value: "marque_blanche", label: "Marque blanche" },
 ];
 
-const emptyRow = (): BatchRow => ({ nom: "", type: "cgp", contrat: "affiliation" });
+const emptyRow = (): BatchRow => ({ nom: "", email: "", type: "cgp", contrat: "affiliation" });
 
 export default function BatchTab() {
   const [rows, setRows] = useState<BatchRow[]>([emptyRow()]);
@@ -68,8 +69,9 @@ export default function BatchTab() {
       if (parts[0]) {
         parsed.push({
           nom: parts[0],
-          type: (PARTNER_TYPES.includes(parts[1] as PartnerType) ? parts[1] : "cgp") as PartnerType,
-          contrat: (parts[2] === "marque_blanche" ? "marque_blanche" : "affiliation") as ContratType,
+          email: parts[1] || "",
+          type: (PARTNER_TYPES.includes(parts[2] as PartnerType) ? parts[2] : "cgp") as PartnerType,
+          contrat: (parts[3] === "marque_blanche" ? "marque_blanche" : "affiliation") as ContratType,
         });
       }
     }
@@ -96,7 +98,7 @@ export default function BatchTab() {
 
   const handleExportCsv = () => {
     const header = "nom,code,email,mot_de_passe\n";
-    const body = created.map((p) => `${p.nom},${p.code},${p.email},${p.temp_password}`).join("\n");
+    const body = created.map((p) => `${p.nom},${p.code},${p.email},${p.tempPassword}`).join("\n");
     const blob = new Blob([header + body], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -133,12 +135,12 @@ export default function BatchTab() {
               Collez votre CSV ici
             </p>
             <p className="text-xs text-gray-400 mb-4">
-              Format : nom, type, contrat
+              Format : nom, email, type, contrat
             </p>
             <textarea
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
-              placeholder={"Cabinet Dupont,cgp,affiliation\nAgence Martin,agence-immo,marque_blanche"}
+              placeholder={"Cabinet Dupont,contact@dupont.fr,cgp,affiliation\nAgence Martin,martin@agence.fr,agence-immo,marque_blanche"}
               className="w-full h-24 p-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0A3855]/20 focus:border-[#0A3855] resize-none font-mono bg-white"
             />
             <Button
@@ -171,6 +173,9 @@ export default function BatchTab() {
                     Nom
                   </th>
                   <th className="text-left pb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="text-left pb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Type
                   </th>
                   <th className="text-left pb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -187,6 +192,14 @@ export default function BatchTab() {
                         value={row.nom}
                         onChange={(e) => updateRow(i, { nom: e.target.value })}
                         placeholder="Nom du partenaire"
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <Input
+                        type="email"
+                        value={row.email}
+                        onChange={(e) => updateRow(i, { email: e.target.value })}
+                        placeholder="email@partenaire.com"
                       />
                     </td>
                     <td className="py-2 pr-3">
@@ -307,7 +320,7 @@ export default function BatchTab() {
                       <td className="py-2 font-mono text-xs text-gray-600">{p.code}</td>
                       <td className="py-2 text-gray-600">{p.email}</td>
                       <td className="py-2 font-mono text-xs text-red-600 bg-red-50/50 rounded px-2">
-                        {p.temp_password}
+                        {p.tempPassword}
                       </td>
                     </tr>
                   ))}
