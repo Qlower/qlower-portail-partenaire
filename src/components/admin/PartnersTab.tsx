@@ -185,11 +185,11 @@ export default function PartnersTab() {
           <CardContent className="pt-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="space-y-1.5">
-                <Label>Identifiant (code)</Label>
+                <Label>Code promo</Label>
                 <Input
                   value={form.identifiant}
                   onChange={(e) => setForm({ ...form, identifiant: e.target.value })}
-                  placeholder={slug(form.nom) || "auto-genere"}
+                  placeholder="ex: DUPONT20 (optionnel)"
                 />
               </div>
               <div className="space-y-1.5">
