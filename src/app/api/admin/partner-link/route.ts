@@ -27,10 +27,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Partner not found or has no email" }, { status: 404 });
   }
 
-  // Generate magic link
+  // Generate magic link — redirect_to must point to /auth/callback so the
+  // PKCE code gets exchanged for a real session before landing on the dashboard
+  const siteUrl = request.nextUrl.origin;
   const { data, error } = await supabase.auth.admin.generateLink({
     type: "magiclink",
     email: partner.email,
+    options: {
+      redirectTo: `${siteUrl}/auth/callback?next=/dashboard`,
+    },
   });
 
   if (error || !data?.properties?.action_link) {
