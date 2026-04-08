@@ -186,13 +186,16 @@ export default function PartnersTab() {
   const handleCreate = async () => {
     setError("");
     try {
+      const partnerSlug = slug(form.nom);
+      const partnerId = `${partnerSlug}-${Date.now().toString().slice(-4)}`;
       await createPartner.mutateAsync({
+        id: partnerId,
         nom: form.nom,
         email: form.email,
         type: form.type,
         contrat: form.contrat,
-        utm: form.utm || slug(form.nom),
-        code: form.identifiant || slug(form.nom),
+        utm: form.utm || partnerSlug,
+        code: form.identifiant || partnerSlug,
         comm_obj_annuel: form.objectif,
         comm_rules: form.comm_rules,
         sendEmail: form.sendEmail,
