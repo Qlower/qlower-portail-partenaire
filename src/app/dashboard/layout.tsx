@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { usePartner, usePartnerByUserId } from "@/hooks/usePartnerData";
 import { TopBar } from "@/components/layout/TopBar";
@@ -29,10 +29,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, signOut, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   // Impersonation: admin can view any partner via ?as=partner_id
-  const impersonateId = searchParams.get("as");
+  // Read from window.location to avoid useSearchParams (requires Suspense boundary)
+  const impersonateId = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("as");
+  }, [pathname]);
   const isAdmin = ADMIN_EMAILS.includes(user?.email || "");
   const overrideId = isAdmin && impersonateId ? impersonateId : undefined;
 
