@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceClient();
   const body = await request.json();
 
-  const { id, nom, email, type, contrat, code, utm, comm_rules, comm_obj_annuel, user_id } = body;
+  const { id, nom, email, type, contrat, code, utm, comm_rules, comm_obj_annuel, user_id, sendEmail } = body;
 
   if (!id || !nom || !code || !utm) {
     return NextResponse.json(
@@ -189,6 +189,16 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.error("HubSpot contact sync error on partner create:", e);
     }
+  }
+
+  // Optionally send welcome email with magic link
+  if (sendEmail && email) {
+    const origin = request.nextUrl.origin;
+    await fetch(`${origin}/api/admin/partner-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ partner_id: id, sendEmail: true }),
+    });
   }
 
   return NextResponse.json(data, { status: 201 });

@@ -31,6 +31,8 @@ import {
   Info,
   Eye,
   Search,
+  Link2,
+  LogIn,
 } from "lucide-react";
 
 const CONTRAT_OPTIONS = [
@@ -54,6 +56,7 @@ interface NewPartnerForm {
   objectif: number;
   email: string;
   comm_rules: CommissionRule[];
+  sendEmail: boolean;
 }
 
 const emptyForm = (): NewPartnerForm => ({
@@ -65,6 +68,7 @@ const emptyForm = (): NewPartnerForm => ({
   objectif: 100,
   email: "",
   comm_rules: DEFAULT_COMM_RULES,
+  sendEmail: false,
 });
 
 function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName: string }) {
@@ -167,6 +171,7 @@ export default function PartnersTab() {
   const [partnerSearch, setPartnerSearch] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [linkLoading, setLinkLoading] = useState<string | null>(null);
 
   const filteredPartners = partners.filter((p) => {
     if (!partnerSearch.trim()) return true;
@@ -191,12 +196,36 @@ export default function PartnersTab() {
         code: form.identifiant || slug(form.nom),
         comm_obj_annuel: form.objectif,
         comm_rules: form.comm_rules,
+        sendEmail: form.sendEmail,
       });
-      setSuccess("Partenaire cree et synchronise HubSpot");
+      setSuccess(form.sendEmail ? "Partenaire créé — email de bienvenue envoyé" : "Partenaire créé et synchronisé HubSpot");
       setShowCreate(false);
       setForm(emptyForm());
     } catch {
       setError("Erreur lors de la creation");
+    }
+  };
+
+  const handleGetLink = async (partnerId: string, open: boolean) => {
+    setLinkLoading(partnerId + (open ? "-open" : "-send"));
+    setError("");
+    try {
+      const res = await fetch("/api/admin/partner-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partner_id: partnerId, sendEmail: !open }),
+      });
+      const json = await res.json();
+      if (!res.ok && res.status !== 207) throw new Error(json.error || "Erreur");
+      if (open) {
+        window.open(json.link, "_blank");
+      } else {
+        setSuccess(json.emailError ? `Lien généré mais email non envoyé : ${json.emailError}` : "Email de connexion envoyé");
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erreur lors de la génération du lien");
+    } finally {
+      setLinkLoading(null);
     }
   };
 
@@ -350,6 +379,18 @@ export default function PartnersTab() {
                   placeholder="contact@partenaire.com"
                 />
               </div>
+              <div className="flex items-center gap-2 self-end pb-1">
+                <input
+                  id="sendEmail"
+                  type="checkbox"
+                  checked={form.sendEmail}
+                  onChange={(e) => setForm({ ...form, sendEmail: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300 accent-[#0A3855]"
+                />
+                <label htmlFor="sendEmail" className="text-sm text-gray-600 cursor-pointer select-none">
+                  Envoyer email de bienvenue
+                </label>
+              </div>
             </div>
 
             <Separator className="my-4" />
@@ -456,7 +497,37 @@ export default function PartnersTab() {
                       </Badge>
                     </div>
 
-                    <div className="ml-auto flex gap-2">
+                    <div className="ml-auto flex gap-2 flex-wrap">
+                      {p.email && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleGetLink(p.id, false)}
+                            disabled={linkLoading === p.id + "-send"}
+                            title="Envoyer un email avec lien de connexion"
+                          >
+                            {linkLoading === p.id + "-send" ? (
+                              <><Loader2 className="size-3.5 mr-1 animate-spin" /> Envoi...</>
+                            ) : (
+                              <><Link2 className="size-3.5 mr-1" /> Lien de connexion</>
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleGetLink(p.id, true)}
+                            disabled={linkLoading === p.id + "-open"}
+                            title="Accéder au portail en tant que ce partenaire"
+                          >
+                            {linkLoading === p.id + "-open" ? (
+                              <><Loader2 className="size-3.5 mr-1 animate-spin" /> Ouverture...</>
+                            ) : (
+                              <><LogIn className="size-3.5 mr-1" /> Accéder</>
+                            )}
+                          </Button>
+                        </>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
