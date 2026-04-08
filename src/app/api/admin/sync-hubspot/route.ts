@@ -66,6 +66,22 @@ async function upsertLead(
   const stage = mapStage(props);
   const commissionDue = !!props.hs_v2_date_entered_999998694;
 
+  // Check if this contact exists under a DIFFERENT partner (transfer case)
+  const { data: oldLead } = await supabase
+    .from("leads")
+    .select("id, partner_id, commission_due")
+    .eq("hs_contact_id", contactId)
+    .neq("partner_id", partner.id)
+    .maybeSingle();
+
+  if (oldLead) {
+    await supabase.from("leads").delete().eq("id", oldLead.id);
+    await supabase.rpc("decrement_partner_leads", { p_id: oldLead.partner_id });
+    if (oldLead.commission_due) {
+      await supabase.rpc("decrement_partner_abonnes", { p_id: oldLead.partner_id });
+    }
+  }
+
   // Check if lead already exists (upsert by email + partner_id)
   const { data: existing } = await supabase
     .from("leads")
