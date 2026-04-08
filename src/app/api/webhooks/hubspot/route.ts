@@ -73,7 +73,24 @@ async function upsertLead(
   // This date is set by HubSpot on first entry and never reset, even after churn + re-subscription
   const commissionDue = !!props.hs_v2_date_entered_999998694;
 
-  // Check if lead already exists
+  // Check if this contact exists under a DIFFERENT partner (transfer case)
+  const { data: oldLead } = await supabase
+    .from("leads")
+    .select("id, partner_id, commission_due")
+    .eq("hs_contact_id", contactId)
+    .neq("partner_id", partner.id)
+    .maybeSingle();
+
+  if (oldLead) {
+    // Remove from old partner and fix their counters
+    await supabase.from("leads").delete().eq("id", oldLead.id);
+    await supabase.rpc("decrement_partner_leads", { p_id: oldLead.partner_id });
+    if (oldLead.commission_due) {
+      await supabase.rpc("decrement_partner_abonnes", { p_id: oldLead.partner_id });
+    }
+  }
+
+  // Check if lead already exists under the CORRECT partner
   const { data: existing } = await supabase
     .from("leads")
     .select("id, stage, commission_due")
@@ -103,7 +120,7 @@ async function upsertLead(
       await supabase.rpc("increment_partner_abonnes", { p_id: partner.id });
     }
 
-    return { status: `updated:${existing.stage}->${stage}` };
+    return { status: oldLead ? `transferred:${oldLead.partner_id}->${partner.id}` : `updated:${existing.stage}->${stage}` };
   }
 
   // Insert new lead
