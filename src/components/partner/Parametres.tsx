@@ -59,7 +59,7 @@ export default function Parametres({ partner, onRestartGuide }: ParametresProps)
   };
 
   const accountRows = [
-    { label: "Email", value: user?.email ?? "-" },
+    { label: "Email", value: partner.email || user?.email || "-" },
     { label: "Societe", value: partner.nom },
     { label: "Type de contrat", value: partner.contrat.replace("_", " "), capitalize: true },
     { label: "Code partenaire", value: partner.code || "En attente", mono: !!partner.code },
