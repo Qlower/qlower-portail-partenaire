@@ -32,8 +32,6 @@ import {
   Eye,
   Search,
   Mail,
-  Copy,
-  ClipboardCheck,
 } from "lucide-react";
 
 const CONTRAT_OPTIONS = [
@@ -173,7 +171,6 @@ export default function PartnersTab() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [linkLoading, setLinkLoading] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
 
   const filteredPartners = partners.filter((p) => {
     if (!partnerSearch.trim()) return true;
@@ -227,43 +224,8 @@ export default function PartnersTab() {
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    // navigator.clipboard fails after async gaps (document not focused)
-    // fallback with execCommand
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    } catch {
-      // last resort
-      navigator.clipboard.writeText(text);
-    }
-  };
-
-  const handleCopyLink = async (partnerId: string) => {
-    setLinkLoading(partnerId + "-copy");
-    setError("");
-    try {
-      const res = await fetch("/api/admin/partner-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ partner_id: partnerId, sendEmail: false }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Erreur");
-      copyToClipboard(json.link);
-      setCopied(partnerId);
-      setTimeout(() => setCopied(null), 2500);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur lors de la copie");
-    } finally {
-      setLinkLoading(null);
-    }
+  const handleImpersonate = (partnerId: string) => {
+    window.open(`/dashboard?as=${partnerId}`, "_blank");
   };
 
   const handleToggleActive = async (partner: Partner) => {
@@ -553,17 +515,10 @@ export default function PartnersTab() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleCopyLink(p.id)}
-                            disabled={!!linkLoading}
-                            title="Copier le lien magique (à ouvrir en navigation privée)"
+                            onClick={() => handleImpersonate(p.id)}
+                            title="Voir le portail en tant que ce partenaire"
                           >
-                            {linkLoading === p.id + "-copy" ? (
-                              <><Loader2 className="size-3.5 mr-1 animate-spin" /> Génération...</>
-                            ) : copied === p.id ? (
-                              <><ClipboardCheck className="size-3.5 mr-1 text-emerald-600" /> <span className="text-emerald-600">Lien copié ✓</span></>
-                            ) : (
-                              <><Copy className="size-3.5 mr-1" /> Voir comme partenaire</>
-                            )}
+                            <Eye className="size-3.5 mr-1" /> Voir comme partenaire
                           </Button>
                         </>
                       )}

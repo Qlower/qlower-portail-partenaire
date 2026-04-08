@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { usePartner, usePartnerByUserId } from "@/hooks/usePartnerData";
 import { TopBar } from "@/components/layout/TopBar";
@@ -23,15 +23,23 @@ export function usePartnerContext(): PartnerContextType {
   return ctx;
 }
 
+const ADMIN_EMAILS = ["alexandre@qlower.com", "admin@qlower.com"];
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const partnerIdFromMeta = user?.user_metadata?.partner_id as string | undefined;
+  // Impersonation: admin can view any partner via ?as=partner_id
+  const impersonateId = searchParams.get("as");
+  const isAdmin = ADMIN_EMAILS.includes(user?.email || "");
+  const overrideId = isAdmin && impersonateId ? impersonateId : undefined;
+
+  const partnerIdFromMeta = overrideId || (user?.user_metadata?.partner_id as string | undefined);
   const { data: partnerById, isLoading: loadingById } = usePartner(partnerIdFromMeta);
   // Fallback: also try user_id lookup if metadata partner not found (e.g. after duplicate cleanup)
-  const shouldFallback = !partnerIdFromMeta || (!loadingById && !partnerById);
+  const shouldFallback = !overrideId && (!partnerIdFromMeta || (!loadingById && !partnerById));
   const { data: partnerByUser, isLoading: loadingByUser } = usePartnerByUserId(
     shouldFallback && user?.id ? user.id : undefined
   );
@@ -113,6 +121,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <PartnerContext.Provider value={{ partner, partnerId: partner.id }}>
       <div className="min-h-screen bg-gray-50 flex flex-col">
+        {overrideId && (
+          <div className="bg-amber-500 text-white text-xs text-center py-1.5 font-medium">
+            Vue partenaire : {partner.nom} — <button onClick={() => router.push("/admin")} className="underline">Retour admin</button>
+          </div>
+        )}
         <TopBar
           partnerName={partner.nom}
           brandColor={partner.brand_color}
