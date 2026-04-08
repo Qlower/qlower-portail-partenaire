@@ -227,6 +227,24 @@ export default function PartnersTab() {
     }
   };
 
+  const copyToClipboard = (text: string) => {
+    // navigator.clipboard fails after async gaps (document not focused)
+    // fallback with execCommand
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch {
+      // last resort
+      navigator.clipboard.writeText(text);
+    }
+  };
+
   const handleCopyLink = async (partnerId: string) => {
     setLinkLoading(partnerId + "-copy");
     setError("");
@@ -238,7 +256,7 @@ export default function PartnersTab() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Erreur");
-      await navigator.clipboard.writeText(json.link);
+      copyToClipboard(json.link);
       setCopied(partnerId);
       setTimeout(() => setCopied(null), 2500);
     } catch (e: unknown) {
