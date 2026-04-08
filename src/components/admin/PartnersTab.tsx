@@ -31,8 +31,9 @@ import {
   Info,
   Eye,
   Search,
-  Link2,
-  LogIn,
+  Mail,
+  Copy,
+  ClipboardCheck,
 } from "lucide-react";
 
 const CONTRAT_OPTIONS = [
@@ -172,6 +173,7 @@ export default function PartnersTab() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [linkLoading, setLinkLoading] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
 
   const filteredPartners = partners.filter((p) => {
     if (!partnerSearch.trim()) return true;
@@ -206,24 +208,41 @@ export default function PartnersTab() {
     }
   };
 
-  const handleGetLink = async (partnerId: string, open: boolean) => {
-    setLinkLoading(partnerId + (open ? "-open" : "-send"));
+  const handleSendEmail = async (partnerId: string) => {
+    setLinkLoading(partnerId + "-send");
     setError("");
     try {
       const res = await fetch("/api/admin/partner-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ partner_id: partnerId, sendEmail: !open }),
+        body: JSON.stringify({ partner_id: partnerId, sendEmail: true }),
       });
       const json = await res.json();
       if (!res.ok && res.status !== 207) throw new Error(json.error || "Erreur");
-      if (open) {
-        window.open(json.link, "_blank");
-      } else {
-        setSuccess(json.emailError ? `Lien généré mais email non envoyé : ${json.emailError}` : "Email de connexion envoyé");
-      }
+      setSuccess(json.emailError ? `Erreur Resend : ${json.emailError}` : "Email d'accès envoyé au partenaire");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur lors de la génération du lien");
+      setError(e instanceof Error ? e.message : "Erreur lors de l'envoi");
+    } finally {
+      setLinkLoading(null);
+    }
+  };
+
+  const handleCopyLink = async (partnerId: string) => {
+    setLinkLoading(partnerId + "-copy");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/partner-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partner_id: partnerId, sendEmail: false }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erreur");
+      await navigator.clipboard.writeText(json.link);
+      setCopied(partnerId);
+      setTimeout(() => setCopied(null), 2500);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erreur lors de la copie");
     } finally {
       setLinkLoading(null);
     }
@@ -503,27 +522,29 @@ export default function PartnersTab() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleGetLink(p.id, false)}
-                            disabled={linkLoading === p.id + "-send"}
-                            title="Envoyer un email avec lien de connexion"
+                            onClick={() => handleSendEmail(p.id)}
+                            disabled={!!linkLoading}
+                            title={`Envoyer un lien de connexion à ${p.email}`}
                           >
                             {linkLoading === p.id + "-send" ? (
                               <><Loader2 className="size-3.5 mr-1 animate-spin" /> Envoi...</>
                             ) : (
-                              <><Link2 className="size-3.5 mr-1" /> Lien de connexion</>
+                              <><Mail className="size-3.5 mr-1" /> Envoyer l'accès</>
                             )}
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleGetLink(p.id, true)}
-                            disabled={linkLoading === p.id + "-open"}
-                            title="Accéder au portail en tant que ce partenaire"
+                            onClick={() => handleCopyLink(p.id)}
+                            disabled={!!linkLoading}
+                            title="Copier le lien magique (à ouvrir en navigation privée)"
                           >
-                            {linkLoading === p.id + "-open" ? (
-                              <><Loader2 className="size-3.5 mr-1 animate-spin" /> Ouverture...</>
+                            {linkLoading === p.id + "-copy" ? (
+                              <><Loader2 className="size-3.5 mr-1 animate-spin" /> Génération...</>
+                            ) : copied === p.id ? (
+                              <><ClipboardCheck className="size-3.5 mr-1 text-emerald-600" /> <span className="text-emerald-600">Lien copié ✓</span></>
                             ) : (
-                              <><LogIn className="size-3.5 mr-1" /> Accéder</>
+                              <><Copy className="size-3.5 mr-1" /> Voir comme partenaire</>
                             )}
                           </Button>
                         </>

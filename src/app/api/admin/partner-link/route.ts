@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY!;
 
 export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
+
   const supabase = createServiceClient();
   const body = await request.json();
   const { partner_id, sendEmail = false } = body;
@@ -67,6 +71,7 @@ export async function POST(request: NextRequest) {
 
     if (!emailRes.ok) {
       const errText = await emailRes.text();
+      console.error("Resend error:", errText);
       return NextResponse.json({ link, emailError: errText }, { status: 207 });
     }
   }
