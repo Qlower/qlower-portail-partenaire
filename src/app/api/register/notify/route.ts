@@ -5,8 +5,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Lazy-import resend to isolate any module errors
-    const { resend, FROM } = await import("@/lib/resend");
+    // TEMP: emails paused for testing — just log and return OK
+    console.log("[register/notify] Would send emails for:", body.partnerName, body.partnerEmail);
+    return NextResponse.json({ ok: true, paused: true });
 
     const prenom = body.prenom || body.partnerName || "Partenaire";
 
