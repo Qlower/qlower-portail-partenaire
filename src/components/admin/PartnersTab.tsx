@@ -33,6 +33,7 @@ import {
   Search,
   Mail,
   Trash2,
+  CheckCircle2,
 } from "lucide-react";
 
 const STATUT_OPTIONS = [
@@ -564,6 +565,18 @@ export default function PartnersTab() {
                       >
                         {STATUT_LABELS[p.statut] || p.statut || "—"}
                       </Badge>
+                      {(p.statut === "en_attente" || p.statut === "contrat_envoye") && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                          title="Marquer le contrat comme signé et activer le dashboard"
+                          onClick={() => updatePartner.mutateAsync({ id: p.id, statut: "actif" as PartnerStatut })}
+                        >
+                          <CheckCircle2 className="size-3 mr-1" />
+                          Contrat signé
+                        </Button>
+                      )}
                     </div>
 
                     <div className="ml-auto flex gap-2 flex-wrap">
