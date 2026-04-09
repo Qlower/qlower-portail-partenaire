@@ -29,9 +29,13 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceClient();
   const body = await request.json();
 
-  const { id, nom, email, type, contrat, code, utm, comm_rules, comm_obj_annuel, user_id, sendEmail } = body;
+  const {
+    id, nom, contact_prenom, contact_nom, email, type, contrat, code, utm,
+    comm_rules, comm_obj_annuel, user_id, sendEmail,
+    statut, metier, siret, tva, adresse, ville, code_postal, telephone, iban, bic, kbis_url,
+  } = body;
 
-  if (!id || !nom || !code || !utm) {
+  if (!id || !nom || !utm) {
     return NextResponse.json(
       { error: "id, nom, code, and utm are required" },
       { status: 400 }
@@ -77,6 +81,8 @@ export async function POST(request: NextRequest) {
     id,
     user_id: userId,
     nom,
+    contact_prenom: contact_prenom || null,
+    contact_nom: contact_nom || null,
     email,
     type: type || "autre",
     contrat: contrat || "affiliation",
@@ -84,6 +90,17 @@ export async function POST(request: NextRequest) {
     utm,
     comm_rules: comm_rules || [],
     comm_obj_annuel: comm_obj_annuel || 500,
+    statut: statut || "en_attente",
+    metier: metier || null,
+    siret: siret || null,
+    tva: tva || null,
+    adresse: adresse || null,
+    ville: ville || null,
+    code_postal: code_postal || null,
+    telephone: telephone || null,
+    iban: iban || null,
+    bic: bic || null,
+    kbis_url: kbis_url || null,
   }).select().single();
 
   if (error) {
@@ -201,10 +218,9 @@ export async function POST(request: NextRequest) {
   const GSHEET_WEBHOOK = process.env.GSHEET_WEBHOOK_URL;
   if (GSHEET_WEBHOOK) {
     try {
-      const nameParts = nom.split(" ");
       const params = new URLSearchParams({
-        nom: nameParts.slice(1).join(" ") || nom,
-        prenom: nameParts[0] || "",
+        nom: contact_nom || nom,
+        prenom: contact_prenom || "",
         email: email || "",
         entreprise: nom,
         code_promo: code,

@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Partner, ContratType } from "@/types";
-import { useAdminPartners } from "@/hooks/useAdminData";
+import { useAdminPartners, useEmailTemplates, useUpdateEmailTemplate } from "@/hooks/useAdminData";
+import type { EmailTemplate } from "@/hooks/useAdminData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select-custom";
 import {
   Loader2,
@@ -19,60 +22,34 @@ import {
   Clock,
   Info,
   Mail,
+  Save,
+  Check,
+  X,
 } from "lucide-react";
 
 type Audience = "tous" | "affiliation" | "marque_blanche";
 
-interface EmailTemplate {
-  key: string;
-  title: string;
-  description: string;
-  subject: (partner: Partner) => string;
-  body: (partner: Partner) => string;
+function replaceVars(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
 }
 
-const TEMPLATES: EmailTemplate[] = [
-  {
-    key: "presentation",
-    title: "Présentation du programme",
-    description: "Email de bienvenue présentant le programme partenaire et ses avantages.",
-    subject: (p) => `${p.nom}, découvrez votre espace partenaire Qlower !`,
-    body: (p) =>
-      `Bonjour ${p.nom},\n\nBienvenue dans le programme partenaire Qlower !\n\nNous sommes ravis de vous accueillir dans notre réseau de professionnels qui accompagnent leurs clients investisseurs LMNP vers une gestion fiscale simplifiée et optimisée.\n\nEn tant que partenaire Qlower, vous bénéficiez de :\n- 100 € de commission par client abonné chaque année\n- Un tableau de bord dédié pour suivre vos leads en temps réel\n- Des supports de communication personnalisés\n- Un interlocuteur dédié pour vous accompagner\n\nVotre lien d'inscription personnalisé :\n👉 https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}\n\nVotre code partenaire : ${p.code}\n\nPour toute question, répondez simplement à cet email.\n\nÀ très vite,\nL'équipe Qlower`,
-  },
-  {
-    key: "relance",
-    title: "Relance activation",
-    description: "Relance pour les partenaires qui n'ont pas encore généré de leads.",
-    subject: (p) => `${p.nom}, activez votre partenariat Qlower`,
-    body: (p) =>
-      `Bonjour ${p.nom},\n\nNous avons remarqué que votre lien partenaire n'a pas encore été utilisé.\n\nC'est tout à fait normal au démarrage — voici quelques idées pour commencer :\n\n• Partagez votre lien avec vos clients propriétaires bailleurs lors de vos prochains rendez-vous\n• Mentionnez Qlower dans votre prochaine newsletter ou communication client\n• Utilisez les supports du kit partenaire disponibles dans votre espace\n\nVotre lien personnalisé :\n👉 https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}\n\nBesoin d'un coup de pouce ? Répondez à cet email, nous sommes là pour vous aider à démarrer.\n\nÀ bientôt,\nL'équipe Qlower`,
-  },
-  {
-    key: "performance",
-    title: "Bilan de performance",
-    description: "Bilan mensuel avec les métriques clés du partenaire.",
-    subject: (p) => `Bilan partenaire Qlower — ${p.nom}`,
-    body: (p) =>
-      `Bonjour ${p.nom},\n\nVoici votre bilan de performance Qlower :\n\n📊 Résumé\n- Leads générés : ${p.leads}\n- Abonnés convertis : ${p.abonnes}\n- Taux de conversion : ${p.leads > 0 ? ((p.abonnes / p.leads) * 100).toFixed(1) : "0"}%\n- Commission estimée : ${p.abonnes * 100} € / an\n\n${p.leads > 0 ? "Bravo pour votre implication ! Continuez sur cette lancée." : "Vous n'avez pas encore généré de leads ce mois-ci. N'hésitez pas à partager votre lien avec vos contacts."}\n\nRappel de votre lien partenaire :\n👉 https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}\n\nÀ très vite,\nL'équipe Qlower`,
-  },
-  {
-    key: "nouveaute",
-    title: "Annonce nouveauté",
-    description: "Annonce d'une nouvelle fonctionnalité ou mise à jour du programme.",
-    subject: () => `Nouveauté Qlower — Programme partenaire`,
-    body: (p) =>
-      `Bonjour ${p.nom},\n\nNous avons le plaisir de vous annoncer une nouveauté dans notre programme partenaire.\n\n[À compléter avant envoi : décrivez ici la nouveauté ou la mise à jour à communiquer]\n\nVotre lien reste inchangé :\n👉 https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}\n\nÀ très vite,\nL'équipe Qlower`,
-  },
-];
-
 export default function CampagnesTab() {
-  const { data: partners = [], isLoading: loading } = useAdminPartners();
+  const { data: partners = [], isLoading: loadingPartners } = useAdminPartners();
+  const { data: templates = [], isLoading: loadingTemplates } = useEmailTemplates();
+  const updateTemplate = useUpdateEmailTemplate();
+
   const [audience, setAudience] = useState<Audience>("tous");
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
   const [sentPartners, setSentPartners] = useState<Set<string>>(new Set());
   const [allSent, setAllSent] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  // Editable fields
+  const [editSubject, setEditSubject] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [saved, setSaved] = useState(false);
 
   const targeted = partners.filter((p) => {
     if (!p.active) return false;
@@ -80,26 +57,102 @@ export default function CampagnesTab() {
     return p.contrat === (audience as ContratType);
   });
 
-  const template = TEMPLATES.find((t) => t.key === selectedTemplate);
-  const previewPartner = targeted[0];
+  const selected = targeted.filter((p) => !excludedIds.has(p.id));
+  const template = templates.find((t) => t.id === selectedTemplateId);
+
+  // When template changes, populate editable fields
+  useEffect(() => {
+    if (template) {
+      setEditSubject(template.subject);
+      setEditBody(template.body);
+      setSaved(false);
+    }
+  }, [template?.id, template?.updated_at]);
+
+  const previewPartner = selected[0];
+  const previewVars: Record<string, string> = previewPartner
+    ? {
+        nom: previewPartner.nom,
+        email: previewPartner.email || "",
+        utm: previewPartner.utm,
+        code: previewPartner.code,
+        leads: String(previewPartner.leads ?? 0),
+        abonnes: String(previewPartner.abonnes ?? 0),
+        link: `https://secure.qlower.com/signup?utm_source=${previewPartner.utm}&utm_medium=affiliation&utm_campaign=${previewPartner.code}`,
+      }
+    : {};
+
+  const togglePartner = (id: string) => {
+    setExcludedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setAllSent(false);
+    setSentPartners(new Set());
+  };
+
+  const selectAll = () => {
+    setExcludedIds(new Set());
+    setAllSent(false);
+    setSentPartners(new Set());
+  };
+
+  const deselectAll = () => {
+    setExcludedIds(new Set(targeted.map((p) => p.id)));
+    setAllSent(false);
+    setSentPartners(new Set());
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!selectedTemplateId) return;
+    try {
+      await updateTemplate.mutateAsync({
+        id: selectedTemplateId,
+        subject: editSubject,
+        body: editBody,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      alert("Erreur lors de la sauvegarde du template.");
+    }
+  };
 
   const handleSendAll = async () => {
+    if (!selectedTemplateId || selected.length === 0) return;
+    setSending(true);
     try {
+      // Save template first if modified
+      if (template && (editSubject !== template.subject || editBody !== template.body)) {
+        await updateTemplate.mutateAsync({
+          id: selectedTemplateId,
+          subject: editSubject,
+          body: editBody,
+        });
+      }
+
       const res = await fetch("/api/admin/send-campaign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateKey: selectedTemplate, audience }),
+        body: JSON.stringify({
+          templateKey: selectedTemplateId,
+          partnerIds: selected.map((p) => p.id),
+        }),
       });
       if (!res.ok) throw new Error("Erreur serveur");
-      const ids = new Set(targeted.map((p) => p.id));
+      const ids = new Set(selected.map((p) => p.id));
       setSentPartners(ids);
       setAllSent(true);
     } catch {
       alert("Erreur lors de l'envoi des emails. Vérifiez la configuration Resend.");
+    } finally {
+      setSending(false);
     }
   };
 
-  if (loading) {
+  if (loadingPartners || loadingTemplates) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <Loader2 className="size-6 text-[#0A3855] animate-spin" />
@@ -125,6 +178,7 @@ export default function CampagnesTab() {
               value={audience}
               onChange={(e) => {
                 setAudience(e.target.value as Audience);
+                setExcludedIds(new Set());
                 setAllSent(false);
                 setSentPartners(new Set());
               }}
@@ -135,32 +189,59 @@ export default function CampagnesTab() {
               ]}
             />
             <div>
-              <p className="text-xs text-gray-500 mb-2">
-                {targeted.length} partenaire(s) ciblé(s)
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {targeted.map((p) => (
-                  <Badge
-                    key={p.id}
-                    variant="secondary"
-                    className={
-                      sentPartners.has(p.id)
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : "bg-[#E5EDF1] text-[#0A3855] border border-[#0A3855]/10"
-                    }
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-gray-500">
+                  {selected.length}/{targeted.length} partenaire(s) sélectionné(s)
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={selectAll}
+                    className="text-xs text-[#0A3855] hover:underline font-medium"
                   >
-                    {sentPartners.has(p.id) && (
-                      <CheckCircle2 className="size-3 mr-0.5" />
-                    )}
-                    {p.nom}
-                  </Badge>
-                ))}
+                    Tout sélectionner
+                  </button>
+                  <span className="text-xs text-gray-300">|</span>
+                  <button
+                    onClick={deselectAll}
+                    className="text-xs text-gray-500 hover:underline font-medium"
+                  >
+                    Tout désélectionner
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {targeted.map((p) => {
+                  const isExcluded = excludedIds.has(p.id);
+                  const isSent = sentPartners.has(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => togglePartner(p.id)}
+                      className="focus:outline-none"
+                    >
+                      <Badge
+                        variant="secondary"
+                        className={`cursor-pointer transition-all ${
+                          isSent
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : isExcluded
+                            ? "bg-gray-100 text-gray-400 border border-gray-200 line-through opacity-60"
+                            : "bg-[#E5EDF1] text-[#0A3855] border border-[#0A3855]/10 hover:bg-[#d5e3ea]"
+                        }`}
+                      >
+                        {isSent && <CheckCircle2 className="size-3 mr-0.5" />}
+                        {isExcluded && !isSent && <X className="size-3 mr-0.5" />}
+                        {p.nom}
+                      </Badge>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Template */}
+        {/* Template selector */}
         <Card>
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2">
@@ -170,24 +251,24 @@ export default function CampagnesTab() {
           </CardHeader>
           <CardContent className="pt-4">
             <div className="grid grid-cols-2 gap-3">
-              {TEMPLATES.map((t) => (
+              {templates.map((t) => (
                 <button
-                  key={t.key}
+                  key={t.id}
                   onClick={() => {
-                    setSelectedTemplate(t.key);
+                    setSelectedTemplateId(t.id);
                     setShowPreview(false);
                     setAllSent(false);
                     setSentPartners(new Set());
                   }}
                   className={`text-left p-3.5 rounded-lg border-2 transition-all ${
-                    selectedTemplate === t.key
+                    selectedTemplateId === t.id
                       ? "border-[#0A3855] bg-[#E5EDF1]/30 ring-1 ring-[#0A3855]/10"
                       : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
-                    <Mail className={`size-3.5 ${selectedTemplate === t.key ? "text-[#0A3855]" : "text-gray-400"}`} />
-                    <p className={`text-sm font-medium ${selectedTemplate === t.key ? "text-[#0A3855]" : "text-gray-900"}`}>
+                    <Mail className={`size-3.5 ${selectedTemplateId === t.id ? "text-[#0A3855]" : "text-gray-400"}`} />
+                    <p className={`text-sm font-medium ${selectedTemplateId === t.id ? "text-[#0A3855]" : "text-gray-900"}`}>
                       {t.title}
                     </p>
                   </div>
@@ -201,6 +282,59 @@ export default function CampagnesTab() {
         </Card>
       </div>
 
+      {/* Template editor */}
+      {selectedTemplateId && template && (
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="size-4 text-[#0A3855]" />
+              Éditer le template : {template.title}
+              <span className="text-xs font-normal text-gray-400 ml-2">
+                Variables : {"{{nom}} {{code}} {{utm}} {{leads}} {{abonnes}} {{link}}"}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label>Objet de l'email</Label>
+              <Input
+                value={editSubject}
+                onChange={(e) => { setEditSubject(e.target.value); setSaved(false); }}
+                placeholder="Objet du mail..."
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Contenu HTML</Label>
+              <textarea
+                value={editBody}
+                onChange={(e) => { setEditBody(e.target.value); setSaved(false); }}
+                rows={12}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0A3855]/20 focus:border-[#0A3855]"
+                placeholder="Contenu HTML du template..."
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleSaveTemplate}
+                disabled={updateTemplate.isPending || saved}
+                className={saved ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
+              >
+                {updateTemplate.isPending ? (
+                  <><Loader2 className="size-4 mr-1.5 animate-spin" /> Sauvegarde...</>
+                ) : saved ? (
+                  <><Check className="size-4 mr-1.5" /> Sauvegardé</>
+                ) : (
+                  <><Save className="size-4 mr-1.5" /> Sauvegarder le template</>
+                )}
+              </Button>
+              {editSubject !== template.subject || editBody !== template.body ? (
+                <span className="text-xs text-amber-600 font-medium">Modifications non sauvegardées</span>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Preview & Send */}
       <Card>
         <CardHeader className="border-b">
@@ -210,7 +344,7 @@ export default function CampagnesTab() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
-          {!selectedTemplate ? (
+          {!selectedTemplateId ? (
             <Alert>
               <Info className="size-4" />
               <AlertDescription>
@@ -226,71 +360,53 @@ export default function CampagnesTab() {
                   disabled={!previewPartner}
                 >
                   {showPreview ? (
-                    <>
-                      <EyeOff className="size-4 mr-1.5" />
-                      Masquer aperçu
-                    </>
+                    <><EyeOff className="size-4 mr-1.5" /> Masquer aperçu</>
                   ) : (
-                    <>
-                      <Eye className="size-4 mr-1.5" />
-                      Prévisualiser
-                    </>
+                    <><Eye className="size-4 mr-1.5" /> Prévisualiser</>
                   )}
                 </Button>
                 <Button
                   className="bg-[#F6CCA4] text-[#6B4D2D] hover:bg-[#F0BF8E] border border-[#E8B88A]"
                   onClick={handleSendAll}
-                  disabled={targeted.length === 0 || allSent}
+                  disabled={selected.length === 0 || allSent || sending}
                 >
-                  {allSent ? (
-                    <>
-                      <CheckCircle2 className="size-4 mr-1.5" />
-                      Envoyé à {targeted.length} partenaire(s)
-                    </>
+                  {sending ? (
+                    <><Loader2 className="size-4 mr-1.5 animate-spin" /> Envoi en cours...</>
+                  ) : allSent ? (
+                    <><CheckCircle2 className="size-4 mr-1.5" /> Envoyé à {selected.length} partenaire(s)</>
                   ) : (
-                    <>
-                      <Send className="size-4 mr-1.5" />
-                      Envoyer à {targeted.length} partenaire(s)
-                    </>
+                    <><Send className="size-4 mr-1.5" /> Envoyer à {selected.length} partenaire(s)</>
                   )}
                 </Button>
               </div>
 
               {/* Preview */}
-              {showPreview && template && previewPartner && (
+              {showPreview && previewPartner && (
                 <Card className="bg-[#F8FAFB] border-dashed">
                   <CardContent>
                     <p className="text-xs text-gray-400 mb-2">
                       Aperçu pour : {previewPartner.nom}
                     </p>
                     <p className="text-sm font-semibold text-gray-900 mb-3">
-                      Objet : {template.subject(previewPartner)}
+                      Objet : {replaceVars(editSubject, previewVars)}
                     </p>
-                    <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed bg-white rounded-lg border border-gray-200 p-4">
-                      {template.body(previewPartner)}
-                    </pre>
+                    <div
+                      className="bg-white rounded-lg border border-gray-200 p-4 text-sm text-gray-700"
+                      dangerouslySetInnerHTML={{ __html: replaceVars(editBody, previewVars) }}
+                    />
                   </CardContent>
                 </Card>
               )}
 
               {/* Per-partner status */}
               <div className="space-y-2">
-                {targeted.map((p) => (
+                {selected.map((p) => (
                   <div
                     key={p.id}
                     className="flex items-center justify-between py-2.5 px-4 rounded-lg bg-white border border-gray-100 hover:border-gray-200 transition-colors"
                   >
                     <span className="text-sm text-gray-700 font-medium">{p.nom}</span>
                     <div className="flex items-center gap-3">
-                      {template && (
-                        <button
-                          onClick={() => setShowPreview(true)}
-                          className="flex items-center gap-1 text-xs text-[#0A3855] hover:underline"
-                        >
-                          <Eye className="size-3" />
-                          Apercu
-                        </button>
-                      )}
                       {sentPartners.has(p.id) ? (
                         <Badge
                           variant="secondary"

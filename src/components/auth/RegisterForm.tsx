@@ -93,7 +93,13 @@ export default function RegisterForm() {
 
       await createPartner.mutateAsync({
         id: partnerId, nom: form.company || `${form.prenom} ${form.nom}`,
+        contact_prenom: form.prenom, contact_nom: form.nom,
         email: form.email, type: "autre", contrat: "affiliation", code, utm,
+        metier: form.metier, siret: form.siret, tva: form.tva || null,
+        adresse: form.address, ville: form.city, code_postal: form.postalCode,
+        telephone: form.contactPhone || null,
+        iban: form.iban, bic: form.bic,
+        statut: "en_attente",
         comm_rules: [
           { type: "annuelle", montant: 100, actif: true },
           { type: "souscription", montant: 0, actif: false },
@@ -104,24 +110,45 @@ export default function RegisterForm() {
 
       await supabase.auth.updateUser({ data: { partner_id: partnerId } });
 
-      // Upload KBIS and notify Coline (non-blocking)
+      // Upload KBIS, save URL to partner, and notify Coline with all info
+      let kbisPublicUrl = "";
       if (form.kbisFile) {
         const { data: kbisData } = await supabase.storage
           .from("kbis")
           .upload(`${partnerId}/${form.kbisFile.name}`, form.kbisFile, { upsert: true });
         if (kbisData?.path) {
           const { data: urlData } = supabase.storage.from("kbis").getPublicUrl(kbisData.path);
-          fetch("/api/admin/notify-kbis", {
-            method: "POST",
+          kbisPublicUrl = urlData.publicUrl;
+          // Save kbis_url to partner record
+          fetch("/api/admin/partners", {
+            method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              partnerName: form.company,
-              partnerEmail: form.email,
-              kbisUrl: urlData.publicUrl,
-            }),
+            body: JSON.stringify({ id: partnerId, kbis_url: kbisPublicUrl }),
           }).catch(() => {});
         }
       }
+
+      // Notify Coline with full partner info for contract
+      fetch("/api/admin/notify-kbis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          partnerName: form.company,
+          partnerEmail: form.email,
+          kbisUrl: kbisPublicUrl || null,
+          prenom: form.prenom,
+          nom: form.nom,
+          metier: form.metier,
+          siret: form.siret,
+          tva: form.tva || null,
+          adresse: form.address,
+          ville: form.city,
+          codePostal: form.postalCode,
+          telephone: form.contactPhone || null,
+          iban: form.iban,
+          bic: form.bic,
+        }),
+      }).catch(() => {});
 
       onboard.mutateAsync({ partnerName: form.company, utmValue: utm }).catch(() => {});
       router.push("/dashboard");

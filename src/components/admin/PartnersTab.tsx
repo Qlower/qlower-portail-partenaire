@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { Partner, CommissionRule, ContratType, PartnerType } from "@/types";
+import type { Partner, CommissionRule, ContratType, PartnerType, PartnerStatut } from "@/types";
 import { PARTNER_TYPES } from "@/services/constants";
 import { calcCommission, DEFAULT_TRANCHES } from "@/services/commission";
 import { slug } from "@/services/links";
-import { useAdminPartners, useCreatePartner, useUpdatePartner, useAdminLeads } from "@/hooks/useAdminData";
+import { useAdminPartners, useCreatePartner, useUpdatePartner, useDeletePartner, useAdminLeads } from "@/hooks/useAdminData";
 import { STAGE_STYLES } from "@/services/constants";
 import type { LeadStage } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +32,29 @@ import {
   Eye,
   Search,
   Mail,
+  Trash2,
 } from "lucide-react";
+
+const STATUT_OPTIONS = [
+  { value: "en_attente", label: "En attente" },
+  { value: "contrat_envoye", label: "Contrat envoyé" },
+  { value: "actif", label: "Actif" },
+  { value: "suspendu", label: "Suspendu" },
+];
+
+const STATUT_STYLES: Record<string, { bg: string; text: string }> = {
+  en_attente: { bg: "bg-amber-50", text: "text-amber-700 border border-amber-200" },
+  contrat_envoye: { bg: "bg-blue-50", text: "text-blue-700 border border-blue-200" },
+  actif: { bg: "bg-emerald-50", text: "text-emerald-700 border border-emerald-200" },
+  suspendu: { bg: "bg-red-50", text: "text-red-700 border border-red-200" },
+};
+
+const STATUT_LABELS: Record<string, string> = {
+  en_attente: "En attente",
+  contrat_envoye: "Contrat envoyé",
+  actif: "Actif",
+  suspendu: "Suspendu",
+};
 
 const CONTRAT_OPTIONS = [
   { value: "affiliation", label: "Affiliation" },
@@ -49,6 +71,8 @@ const DEFAULT_COMM_RULES: CommissionRule[] = [
 interface NewPartnerForm {
   identifiant: string;
   nom: string;
+  contact_prenom: string;
+  contact_nom: string;
   type: PartnerType;
   utm: string;
   contrat: ContratType;
@@ -61,6 +85,8 @@ interface NewPartnerForm {
 const emptyForm = (): NewPartnerForm => ({
   identifiant: "",
   nom: "",
+  contact_prenom: "",
+  contact_nom: "",
   type: "cgp",
   utm: "",
   contrat: "affiliation",
@@ -162,7 +188,9 @@ export default function PartnersTab() {
   const { data: partners = [], isLoading: loading } = useAdminPartners();
   const createPartner = useCreatePartner();
   const updatePartner = useUpdatePartner();
+  const deletePartner = useDeletePartner();
   const [showCreate, setShowCreate] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState<NewPartnerForm>(emptyForm());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Partner>>({});
@@ -191,6 +219,8 @@ export default function PartnersTab() {
       await createPartner.mutateAsync({
         id: partnerId,
         nom: form.nom,
+        contact_prenom: form.contact_prenom,
+        contact_nom: form.contact_nom,
         email: form.email,
         type: form.type,
         contrat: form.contrat,
@@ -231,6 +261,16 @@ export default function PartnersTab() {
     window.open(`/dashboard?as=${partnerId}`, "_blank");
   };
 
+  const handleDelete = async (id: string) => {
+    try {
+      await deletePartner.mutateAsync(id);
+      setConfirmDeleteId(null);
+      setSuccess("Partenaire supprimé");
+    } catch {
+      setError("Erreur lors de la suppression");
+    }
+  };
+
   const handleToggleActive = async (partner: Partner) => {
     try {
       await updatePartner.mutateAsync({
@@ -257,6 +297,8 @@ export default function PartnersTab() {
     setEditingId(p.id);
     setEditForm({
       nom: p.nom,
+      contact_prenom: p.contact_prenom,
+      contact_nom: p.contact_nom,
       email: p.email,
       type: p.type,
       contrat: p.contrat,
@@ -264,6 +306,16 @@ export default function PartnersTab() {
       code: p.code,
       comm_obj_annuel: p.comm_obj_annuel,
       comm_rules: p.comm_rules,
+      statut: p.statut,
+      metier: p.metier,
+      siret: p.siret,
+      tva: p.tva,
+      adresse: p.adresse,
+      ville: p.ville,
+      code_postal: p.code_postal,
+      telephone: p.telephone,
+      iban: p.iban,
+      bic: p.bic,
     });
   };
 
@@ -337,11 +389,27 @@ export default function PartnersTab() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Nom</Label>
+                <Label>Entreprise</Label>
                 <Input
                   value={form.nom}
                   onChange={(e) => setForm({ ...form, nom: e.target.value })}
-                  placeholder="Nom du partenaire"
+                  placeholder="Nom de l'entreprise"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Prenom du contact</Label>
+                <Input
+                  value={form.contact_prenom}
+                  onChange={(e) => setForm({ ...form, contact_prenom: e.target.value })}
+                  placeholder="Jean"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nom du contact</Label>
+                <Input
+                  value={form.contact_nom}
+                  onChange={(e) => setForm({ ...form, contact_nom: e.target.value })}
+                  placeholder="Dupont"
                 />
               </div>
               <Select
@@ -467,6 +535,7 @@ export default function PartnersTab() {
                     <div className="flex items-center gap-1.5 ml-1">
                       <Badge
                         variant="secondary"
+                        title={`Type de partenaire : ${p.type}`}
                         className={
                           p.type === "cgp"
                             ? "bg-blue-50 text-blue-700 border border-blue-200"
@@ -479,6 +548,7 @@ export default function PartnersTab() {
                       </Badge>
                       <Badge
                         variant="secondary"
+                        title={`Contrat : ${p.contrat === "affiliation" ? "Affiliation" : "Marque blanche"}`}
                         className={
                           p.contrat === "affiliation"
                             ? "bg-amber-50 text-amber-700 border border-amber-200"
@@ -488,14 +558,11 @@ export default function PartnersTab() {
                         {p.contrat === "affiliation" ? "AF" : "MB"}
                       </Badge>
                       <Badge
-                        variant={p.active ? "secondary" : "destructive"}
-                        className={
-                          p.active
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : undefined
-                        }
+                        variant="secondary"
+                        title={`Statut : ${STATUT_LABELS[p.statut] || p.statut || "Inconnu"}`}
+                        className={`${STATUT_STYLES[p.statut]?.bg || "bg-gray-50"} ${STATUT_STYLES[p.statut]?.text || "text-gray-500 border border-gray-200"}`}
                       >
-                        {p.active ? "Actif" : "Inactif"}
+                        {STATUT_LABELS[p.statut] || p.statut || "—"}
                       </Badge>
                     </div>
 
@@ -571,6 +638,41 @@ export default function PartnersTab() {
                           </>
                         )}
                       </Button>
+                      {confirmDeleteId === p.id ? (
+                        <div className="flex items-center gap-1.5 ml-1 px-2 py-1 bg-red-50 rounded-md border border-red-200">
+                          <span className="text-xs text-red-700">Supprimer ?</span>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => handleDelete(p.id)}
+                            disabled={deletePartner.isPending}
+                          >
+                            {deletePartner.isPending ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              "Oui"
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => setConfirmDeleteId(null)}
+                          >
+                            Non
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setConfirmDeleteId(p.id)}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -593,12 +695,32 @@ export default function PartnersTab() {
                     <div className="mt-5 pt-5 border-t border-gray-100">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div className="space-y-1.5">
-                          <Label>Nom</Label>
+                          <Label>Entreprise</Label>
                           <Input
                             value={editForm.nom ?? ""}
                             onChange={(e) =>
                               setEditForm({ ...editForm, nom: e.target.value })
                             }
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Prenom du contact</Label>
+                          <Input
+                            value={editForm.contact_prenom ?? ""}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, contact_prenom: e.target.value })
+                            }
+                            placeholder="Jean"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Nom du contact</Label>
+                          <Input
+                            value={editForm.contact_nom ?? ""}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, contact_nom: e.target.value })
+                            }
+                            placeholder="Dupont"
                           />
                         </div>
                         <div className="space-y-1.5">
@@ -652,6 +774,92 @@ export default function PartnersTab() {
                             }
                           />
                         </div>
+                        <Select
+                          label="Statut"
+                          value={(editForm.statut as string) ?? p.statut ?? "en_attente"}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, statut: e.target.value as PartnerStatut })
+                          }
+                          options={STATUT_OPTIONS}
+                        />
+                      </div>
+
+                      {/* Informations société */}
+                      <Separator className="my-4" />
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Informations société</p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="space-y-1.5">
+                          <Label>Métier</Label>
+                          <Input
+                            value={(editForm.metier as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, metier: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>SIRET</Label>
+                          <Input
+                            value={(editForm.siret as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, siret: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>N° TVA</Label>
+                          <Input
+                            value={(editForm.tva as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, tva: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Adresse</Label>
+                          <Input
+                            value={(editForm.adresse as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, adresse: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Ville</Label>
+                          <Input
+                            value={(editForm.ville as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, ville: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Code postal</Label>
+                          <Input
+                            value={(editForm.code_postal as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, code_postal: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Téléphone</Label>
+                          <Input
+                            value={(editForm.telephone as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, telephone: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>IBAN</Label>
+                          <Input
+                            value={(editForm.iban as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, iban: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>BIC</Label>
+                          <Input
+                            value={(editForm.bic as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, bic: e.target.value })}
+                          />
+                        </div>
+                        {p.kbis_url && (
+                          <div className="space-y-1.5">
+                            <Label>Kbis</Label>
+                            <a href={p.kbis_url} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-sm text-[#0A3855] hover:underline font-medium">
+                              Voir le document →
+                            </a>
+                          </div>
+                        )}
                       </div>
 
                       <Separator className="my-4" />

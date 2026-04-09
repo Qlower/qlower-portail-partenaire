@@ -9,7 +9,7 @@ export interface PartnerEmailData {
 
 export type TemplateKey = "presentation" | "relance" | "performance" | "nouveaute";
 
-function layout(content: string): string {
+export function layout(content: string): string {
   return `
 <!DOCTYPE html>
 <html lang="fr">
@@ -27,7 +27,7 @@ function layout(content: string): string {
       <!-- Footer -->
       <div style="margin-top:32px;padding-top:20px;border-top:1px solid #e5e7eb;">
         <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
-          Qlower &mdash; Gestion fiscale immobili&egrave;re simplifi&eacute;e<br>
+          Qlower — Gestion fiscale immobilière simplifiée<br>
           <a href="https://qlower.com" style="color:#0A3855;text-decoration:none;">qlower.com</a>
         </p>
       </div>
@@ -60,16 +60,16 @@ export function getEmailContent(key: TemplateKey, p: PartnerEmailData): { subjec
         html: layout(`
           <h2 style="margin:0 0 8px;font-size:20px;color:#0A3855;font-weight:700;">Bienvenue ${p.nom} !</h2>
           <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">
-            Nous sommes ravis de vous accueillir dans le programme partenaire Qlower. Vous rejoignez un r&eacute;seau de professionnels qui accompagnent leurs clients investisseurs LMNP vers une gestion fiscale simplifi&eacute;e.
+            Nous sommes ravis de vous accueillir dans le programme partenaire Qlower. Vous rejoignez un réseau de professionnels qui accompagnent leurs clients investisseurs LMNP vers une gestion fiscale simplifiée.
           </p>
 
           <div style="background:#f0f7fa;border-radius:12px;padding:20px;margin-bottom:24px;border-left:4px solid #0A3855;">
             <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0A3855;">Vos avantages partenaire :</p>
             <table style="width:100%;font-size:14px;color:#374151;line-height:1.8;">
-              <tr><td style="padding:2px 0;">&#10003;&nbsp; <strong>100 &euro; de commission</strong> par client abonn&eacute; / an</td></tr>
-              <tr><td style="padding:2px 0;">&#10003;&nbsp; Tableau de bord d&eacute;di&eacute; en temps r&eacute;el</td></tr>
-              <tr><td style="padding:2px 0;">&#10003;&nbsp; Supports de communication personnalis&eacute;s</td></tr>
-              <tr><td style="padding:2px 0;">&#10003;&nbsp; Interlocuteur d&eacute;di&eacute; pour vous accompagner</td></tr>
+              <tr><td style="padding:2px 0;">✓ <strong>100 € de commission</strong> par client abonné / an</td></tr>
+              <tr><td style="padding:2px 0;">✓ Tableau de bord dédié en temps réel</td></tr>
+              <tr><td style="padding:2px 0;">✓ Supports de communication personnalisés</td></tr>
+              <tr><td style="padding:2px 0;">✓ Interlocuteur dédié pour vous accompagner</td></tr>
             </table>
           </div>
 
@@ -79,14 +79,14 @@ export function getEmailContent(key: TemplateKey, p: PartnerEmailData): { subjec
           </div>
 
           <div style="text-align:center;margin:28px 0 8px;">
-            ${btn("Acc&eacute;der &agrave; mon espace &rarr;", "https://partenaire.qlower.com/dashboard")}
+            ${btn("Accéder à mon espace →", "https://partenaire.qlower.com/dashboard")}
           </div>
           <div style="text-align:center;margin-top:12px;">
             <a href="${link}" style="font-size:13px;color:#0A3855;text-decoration:underline;">Voir mon lien d'inscription partenaire</a>
           </div>
 
           <p style="margin:24px 0 0;font-size:13px;color:#6b7280;line-height:1.5;">
-            Pour toute question, r&eacute;pondez simplement &agrave; cet email.
+            Pour toute question, répondez simplement à cet email.
           </p>
         `),
       };
@@ -98,7 +98,7 @@ export function getEmailContent(key: TemplateKey, p: PartnerEmailData): { subjec
           <h2 style="margin:0 0 8px;font-size:20px;color:#0A3855;font-weight:700;">On ne vous oublie pas !</h2>
           <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">
             Bonjour ${p.nom},<br><br>
-            Nous avons remarqu&eacute; que votre lien partenaire n'a pas encore &eacute;t&eacute; utilis&eacute;. C'est tout &agrave; fait normal au d&eacute;marrage &mdash; voici quelques id&eacute;es pour commencer :
+            Nous avons remarqué que votre lien partenaire n'a pas encore été utilisé. C'est tout à fait normal au démarrage — voici quelques idées pour commencer :
           </p>
 
           <div style="background:#f8fafc;border-radius:12px;padding:20px;margin-bottom:24px;">
@@ -110,14 +110,14 @@ export function getEmailContent(key: TemplateKey, p: PartnerEmailData): { subjec
           </div>
 
           <div style="text-align:center;margin:28px 0 8px;">
-            ${btn("Mon espace partenaire &rarr;", "https://partenaire.qlower.com/dashboard")}
+            ${btn("Mon espace partenaire →", "https://partenaire.qlower.com/dashboard")}
           </div>
           <div style="text-align:center;margin-top:12px;">
             <a href="${link}" style="font-size:13px;color:#0A3855;text-decoration:underline;">Copier mon lien d'inscription</a>
           </div>
 
           <p style="margin:24px 0 0;font-size:13px;color:#6b7280;line-height:1.5;">
-            Besoin d'un coup de pouce ? R&eacute;pondez simplement &agrave; cet email.
+            Besoin d'un coup de pouce ? Répondez simplement à cet email.
           </p>
         `),
       };
@@ -128,31 +128,31 @@ export function getEmailContent(key: TemplateKey, p: PartnerEmailData): { subjec
         html: layout(`
           <h2 style="margin:0 0 8px;font-size:20px;color:#0A3855;font-weight:700;">Votre bilan de performance</h2>
           <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
-            Bonjour ${p.nom}, voici un r&eacute;capitulatif de votre activit&eacute; partenaire Qlower.
+            Bonjour ${p.nom}, voici un récapitulatif de votre activité partenaire Qlower.
           </p>
 
           <!-- Stats grid -->
           <!--[if mso]><table role="presentation" cellspacing="8"><tr><td><![endif]-->
           <div style="display:flex;gap:10px;margin-bottom:20px;">
             ${statCard("Leads", String(p.leads))}
-            ${statCard("Abonn&eacute;s", String(p.abonnes), "#059669")}
+            ${statCard("Abonnés", String(p.abonnes), "#059669")}
           </div>
           <!--[if mso]></td></tr></table><![endif]-->
 
           <div style="display:flex;gap:10px;margin-bottom:24px;">
             ${statCard("Conversion", conversionRate + "%", "#0A3855")}
-            ${statCard("Commission", commission + " &euro;/an", "#059669")}
+            ${statCard("Commission", commission + " €/an", "#059669")}
           </div>
 
           ${p.leads > 0
             ? `<div style="background:#ecfdf5;border-radius:12px;padding:16px 20px;margin-bottom:24px;border:1px solid #a7f3d0;">
                 <p style="margin:0;font-size:14px;color:#065f46;font-weight:500;">
-                  &#127942; Bravo pour votre implication ! Continuez sur cette lanc&eacute;e.
+                  🏆 Bravo pour votre implication ! Continuez sur cette lancée.
                 </p>
               </div>`
             : `<div style="background:#fff8f0;border-radius:12px;padding:16px 20px;margin-bottom:24px;border:1px solid #f6cca4;">
                 <p style="margin:0;font-size:14px;color:#92400e;font-weight:500;">
-                  Vous n'avez pas encore g&eacute;n&eacute;r&eacute; de leads. Partagez votre lien pour d&eacute;marrer !
+                  Vous n'avez pas encore généré de leads. Partagez votre lien pour démarrer !
                 </p>
               </div>`
           }
@@ -163,7 +163,7 @@ export function getEmailContent(key: TemplateKey, p: PartnerEmailData): { subjec
           </div>
 
           <div style="text-align:center;margin:28px 0 8px;">
-            ${btn("Voir mon tableau de bord &rarr;", "https://partenaire.qlower.com/dashboard")}
+            ${btn("Voir mon tableau de bord →", "https://partenaire.qlower.com/dashboard")}
           </div>
         `),
       };
@@ -172,29 +172,29 @@ export function getEmailContent(key: TemplateKey, p: PartnerEmailData): { subjec
       return {
         subject: `Nouveauté Qlower — Programme partenaire`,
         html: layout(`
-          <h2 style="margin:0 0 8px;font-size:20px;color:#0A3855;font-weight:700;">Nouveaut&eacute; programme partenaire</h2>
+          <h2 style="margin:0 0 8px;font-size:20px;color:#0A3855;font-weight:700;">Nouveauté programme partenaire</h2>
           <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">
             Bonjour ${p.nom},<br><br>
-            Nous avons le plaisir de vous annoncer une nouveaut&eacute; dans notre programme partenaire.
+            Nous avons le plaisir de vous annoncer une nouveauté dans notre programme partenaire.
           </p>
 
           <div style="background:#f0f7fa;border-radius:12px;padding:20px;margin-bottom:24px;border-left:4px solid #F6CCA4;">
             <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;font-style:italic;">
-              [&Agrave; compl&eacute;ter avant envoi : d&eacute;crivez ici la nouveaut&eacute; ou la mise &agrave; jour &agrave; communiquer aux partenaires]
+              [À compléter avant envoi : décrivez ici la nouveauté ou la mise à jour à communiquer aux partenaires]
             </p>
           </div>
 
           <div style="background:#f8fafc;border-radius:12px;padding:16px 20px;margin-bottom:24px;border:1px solid #e5e7eb;">
-            <p style="margin:0 0 4px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Votre lien reste inchang&eacute;</p>
+            <p style="margin:0 0 4px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Votre lien reste inchangé</p>
             <a href="${link}" style="font-size:13px;color:#0A3855;word-break:break-all;">${link}</a>
           </div>
 
           <div style="text-align:center;margin:28px 0 8px;">
-            ${btn("Mon espace partenaire &rarr;", "https://partenaire.qlower.com/dashboard")}
+            ${btn("Mon espace partenaire →", "https://partenaire.qlower.com/dashboard")}
           </div>
 
           <p style="margin:24px 0 0;font-size:13px;color:#6b7280;line-height:1.5;">
-            &Agrave; tr&egrave;s vite,<br>L'&eacute;quipe Qlower
+            À très vite,<br>L'équipe Qlower
           </p>
         `),
       };

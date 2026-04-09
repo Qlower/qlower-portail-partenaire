@@ -40,6 +40,17 @@ export function useUpdatePartner() {
   });
 }
 
+export function useDeletePartner() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.delete(`/admin/partners?id=${id}`);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "partners"] }),
+  });
+}
+
 export function useBatchCreatePartners() {
   const qc = useQueryClient();
   return useMutation({
@@ -73,6 +84,38 @@ export function useAdminLeads(partnerId: string | undefined) {
       return data as Lead[];
     },
     enabled: !!partnerId,
+  });
+}
+
+// ── Email Templates ─────────────────────────────────────────
+
+export interface EmailTemplate {
+  id: string;
+  title: string;
+  description: string | null;
+  subject: string;
+  body: string;
+  updated_at: string;
+}
+
+export function useEmailTemplates() {
+  return useQuery<EmailTemplate[]>({
+    queryKey: ["admin", "email-templates"],
+    queryFn: async () => {
+      const { data } = await api.get("/admin/email-templates");
+      return data;
+    },
+  });
+}
+
+export function useUpdateEmailTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (update: { id: string; subject?: string; body?: string }) => {
+      const { data } = await api.patch("/admin/email-templates", update);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "email-templates"] }),
   });
 }
 

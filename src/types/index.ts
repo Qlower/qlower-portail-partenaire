@@ -1,6 +1,7 @@
 // ── Partner ───────────────────────────────────────────────────
 export type ContratType = "affiliation" | "marque_blanche";
 export type PartnerType = "cgp" | "agence-immo" | "apporteur" | "courtier" | "conciergerie" | "proptech" | "banque" | "influenceur" | "autre";
+export type PartnerStatut = "en_attente" | "contrat_envoye" | "actif" | "suspendu";
 export type LeadStage = "Abonne" | "Payeur" | "Non payeur";
 export type LeadSource = "UTM" | "Manuel" | "Promo";
 export type CommissionType = "souscription" | "annuelle" | "biens" | "pct_ca";
@@ -22,12 +23,25 @@ export interface Partner {
   id: string;
   user_id: string | null;
   nom: string;
+  contact_prenom: string | null;
+  contact_nom: string | null;
   email: string | null;
   type: PartnerType;
   contrat: ContratType;
   code: string;
   utm: string;
+  statut: PartnerStatut;
   active: boolean;
+  metier: string | null;
+  siret: string | null;
+  tva: string | null;
+  adresse: string | null;
+  ville: string | null;
+  code_postal: string | null;
+  telephone: string | null;
+  iban: string | null;
+  bic: string | null;
+  kbis_url: string | null;
   leads: number;
   abonnes: number;
   biens_moyens: number;
