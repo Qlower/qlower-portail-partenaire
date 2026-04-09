@@ -13,10 +13,8 @@ import type {
 
 export function useRegisterPartner() {
   return useMutation({
-    mutationFn: async ({ partner, token }: { partner: Record<string, unknown>; token: string }) => {
-      const { data } = await api.post("/register", partner, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    mutationFn: async (partner: Record<string, unknown>) => {
+      const { data } = await api.post("/register", partner);
       return data;
     },
   });

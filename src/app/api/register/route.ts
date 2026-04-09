@@ -1,60 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
-import { createServerClient } from "@supabase/ssr";
 
 // POST — self-service partner registration (no admin required)
-// Only creates the partner record; auth user is already created client-side via signUp
+// Verifies the user_id exists in auth before creating the partner record
 export async function POST(request: NextRequest) {
-  // Verify the user is authenticated via Authorization header (preferred) or cookies
-  const authHeader = request.headers.get("authorization");
-  let user = null;
-
-  if (authHeader?.startsWith("Bearer ")) {
-    // Use the token from Authorization header (set right after signUp)
-    const { createClient } = await import("@supabase/supabase-js");
-    const supabaseWithToken = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data, error } = await supabaseWithToken.auth.getUser();
-    if (!error && data.user) user = data.user;
-  }
-
-  if (!user) {
-    // Fallback to cookies
-    const supabaseAuth = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return request.cookies.getAll(); },
-          setAll() {},
-        },
-      },
-    );
-    const { data, error } = await supabaseAuth.auth.getUser();
-    if (!error && data.user) user = data.user;
-  }
-
-  if (!user) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-
   const supabase = createServiceClient();
   const body = await request.json();
 
   const {
-    id, nom, contact_prenom, contact_nom, email, utm,
+    id, user_id, nom, contact_prenom, contact_nom, email, utm,
     metier, siret, tva, adresse, ville, code_postal, telephone, iban, bic,
     comm_rules,
   } = body;
 
-  if (!id || !nom || !utm) {
-    return NextResponse.json({ error: "id, nom, and utm are required" }, { status: 400 });
+  if (!id || !nom || !utm || !user_id) {
+    return NextResponse.json({ error: "id, nom, utm, and user_id are required" }, { status: 400 });
   }
 
-  // Ensure the user_id matches the authenticated user (prevent spoofing)
+  // Verify user_id exists in Supabase Auth (prevent spoofing)
+  const { data: { user }, error: authError } = await supabase.auth.admin.getUserById(user_id);
+  if (authError || !user) {
+    return NextResponse.json({ error: "User not found" }, { status: 401 });
+  }
+
   const { data, error } = await supabase.from("partners").insert({
     id,
     user_id: user.id,
@@ -81,6 +49,7 @@ export async function POST(request: NextRequest) {
   }).select().single();
 
   if (error) {
+    console.error("[register] Insert error:", error.message, error.details);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
