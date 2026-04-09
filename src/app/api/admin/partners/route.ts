@@ -38,8 +38,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Generate a temporary password for new users
+  const tempPassword = `Ql-${Math.random().toString(36).slice(2, 8)}${Math.floor(Math.random() * 90 + 10)}`;
+
   // Use provided user_id, or look up by email, or create new auth user
   let userId = user_id || null;
+  let isNewUser = false;
   if (!userId && email) {
     // Try to find existing user by email
     const { data: users } = await supabase.auth.admin.listUsers();
@@ -51,9 +55,10 @@ export async function POST(request: NextRequest) {
         user_metadata: { partner_id: id },
       });
     } else {
-      // Create new auth user (admin flow)
+      // Create new auth user (admin flow) with temporary password
       const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
         email,
+        password: tempPassword,
         email_confirm: true,
         user_metadata: { nom, partner_id: id },
       });
@@ -64,6 +69,7 @@ export async function POST(request: NextRequest) {
         );
       }
       userId = authUser.user.id;
+      isNewUser = true;
     }
   }
 
@@ -191,12 +197,36 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Sync to Google Sheets (use GET with query params to avoid Google redirect issues)
+  const GSHEET_WEBHOOK = process.env.GSHEET_WEBHOOK_URL;
+  if (GSHEET_WEBHOOK) {
+    try {
+      const nameParts = nom.split(" ");
+      const params = new URLSearchParams({
+        nom: nameParts.slice(1).join(" ") || nom,
+        prenom: nameParts[0] || "",
+        email: email || "",
+        entreprise: nom,
+        code_promo: code,
+        utm,
+        contrat: contrat || "affiliation",
+        mot_de_passe: isNewUser ? tempPassword : "(compte existant)",
+      });
+      await fetch(`${GSHEET_WEBHOOK}?${params.toString()}`);
+    } catch (e) {
+      console.error("Google Sheets sync error:", e);
+    }
+  }
+
   // Optionally send welcome email with magic link
   if (sendEmail && email) {
     const origin = request.nextUrl.origin;
     await fetch(`${origin}/api/admin/partner-link`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        cookie: request.headers.get("cookie") || "",
+      },
       body: JSON.stringify({ partner_id: id, sendEmail: true }),
     });
   }

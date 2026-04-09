@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     (partners ?? [])
       .filter((p) => p.email)
       .map(async (p) => {
-        const { subject, body: text } = getEmailContent(templateKey, {
+        const { subject, html } = getEmailContent(templateKey, {
           nom: p.nom,
           email: p.email!,
           utm: p.utm,
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
           from: FROM,
           to: p.email!,
           subject,
-          text,
+          html,
         });
 
         return p.id;

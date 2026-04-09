@@ -16,4 +16,4 @@ export const resend = new Proxy({} as Resend, {
     return (getResend() as unknown as Record<string, unknown>)[prop as string];
   },
 });
-export const FROM = "Qlower <no-reply@qlower.com>";
+export const FROM = "Qlower <noreply@qlower.com>";
