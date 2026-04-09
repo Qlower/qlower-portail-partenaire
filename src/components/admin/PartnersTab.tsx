@@ -570,11 +570,11 @@ export default function PartnersTab() {
                           variant="ghost"
                           size="sm"
                           className="h-6 px-2 text-xs bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
-                          title="Marquer le contrat comme signé et activer le dashboard"
+                          title="Activer le compte après signature du contrat"
                           onClick={() => updatePartner.mutateAsync({ id: p.id, statut: "actif" as PartnerStatut })}
                         >
                           <CheckCircle2 className="size-3 mr-1" />
-                          Contrat signé
+                          Activer
                         </Button>
                       )}
                     </div>
