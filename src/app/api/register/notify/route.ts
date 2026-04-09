@@ -117,7 +117,13 @@ export async function POST(request: NextRequest) {
   });
 
   // Send both emails in parallel
-  await Promise.all([notifyColine, welcomePartner]);
-
-  return NextResponse.json({ ok: true });
+  try {
+    const results = await Promise.all([notifyColine, welcomePartner]);
+    console.log("[register/notify] Emails sent:", JSON.stringify(results));
+    return NextResponse.json({ ok: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[register/notify] Email error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
