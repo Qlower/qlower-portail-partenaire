@@ -43,6 +43,7 @@ export default function RegisterForm() {
   const router = useRouter();
 
   const [step, setStep] = useState<StepIndex>(0);
+  const [maxVisited, setMaxVisited] = useState<StepIndex>(0);
   const [form, setForm] = useState<FormData>(initial);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -71,10 +72,19 @@ export default function RegisterForm() {
     const err = validateStep();
     if (err) { setError(err); return; }
     setError("");
-    setStep((s) => Math.min(s + 1, 5) as StepIndex);
+    const nextStep = Math.min(step + 1, 5) as StepIndex;
+    setStep(nextStep);
+    setMaxVisited((prev) => Math.max(prev, nextStep) as StepIndex);
   };
 
   const prev = () => { setError(""); setStep((s) => Math.max(s - 1, 0) as StepIndex); };
+
+  const goToStep = (target: StepIndex) => {
+    if (target <= maxVisited) {
+      setError("");
+      setStep(target);
+    }
+  };
 
   const handleFinish = async (e: FormEvent) => {
     e.preventDefault();
@@ -162,12 +172,17 @@ export default function RegisterForm() {
     <div className="flex items-center justify-between mb-8 px-2">
       {STEP_LABELS.map((label, i) => (
         <div key={label} className="flex items-center flex-1 last:flex-none">
-          <div className="flex flex-col items-center">
+          <div
+            className={cn("flex flex-col items-center", i <= maxVisited && "cursor-pointer group")}
+            onClick={() => i <= maxVisited && goToStep(i as StepIndex)}
+          >
             <div className={cn(
               "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300",
               i < step ? "bg-green-500 text-white" :
               i === step ? "bg-[#0A3855] text-white ring-4 ring-[#0A3855]/15" :
-              "bg-muted text-muted-foreground"
+              i <= maxVisited ? "bg-green-500/20 text-green-700 ring-2 ring-green-400/30" :
+              "bg-muted text-muted-foreground",
+              i <= maxVisited && i !== step && "group-hover:ring-2 group-hover:ring-[#0A3855]/30 group-hover:scale-110"
             )}>
               {i < step ? (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -177,7 +192,7 @@ export default function RegisterForm() {
             </div>
             <span className={cn(
               "text-[10px] mt-1.5 font-medium whitespace-nowrap",
-              i === step ? "text-[#0A3855]" : "text-muted-foreground"
+              i === step ? "text-[#0A3855]" : i <= maxVisited ? "text-green-700" : "text-muted-foreground"
             )}>{label}</span>
           </div>
           {i < STEP_LABELS.length - 1 && (
