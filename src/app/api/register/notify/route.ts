@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resend, FROM } from "@/lib/resend";
-import { layout } from "@/services/emailTemplates";
 
 interface NotifyBody {
   partnerName: string;
@@ -83,37 +82,43 @@ export async function POST(request: NextRequest) {
     from: FROM,
     to: body.partnerEmail,
     subject: `Bienvenue ${prenom} — Votre inscription est en cours de traitement`,
-    html: layout(`
-      <h2 style="margin:0 0 8px;font-size:20px;color:#0A3855;font-weight:700;">Bienvenue ${prenom} !</h2>
-      <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">
-        Merci pour votre inscription au programme partenaire Qlower. Nous avons bien reçu votre demande et nous sommes ravis de vous compter parmi nos futurs partenaires.
+    html: `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:560px;margin:0 auto;padding:32px 16px;">
+  <div style="background:linear-gradient(135deg,#0A3855 0%,#0d4a6f 100%);border-radius:16px 16px 0 0;padding:32px 32px 24px;text-align:center;">
+    <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;">Qlower</h1>
+    <p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:2px;font-weight:600;">Programme Partenaire</p>
+  </div>
+  <div style="background:#ffffff;padding:32px;border-radius:0 0 16px 16px;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+    <h2 style="margin:0 0 8px;font-size:20px;color:#0A3855;font-weight:700;">Bienvenue ${prenom} !</h2>
+    <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">
+      Merci pour votre inscription au programme partenaire Qlower. Nous avons bien reçu votre demande et nous sommes ravis de vous compter parmi nos futurs partenaires.
+    </p>
+    <div style="background:#f0f7fa;border-radius:12px;padding:20px;margin-bottom:24px;border-left:4px solid #0A3855;">
+      <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0A3855;">Prochaines étapes :</p>
+      <table style="width:100%;font-size:14px;color:#374151;line-height:2;">
+        <tr><td style="padding:2px 0;">1. Coline, notre responsable partenariats, vous contacte sous <strong>48h</strong></td></tr>
+        <tr><td style="padding:2px 0;">2. Vous signez votre <strong>contrat d'affiliation</strong> personnalisé</td></tr>
+        <tr><td style="padding:2px 0;">3. Votre <strong>code promo et tableau de bord</strong> sont activés</td></tr>
+      </table>
+    </div>
+    <div style="background:#fff8f0;border-radius:12px;padding:16px 20px;margin-bottom:24px;border:1px solid #f6cca4;">
+      <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+        <strong>Votre espace partenaire est déjà accessible</strong> — connectez-vous sur <a href="https://partenaire.qlower.com" style="color:#0A3855;font-weight:600;">partenaire.qlower.com</a>. Votre tableau de bord complet sera disponible dès la signature de votre contrat.
       </p>
-
-      <div style="background:#f0f7fa;border-radius:12px;padding:20px;margin-bottom:24px;border-left:4px solid #0A3855;">
-        <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0A3855;">Prochaines étapes :</p>
-        <table style="width:100%;font-size:14px;color:#374151;line-height:2;">
-          <tr><td style="padding:2px 0;"><span style="display:inline-block;width:24px;height:24px;background:#E5EDF1;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;color:#0A3855;margin-right:8px;">1</span> Coline, notre responsable partenariats, vous contacte sous <strong>48h</strong></td></tr>
-          <tr><td style="padding:2px 0;"><span style="display:inline-block;width:24px;height:24px;background:#E5EDF1;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;color:#0A3855;margin-right:8px;">2</span> Vous signez votre <strong>contrat d'affiliation</strong> personnalisé</td></tr>
-          <tr><td style="padding:2px 0;"><span style="display:inline-block;width:24px;height:24px;background:#E5EDF1;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;color:#0A3855;margin-right:8px;">3</span> Votre <strong>code promo et tableau de bord</strong> sont activés</td></tr>
-        </table>
-      </div>
-
-      <div style="background:#fff8f0;border-radius:12px;padding:16px 20px;margin-bottom:24px;border:1px solid #f6cca4;">
-        <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
-          <strong>Votre espace partenaire est déjà accessible</strong> — vous pouvez vous connecter à tout moment sur <a href="https://partenaire.qlower.com" style="color:#0A3855;font-weight:600;">partenaire.qlower.com</a>. Votre tableau de bord complet sera disponible dès la signature de votre contrat.
-        </p>
-      </div>
-
-      <div style="text-align:center;margin:28px 0 8px;">
-        <a href="https://partenaire.qlower.com/dashboard" style="display:inline-block;background:#0A3855;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:600;font-size:14px;">
-          Accéder à mon espace →
-        </a>
-      </div>
-
-      <p style="margin:24px 0 0;font-size:13px;color:#6b7280;line-height:1.5;">
-        Pour toute question, contactez Coline directement : <a href="mailto:coline@qlower.com" style="color:#0A3855;">coline@qlower.com</a>
-      </p>
-    `),
+    </div>
+    <div style="text-align:center;margin:28px 0 8px;">
+      <a href="https://partenaire.qlower.com/dashboard" style="display:inline-block;background:#0A3855;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:600;font-size:14px;">Accéder à mon espace</a>
+    </div>
+    <p style="margin:24px 0 0;font-size:13px;color:#6b7280;line-height:1.5;">
+      Pour toute question, contactez Coline : <a href="mailto:coline@qlower.com" style="color:#0A3855;">coline@qlower.com</a>
+    </p>
+    <div style="margin-top:32px;padding-top:20px;border-top:1px solid #e5e7eb;">
+      <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Qlower — Gestion fiscale immobilière simplifiée<br><a href="https://qlower.com" style="color:#0A3855;text-decoration:none;">qlower.com</a></p>
+    </div>
+  </div>
+</div>
+</body></html>`,
   });
 
   // Send both emails in parallel
