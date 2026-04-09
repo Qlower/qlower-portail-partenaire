@@ -634,26 +634,6 @@ export default function PartnersTab() {
                           </>
                         )}
                       </Button>
-                      <Button
-                        variant={p.active ? "destructive" : "default"}
-                        size="sm"
-                        className={
-                          !p.active ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""
-                        }
-                        onClick={() => handleToggleActive(p)}
-                      >
-                        {p.active ? (
-                          <>
-                            <PowerOff className="size-3.5 mr-1" />
-                            Desactiver
-                          </>
-                        ) : (
-                          <>
-                            <Power className="size-3.5 mr-1" />
-                            Activer
-                          </>
-                        )}
-                      </Button>
                       {confirmDeleteId === p.id ? (
                         <div className="flex items-center gap-1.5 ml-1 px-2 py-1 bg-red-50 rounded-md border border-red-200">
                           <span className="text-xs text-red-700">Supprimer ?</span>
