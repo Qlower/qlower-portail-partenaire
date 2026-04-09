@@ -53,5 +53,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Sync to Google Sheets
+  const GSHEET_WEBHOOK = process.env.GSHEET_WEBHOOK_URL;
+  if (GSHEET_WEBHOOK) {
+    try {
+      const params = new URLSearchParams({
+        nom: contact_nom || nom,
+        prenom: contact_prenom || "",
+        email: email || user.email || "",
+        entreprise: nom,
+        code_promo: "",
+        utm,
+        contrat: "affiliation",
+        mot_de_passe: "(inscription autonome)",
+      });
+      await fetch(`${GSHEET_WEBHOOK}?${params.toString()}`);
+    } catch (e) {
+      console.error("[register] Google Sheets sync error:", e);
+    }
+  }
+
   return NextResponse.json(data, { status: 201 });
 }
