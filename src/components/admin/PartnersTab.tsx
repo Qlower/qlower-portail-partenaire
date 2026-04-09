@@ -565,18 +565,21 @@ export default function PartnersTab() {
                       >
                         {STATUT_LABELS[p.statut] || p.statut || "—"}
                       </Badge>
-                      {(p.statut === "en_attente" || p.statut === "contrat_envoye") && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2 text-xs bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
-                          title="Activer le compte après signature du contrat"
-                          onClick={() => updatePartner.mutateAsync({ id: p.id, statut: "actif" as PartnerStatut })}
-                        >
-                          <CheckCircle2 className="size-3 mr-1" />
-                          Activer
-                        </Button>
-                      )}
+                      <button
+                        title={p.statut === "actif" ? "Compte actif — cliquer pour désactiver" : "Compte inactif — cliquer pour activer"}
+                        className="inline-flex items-center gap-1.5 cursor-pointer"
+                        onClick={() => updatePartner.mutateAsync({
+                          id: p.id,
+                          statut: (p.statut === "actif" ? "suspendu" : "actif") as PartnerStatut,
+                        })}
+                      >
+                        <div className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${p.statut === "actif" ? "bg-green-500" : "bg-red-400"}`}>
+                          <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${p.statut === "actif" ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+                        </div>
+                        <span className={`text-xs font-medium ${p.statut === "actif" ? "text-green-700" : "text-red-600"}`}>
+                          {p.statut === "actif" ? "Actif" : "Inactif"}
+                        </span>
+                      </button>
                     </div>
 
                     <div className="ml-auto flex gap-2 flex-wrap">
