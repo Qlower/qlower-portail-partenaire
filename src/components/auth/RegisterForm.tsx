@@ -63,8 +63,10 @@ export default function RegisterForm() {
     if (step === 1 && (!form.siret || !form.address || !form.city || !form.postalCode)) {
       return "Adresse complète et SIRET requis.";
     }
-    // Code promo is now set by admin after contract signature
-    // RIB is optional — can be provided later
+    // RIB is optional, but if one field is filled, both are required
+    if (step === 4 && ((form.iban && !form.bic) || (!form.iban && form.bic))) {
+      return "Veuillez renseigner l'IBAN et le BIC, ou laissez les deux vides.";
+    }
     return null;
   };
 
@@ -310,13 +312,6 @@ export default function RegisterForm() {
           <div className="grid grid-cols-[2fr_1fr] gap-3">
             <div className="space-y-2"><Label>IBAN (optionnel)</Label><Input value={form.iban} onChange={(e) => set("iban", e.target.value)} placeholder="FR76 3000 6000..." /></div>
             <div className="space-y-2"><Label>BIC (optionnel)</Label><Input value={form.bic} onChange={(e) => set("bic", e.target.value)} placeholder="BNPAFRPP" /></div>
-          </div>
-          <div className="bg-[#E5EDF1] rounded-xl p-4 text-sm">
-            <p className="font-semibold text-[#0A3855] mb-1">RIB Qlower</p>
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              IBAN : FR76 1820 6004 5920 0400 0903 080<br />
-              BIC : AGRIFRPP882 · Crédit Agricole
-            </p>
           </div>
         </div>
       );
