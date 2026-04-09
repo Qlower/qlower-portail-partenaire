@@ -1,134 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resend, FROM } from "@/lib/resend";
-
-interface NotifyBody {
-  partnerName: string;
-  partnerEmail: string;
-  kbisUrl: string | null;
-  prenom?: string;
-  nom?: string;
-  metier?: string;
-  siret?: string;
-  tva?: string;
-  adresse?: string;
-  ville?: string;
-  codePostal?: string;
-  telephone?: string;
-  iban?: string;
-  bic?: string;
-}
-
-function row(label: string, value: string | undefined | null): string {
-  if (!value) return "";
-  return `<tr><td style="color:#9ca3af;width:140px;padding:4px 0;vertical-align:top;">${label}</td><td style="font-weight:500;padding:4px 0;">${value}</td></tr>`;
-}
 
 // POST — notify Coline + send welcome email to partner
 export async function POST(request: NextRequest) {
-  const body: NotifyBody = await request.json();
-
-  if (!body.partnerName) {
-    return NextResponse.json({ error: "partnerName required" }, { status: 400 });
-  }
-
-  const rows = [
-    row("Entreprise", body.partnerName),
-    row("Prénom", body.prenom),
-    row("Nom", body.nom),
-    row("Email", body.partnerEmail ? `<a href="mailto:${body.partnerEmail}" style="color:#0A3855;">${body.partnerEmail}</a>` : null),
-    row("Téléphone", body.telephone),
-    row("Métier", body.metier),
-    row("SIRET", body.siret),
-    row("N° TVA", body.tva),
-    row("Adresse", [body.adresse, body.codePostal, body.ville].filter(Boolean).join(", ")),
-    row("IBAN", body.iban),
-    row("BIC", body.bic),
-  ].filter(Boolean).join("\n");
-
-  // 1. Notify Coline with full partner info
-  const notifyColine = resend.emails.send({
-    from: FROM,
-    to: "coline@qlower.com",
-    subject: `Nouveau partenaire inscrit — ${body.partnerName}`,
-    html: `
-      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">
-        <div style="background:#0A3855;border-radius:12px 12px 0 0;padding:20px 24px;">
-          <h2 style="margin:0;font-size:16px;color:#ffffff;">Nouveau partenaire inscrit</h2>
-          <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.6);">Informations pour rédaction du contrat</p>
-        </div>
-        <div style="background:#ffffff;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;">
-          <table style="width:100%;font-size:14px;color:#374151;line-height:1.6;margin-bottom:20px;border-collapse:collapse;">
-            ${rows}
-          </table>
-          ${body.kbisUrl ? `
-          <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;">
-            <a href="${body.kbisUrl}" style="display:inline-block;background:#0A3855;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600;font-size:13px;">
-              Voir le Kbis →
-            </a>
-          </div>` : ""}
-          <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
-            <a href="https://partenaire.qlower.com/admin" style="font-size:13px;color:#0A3855;text-decoration:underline;">
-              Voir dans l'admin →
-            </a>
-          </div>
-        </div>
-      </div>
-    `,
-  });
-
-  // 2. Send welcome email to partner
-  const prenom = body.prenom || body.partnerName;
-  const welcomePartner = resend.emails.send({
-    from: FROM,
-    to: body.partnerEmail,
-    subject: `Bienvenue ${prenom} — Votre inscription est en cours de traitement`,
-    html: `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-  <div style="background:linear-gradient(135deg,#0A3855 0%,#0d4a6f 100%);border-radius:16px 16px 0 0;padding:32px 32px 24px;text-align:center;">
-    <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;">Qlower</h1>
-    <p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:2px;font-weight:600;">Programme Partenaire</p>
-  </div>
-  <div style="background:#ffffff;padding:32px;border-radius:0 0 16px 16px;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
-    <h2 style="margin:0 0 8px;font-size:20px;color:#0A3855;font-weight:700;">Bienvenue ${prenom} !</h2>
-    <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">
-      Merci pour votre inscription au programme partenaire Qlower. Nous avons bien reçu votre demande et nous sommes ravis de vous compter parmi nos futurs partenaires.
-    </p>
-    <div style="background:#f0f7fa;border-radius:12px;padding:20px;margin-bottom:24px;border-left:4px solid #0A3855;">
-      <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0A3855;">Prochaines étapes :</p>
-      <table style="width:100%;font-size:14px;color:#374151;line-height:2;">
-        <tr><td style="padding:2px 0;">1. Coline, notre responsable partenariats, vous contacte sous <strong>48h</strong></td></tr>
-        <tr><td style="padding:2px 0;">2. Vous signez votre <strong>contrat d'affiliation</strong> personnalisé</td></tr>
-        <tr><td style="padding:2px 0;">3. Votre <strong>code promo et tableau de bord</strong> sont activés</td></tr>
-      </table>
-    </div>
-    <div style="background:#fff8f0;border-radius:12px;padding:16px 20px;margin-bottom:24px;border:1px solid #f6cca4;">
-      <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
-        <strong>Votre espace partenaire est déjà accessible</strong> — connectez-vous sur <a href="https://partenaire.qlower.com" style="color:#0A3855;font-weight:600;">partenaire.qlower.com</a>. Votre tableau de bord complet sera disponible dès la signature de votre contrat.
-      </p>
-    </div>
-    <div style="text-align:center;margin:28px 0 8px;">
-      <a href="https://partenaire.qlower.com/dashboard" style="display:inline-block;background:#0A3855;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:600;font-size:14px;">Accéder à mon espace</a>
-    </div>
-    <p style="margin:24px 0 0;font-size:13px;color:#6b7280;line-height:1.5;">
-      Pour toute question, contactez Coline : <a href="mailto:coline@qlower.com" style="color:#0A3855;">coline@qlower.com</a>
-    </p>
-    <div style="margin-top:32px;padding-top:20px;border-top:1px solid #e5e7eb;">
-      <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Qlower — Gestion fiscale immobilière simplifiée<br><a href="https://qlower.com" style="color:#0A3855;text-decoration:none;">qlower.com</a></p>
-    </div>
-  </div>
-</div>
-</body></html>`,
-  });
-
-  // Send both emails in parallel
   try {
-    const results = await Promise.all([notifyColine, welcomePartner]);
-    console.log("[register/notify] Emails sent:", JSON.stringify(results));
+    const body = await request.json();
+
+    // Lazy-import resend to isolate any module errors
+    const { resend, FROM } = await import("@/lib/resend");
+
+    const prenom = body.prenom || body.partnerName || "Partenaire";
+
+    // 1. Notify Coline
+    await resend.emails.send({
+      from: FROM,
+      to: "coline@qlower.com",
+      subject: `Nouveau partenaire inscrit — ${body.partnerName}`,
+      html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px;">
+        <h2 style="color:#0A3855;">Nouveau partenaire inscrit</h2>
+        <p><strong>Entreprise :</strong> ${body.partnerName || ""}</p>
+        <p><strong>Prénom :</strong> ${body.prenom || ""}</p>
+        <p><strong>Nom :</strong> ${body.nom || ""}</p>
+        <p><strong>Email :</strong> ${body.partnerEmail || ""}</p>
+        <p><strong>Téléphone :</strong> ${body.telephone || ""}</p>
+        <p><strong>Métier :</strong> ${body.metier || ""}</p>
+        <p><strong>SIRET :</strong> ${body.siret || ""}</p>
+        <p><strong>TVA :</strong> ${body.tva || ""}</p>
+        <p><strong>Adresse :</strong> ${[body.adresse, body.codePostal, body.ville].filter(Boolean).join(", ") || ""}</p>
+        <p><strong>IBAN :</strong> ${body.iban || ""}</p>
+        <p><strong>BIC :</strong> ${body.bic || ""}</p>
+        ${body.kbisUrl ? `<p><a href="${body.kbisUrl}">Voir le Kbis</a></p>` : ""}
+        <hr>
+        <a href="https://partenaire.qlower.com/admin">Voir dans l'admin</a>
+      </div>`,
+    });
+
+    // 2. Welcome email to partner
+    if (body.partnerEmail) {
+      await resend.emails.send({
+        from: FROM,
+        to: body.partnerEmail,
+        subject: `Bienvenue ${prenom} — Votre inscription est en cours`,
+        html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px;">
+          <div style="background:#0A3855;padding:24px;border-radius:12px 12px 0 0;text-align:center;">
+            <h1 style="color:#fff;margin:0;font-size:22px;">Qlower</h1>
+            <p style="color:rgba(255,255,255,0.6);margin:4px 0 0;font-size:11px;text-transform:uppercase;letter-spacing:2px;">Programme Partenaire</p>
+          </div>
+          <div style="background:#fff;padding:28px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:0;">
+            <h2 style="color:#0A3855;margin:0 0 12px;">Bienvenue ${prenom} !</h2>
+            <p style="color:#374151;line-height:1.6;">Merci pour votre inscription au programme partenaire Qlower. Votre demande a bien été enregistrée.</p>
+            <div style="background:#f0f7fa;border-left:4px solid #0A3855;border-radius:8px;padding:16px;margin:20px 0;">
+              <p style="margin:0 0 8px;font-weight:600;color:#0A3855;">Prochaines étapes :</p>
+              <p style="margin:0;color:#374151;line-height:1.8;">
+                1. Coline vous contacte sous <strong>48h</strong><br>
+                2. Signature de votre <strong>contrat d'affiliation</strong><br>
+                3. Activation de votre <strong>code promo et tableau de bord</strong>
+              </p>
+            </div>
+            <p style="color:#374151;line-height:1.6;">Votre espace est déjà accessible sur <a href="https://partenaire.qlower.com" style="color:#0A3855;font-weight:600;">partenaire.qlower.com</a>. Le tableau de bord complet sera disponible après signature du contrat.</p>
+            <div style="text-align:center;margin:24px 0;">
+              <a href="https://partenaire.qlower.com/dashboard" style="background:#0A3855;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Accéder à mon espace</a>
+            </div>
+            <p style="color:#6b7280;font-size:13px;">Question ? Contactez Coline : <a href="mailto:coline@qlower.com" style="color:#0A3855;">coline@qlower.com</a></p>
+          </div>
+        </div>`,
+      });
+    }
+
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[register/notify] Email error:", message);
+    console.error("[register/notify] Error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
