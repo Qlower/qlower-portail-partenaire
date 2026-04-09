@@ -116,6 +116,67 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
+  // Block dashboard if contract not signed yet
+  if (partner.statut === "en_attente" && !isAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-white to-[#E5EDF1]/30 flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 rounded-full bg-[#E5EDF1] flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-[#0A3855]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Inscription en cours de traitement</h2>
+          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+            Merci pour votre inscription, <strong>{partner.contact_prenom || partner.nom}</strong> !
+            Coline, notre responsable partenariats, vous contacte sous <strong>48h</strong> pour finaliser votre contrat d&apos;affiliation.
+          </p>
+          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6 text-left">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Prochaines étapes</p>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Inscription envoyée</p>
+                  <p className="text-xs text-gray-400">Vos informations ont bien été transmises</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5 animate-pulse">
+                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Prise de contact par Coline</p>
+                  <p className="text-xs text-gray-400">Sous 48h pour discuter de votre contrat</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-gray-300" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-400">Signature du contrat</p>
+                  <p className="text-xs text-gray-300">Votre code promo et tableau de bord seront activés</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-center gap-4">
+            <a href="mailto:coline@qlower.com" className="text-sm text-[#0A3855] font-medium hover:underline">
+              Contacter Coline
+            </a>
+            <span className="text-gray-300">|</span>
+            <button onClick={() => signOut()} className="text-sm text-gray-400 hover:text-gray-600">
+              Se déconnecter
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const handleNavigate = (key: string) => {
     router.push(key === "dashboard" ? "/dashboard" : `/dashboard/${key}`);
     setSidebarOpen(false);

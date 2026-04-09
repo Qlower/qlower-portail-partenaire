@@ -247,11 +247,7 @@ export default function RegisterForm() {
             <div className="space-y-2"><Label>Code postal</Label><Input value={form.postalCode} onChange={(e) => set("postalCode", e.target.value)} placeholder="75001" /></div>
           </div>
           <Separator />
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contact (optionnel)</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.contactEmail} onChange={(e) => set("contactEmail", e.target.value)} placeholder="contact@..." /></div>
-            <div className="space-y-2"><Label>Téléphone</Label><Input type="tel" value={form.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} placeholder="06 12 34 56 78" /></div>
-          </div>
+          <div className="space-y-2"><Label>Téléphone</Label><Input type="tel" value={form.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} placeholder="06 12 34 56 78" /></div>
         </div>
       );
       case 2: return (
