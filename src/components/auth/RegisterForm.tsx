@@ -64,7 +64,7 @@ export default function RegisterForm() {
       return "Adresse complète et SIRET requis.";
     }
     // Code promo is now set by admin after contract signature
-    if (step === 4 && (!form.iban || !form.bic)) return "IBAN et BIC requis.";
+    // RIB is optional — can be provided later
     return null;
   };
 
@@ -308,8 +308,8 @@ export default function RegisterForm() {
       case 4: return (
         <div className="space-y-4">
           <div className="grid grid-cols-[2fr_1fr] gap-3">
-            <div className="space-y-2"><Label>IBAN</Label><Input value={form.iban} onChange={(e) => set("iban", e.target.value)} placeholder="FR76 3000 6000..." /></div>
-            <div className="space-y-2"><Label>BIC</Label><Input value={form.bic} onChange={(e) => set("bic", e.target.value)} placeholder="BNPAFRPP" /></div>
+            <div className="space-y-2"><Label>IBAN (optionnel)</Label><Input value={form.iban} onChange={(e) => set("iban", e.target.value)} placeholder="FR76 3000 6000..." /></div>
+            <div className="space-y-2"><Label>BIC (optionnel)</Label><Input value={form.bic} onChange={(e) => set("bic", e.target.value)} placeholder="BNPAFRPP" /></div>
           </div>
           <div className="bg-[#E5EDF1] rounded-xl p-4 text-sm">
             <p className="font-semibold text-[#0A3855] mb-1">RIB Qlower</p>
