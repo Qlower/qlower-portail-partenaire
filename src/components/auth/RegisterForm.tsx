@@ -9,7 +9,7 @@ import { useOnboardPartner } from "@/hooks/useMutations";
 import { isValidEmail, slug } from "@/services/links";
 import { METIERS } from "@/services/constants";
 import { DEFAULT_TRANCHES } from "@/services/commission";
-import { useCreatePartner } from "@/hooks/useAdminData";
+import { useRegisterPartner } from "@/hooks/useMutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,7 +39,7 @@ const initial: FormData = {
 export default function RegisterForm() {
   const { signUp, supabase } = useAuth();
   const onboard = useOnboardPartner();
-  const createPartner = useCreatePartner();
+  const createPartner = useRegisterPartner();
   const router = useRouter();
 
   const [step, setStep] = useState<StepIndex>(0);
@@ -119,17 +119,13 @@ export default function RegisterForm() {
         if (kbisData?.path) {
           const { data: urlData } = supabase.storage.from("kbis").getPublicUrl(kbisData.path);
           kbisPublicUrl = urlData.publicUrl;
-          // Save kbis_url to partner record
-          fetch("/api/admin/partners", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: partnerId, kbis_url: kbisPublicUrl }),
-          }).catch(() => {});
+          // Save kbis_url to partner record (via Supabase directly)
+          supabase.from("partners").update({ kbis_url: kbisPublicUrl }).eq("id", partnerId).then(() => {});
         }
       }
 
       // Notify Coline with full partner info for contract
-      fetch("/api/admin/notify-kbis", {
+      fetch("/api/register/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

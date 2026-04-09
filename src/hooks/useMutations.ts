@@ -11,6 +11,15 @@ import type {
   OnboardPartnerPayload,
 } from "@/types";
 
+export function useRegisterPartner() {
+  return useMutation({
+    mutationFn: async (partner: Record<string, unknown>) => {
+      const { data } = await api.post("/register", partner);
+      return data;
+    },
+  });
+}
+
 export function useAddReferral() {
   const queryClient = useQueryClient();
 
