@@ -56,20 +56,17 @@ function AuthProvider({ children }: { children: ReactNode }) {
       password: string,
       metadata?: Record<string, string>,
     ) => {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: metadata
-          ? {
-              data: {
-                nom: metadata.nom,
-                prenom: metadata.prenom,
-                company: metadata.company,
-              },
-            }
-          : undefined,
+        options: metadata ? { data: metadata } : undefined,
       });
       if (error) throw error;
+      // Store session immediately so subsequent API calls can use the token
+      if (data.session) {
+        setSession(data.session);
+        setUser(data.session.user);
+      }
     },
     [supabase],
   );

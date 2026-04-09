@@ -101,21 +101,29 @@ export default function RegisterForm() {
         company: form.company, metier: form.metier, partner_id: partnerId,
       });
 
+      // Get the access token right after signUp for authenticated API calls
+      const { data: { session: newSession } } = await supabase.auth.getSession();
+      const token = newSession?.access_token;
+      if (!token) throw new Error("Session non disponible après inscription.");
+
       await createPartner.mutateAsync({
-        id: partnerId, nom: form.company || `${form.prenom} ${form.nom}`,
-        contact_prenom: form.prenom, contact_nom: form.nom,
-        email: form.email, type: "autre", contrat: "affiliation", code, utm,
-        metier: form.metier, siret: form.siret, tva: form.tva || null,
-        adresse: form.address, ville: form.city, code_postal: form.postalCode,
-        telephone: form.contactPhone || null,
-        iban: form.iban, bic: form.bic,
-        statut: "en_attente",
-        comm_rules: [
-          { type: "annuelle", montant: 100, actif: true },
-          { type: "souscription", montant: 0, actif: false },
-          { type: "biens", tranches: DEFAULT_TRANCHES(), actif: false },
-          { type: "pct_ca", pct: 0, actif: false },
-        ],
+        partner: {
+          id: partnerId, nom: form.company || `${form.prenom} ${form.nom}`,
+          contact_prenom: form.prenom, contact_nom: form.nom,
+          email: form.email, type: "autre", contrat: "affiliation", code, utm,
+          metier: form.metier, siret: form.siret, tva: form.tva || null,
+          adresse: form.address, ville: form.city, code_postal: form.postalCode,
+          telephone: form.contactPhone || null,
+          iban: form.iban, bic: form.bic,
+          statut: "en_attente",
+          comm_rules: [
+            { type: "annuelle", montant: 100, actif: true },
+            { type: "souscription", montant: 0, actif: false },
+            { type: "biens", tranches: DEFAULT_TRANCHES(), actif: false },
+            { type: "pct_ca", pct: 0, actif: false },
+          ],
+        },
+        token,
       });
 
       await supabase.auth.updateUser({ data: { partner_id: partnerId } });
@@ -137,7 +145,7 @@ export default function RegisterForm() {
       // Notify Coline with full partner info for contract
       fetch("/api/register/notify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           partnerName: form.company,
           partnerEmail: form.email,

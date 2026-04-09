@@ -5,20 +5,39 @@ import { createServerClient } from "@supabase/ssr";
 // POST — self-service partner registration (no admin required)
 // Only creates the partner record; auth user is already created client-side via signUp
 export async function POST(request: NextRequest) {
-  // Verify the user is authenticated (but not necessarily admin)
-  const supabaseAuth = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll(); },
-        setAll() {},
-      },
-    }
-  );
+  // Verify the user is authenticated via Authorization header (preferred) or cookies
+  const authHeader = request.headers.get("authorization");
+  let user = null;
 
-  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-  if (authError || !user) {
+  if (authHeader?.startsWith("Bearer ")) {
+    // Use the token from Authorization header (set right after signUp)
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabaseWithToken = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data, error } = await supabaseWithToken.auth.getUser();
+    if (!error && data.user) user = data.user;
+  }
+
+  if (!user) {
+    // Fallback to cookies
+    const supabaseAuth = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return request.cookies.getAll(); },
+          setAll() {},
+        },
+      },
+    );
+    const { data, error } = await supabaseAuth.auth.getUser();
+    if (!error && data.user) user = data.user;
+  }
+
+  if (!user) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 

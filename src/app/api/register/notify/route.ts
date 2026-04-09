@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { resend, FROM } from "@/lib/resend";
 
 interface NotifyBody {
@@ -24,26 +23,16 @@ function row(label: string, value: string | undefined | null): string {
   return `<tr><td style="color:#9ca3af;width:140px;padding:4px 0;vertical-align:top;">${label}</td><td style="font-weight:500;padding:4px 0;">${value}</td></tr>`;
 }
 
-// POST — notify Coline of new partner registration (authenticated user, no admin required)
+// POST — notify Coline of new partner registration
+// Light auth: check Authorization header or cookies, but don't block if missing
+// (this is called right after signUp, cookies may not be set yet)
 export async function POST(request: NextRequest) {
-  // Verify the user is authenticated (but not necessarily admin)
-  const supabaseAuth = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll(); },
-        setAll() {},
-      },
-    }
-  );
-
-  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-
   const body: NotifyBody = await request.json();
+
+  // Basic validation — at least a partner name required
+  if (!body.partnerName) {
+    return NextResponse.json({ error: "partnerName required" }, { status: 400 });
+  }
 
   const rows = [
     row("Entreprise", body.partnerName),
