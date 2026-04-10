@@ -107,6 +107,11 @@ export default function LoginForm() {
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
                 />
+                <div className="text-right">
+                  <Link href="/auth/forgot-password" className="text-xs text-gray-400 hover:text-[#0A3855] transition-colors">
+                    Mot de passe oublié ?
+                  </Link>
+                </div>
               </div>
 
               <Button type="submit" size="lg" disabled={loading} className="w-full mt-2">
