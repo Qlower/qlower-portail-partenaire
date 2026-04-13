@@ -202,7 +202,7 @@ export default function ReferralForm({ partner }: ReferralFormProps) {
           </div>
 
           <div className="rounded-xl border border-[#0A3855]/10 bg-[#E5EDF1]/30 px-4 py-3 text-xs text-[#0A3855]/70 leading-relaxed">
-            💡 Si ce contact souscrit à Qlower, vous percevrez <strong className="text-[#0A3855]">100&nbsp;€</strong> de commission, versée annuellement.
+            💡 Vous percevez une commission dès lors qu&apos;un de vos clients souscrit à un abonnement chez Qlower.
           </div>
 
           <Button
