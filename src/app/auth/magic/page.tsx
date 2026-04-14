@@ -16,24 +16,31 @@ export default function MagicPage() {
     const code = params.get("code");
     if (code) {
       supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
-        if (!err) {
-          router.replace("/dashboard");
-        } else {
-          console.error("Code exchange failed:", err.message);
-          setError(true);
-        }
+        if (!err) router.replace("/dashboard");
+        else setError(true);
       });
       return;
     }
 
     // 2. Handle implicit flow: tokens in hash fragment
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === "SIGNED_IN" && session) {
-          router.replace("/dashboard");
-        }
+    //    (Supabase PKCE client ignores hash tokens, so we parse them manually)
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+      const hashParams = new URLSearchParams(hash);
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+
+      if (accessToken && refreshToken) {
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        }).then(({ error: err }) => {
+          if (!err) router.replace("/dashboard");
+          else setError(true);
+        });
+        return;
       }
-    );
+    }
 
     // 3. Fallback: session may already be set
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -43,8 +50,6 @@ export default function MagicPage() {
         setTimeout(() => setError(true), 5000);
       }
     });
-
-    return () => subscription.unsubscribe();
   }, [router]);
 
   if (error) {
