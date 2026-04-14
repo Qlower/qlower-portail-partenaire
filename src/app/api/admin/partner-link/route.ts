@@ -44,6 +44,14 @@ export async function POST(request: NextRequest) {
 
   const link = data.properties.action_link;
 
+  // Keep partner.user_id in sync with the auth user for this email
+  if (data.user?.id) {
+    await supabase
+      .from("partners")
+      .update({ user_id: data.user.id })
+      .eq("id", partner_id);
+  }
+
   // Optionally send email via Resend
   if (sendEmail) {
     const emailRes = await fetch("https://api.resend.com/emails", {
