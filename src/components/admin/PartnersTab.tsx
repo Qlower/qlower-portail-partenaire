@@ -585,19 +585,27 @@ export default function PartnersTab() {
                     <div className="ml-auto flex gap-2 flex-wrap">
                       {p.email && (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSendEmail(p.id)}
-                            disabled={!!linkLoading}
-                            title={`Envoyer un lien de connexion à ${p.email}`}
-                          >
-                            {linkLoading === p.id + "-send" ? (
-                              <><Loader2 className="size-3.5 mr-1 animate-spin" /> Envoi...</>
-                            ) : (
-                              <><Mail className="size-3.5 mr-1" /> Envoyer l'accès</>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSendEmail(p.id)}
+                              disabled={!!linkLoading}
+                              title={`Envoyer un lien de connexion à ${p.email}`}
+                            >
+                              {linkLoading === p.id + "-send" ? (
+                                <><Loader2 className="size-3.5 mr-1 animate-spin" /> Envoi...</>
+                              ) : (
+                                <><Mail className="size-3.5 mr-1" /> Envoyer l'accès</>
+                              )}
+                            </Button>
+                            {p.lien_envoye_le && (
+                              <span className="text-[10px] text-gray-400" title={`Dernier envoi : ${new Date(p.lien_envoye_le).toLocaleString("fr-FR")}`}>
+                                <CheckCircle2 className="size-3 inline text-green-500 mr-0.5" />
+                                {new Date(p.lien_envoye_le).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                              </span>
                             )}
-                          </Button>
+                          </div>
                           <Button
                             variant="ghost"
                             size="sm"

@@ -42,6 +42,7 @@ export interface Partner {
   iban: string | null;
   bic: string | null;
   kbis_url: string | null;
+  lien_envoye_le: string | null;
   leads: number;
   abonnes: number;
   biens_moyens: number;

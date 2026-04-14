@@ -79,6 +79,12 @@ export async function POST(request: NextRequest) {
       console.error("Resend error:", errText);
       return NextResponse.json({ link, emailError: errText }, { status: 207 });
     }
+
+    // Record when access was sent
+    await supabase
+      .from("partners")
+      .update({ lien_envoye_le: new Date().toISOString() })
+      .eq("id", partner_id);
   }
 
   return NextResponse.json({ link });
