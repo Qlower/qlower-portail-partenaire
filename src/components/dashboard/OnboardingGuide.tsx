@@ -94,7 +94,7 @@ export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGu
               preload="metadata"
               poster=""
             >
-              <source src="/demo-qlower-pro.mp4" type="video/mp4" />
+              <source src="https://dclgptcsyfleqkqltdif.supabase.co/storage/v1/object/public/assets/demo-qlower-pro.mp4" type="video/mp4" />
               Votre navigateur ne supporte pas la lecture vidéo.
             </video>
           </div>
