@@ -11,7 +11,22 @@ export default function MagicPage() {
   useEffect(() => {
     const supabase = createClient();
 
-    // onAuthStateChange fires when the browser client processes the hash tokens
+    // 1. Handle PKCE flow: code in query params
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
+        if (!err) {
+          router.replace("/dashboard");
+        } else {
+          console.error("Code exchange failed:", err.message);
+          setError(true);
+        }
+      });
+      return;
+    }
+
+    // 2. Handle implicit flow: tokens in hash fragment
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === "SIGNED_IN" && session) {
@@ -20,12 +35,12 @@ export default function MagicPage() {
       }
     );
 
-    // Fallback: session may already be set
+    // 3. Fallback: session may already be set
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         router.replace("/dashboard");
       } else {
-        setTimeout(() => setError(true), 4000);
+        setTimeout(() => setError(true), 5000);
       }
     });
 
@@ -37,7 +52,7 @@ export default function MagicPage() {
       <div className="min-h-screen flex items-center justify-center text-center px-4">
         <div>
           <p className="text-gray-700 font-medium mb-1">Lien invalide ou expiré</p>
-          <p className="text-sm text-gray-400">Demandez un nouveau lien depuis l'admin.</p>
+          <p className="text-sm text-gray-400">Demandez un nouveau lien depuis l&apos;admin.</p>
         </div>
       </div>
     );

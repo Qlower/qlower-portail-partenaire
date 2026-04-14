@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     type: "magiclink",
     email: partner.email,
     options: {
-      redirectTo: `${siteUrl}/auth/callback?next=/dashboard`,
+      redirectTo: `${siteUrl}/auth/magic`,
     },
   });
 
