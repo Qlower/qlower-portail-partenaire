@@ -87,12 +87,16 @@ export function OnboardingGuide({ partnerName, code, utm, onDone }: OnboardingGu
             Découvrez en 3 minutes comment Qlower aide vos clients à gérer leur fiscalité immobilière
             et comment en parler efficacement.
           </p>
-          <div className="bg-gradient-to-br from-[#E5EDF1] to-[#E5EDF1]/40 rounded-xl h-40 flex items-center justify-center mb-3 border border-[#E5EDF1]">
-            <div className="w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
-              <svg className="w-6 h-6 text-[#0A3855] ml-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </div>
+          <div className="rounded-xl overflow-hidden mb-3 border border-[#E5EDF1]">
+            <video
+              className="w-full rounded-xl"
+              controls
+              preload="metadata"
+              poster=""
+            >
+              <source src="/demo-qlower-pro.mp4" type="video/mp4" />
+              Votre navigateur ne supporte pas la lecture vidéo.
+            </video>
           </div>
           <button
             className="text-xs text-[#0A3855]/60 hover:text-[#0A3855] underline underline-offset-2 transition-colors"
