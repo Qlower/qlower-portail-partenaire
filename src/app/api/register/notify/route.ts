@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
     const notifyColine = resend.emails.send({
       from: FROM,
       to: "coline@qlower.com",
+      cc: "deblasi.alexandre@gmail.com",
       subject: `Nouveau partenaire inscrit — ${body.partnerName}`,
       html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px;">
         <h2 style="color:#0A3855;">Nouveau partenaire inscrit</h2>
