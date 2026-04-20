@@ -96,20 +96,22 @@ async function upsertLead(
 }
 
 // Sync contacts modified in the last 26 hours (cron runs once per day around midnight Paris time)
-// 24h + 2h safety margin to cover DST transitions and any missed run
-async function fetchRecentContacts() {
+// 24h + 2h safety margin to cover DST transitions and any missed run.
+// If full=true, skip the date filter entirely (used to rattraper d'anciens decalages).
+async function fetchRecentContacts(full = false) {
   const since = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
   const contacts: Array<{ id: string; properties: Record<string, string | null> }> = [];
   let after: string | undefined;
 
   do {
+    const filters: Array<Record<string, string>> = [
+      { propertyName: "partenaire__lead_", operator: "HAS_PROPERTY" },
+    ];
+    if (!full) {
+      filters.push({ propertyName: "lastmodifieddate", operator: "GTE", value: since });
+    }
     const body: Record<string, unknown> = {
-      filterGroups: [{
-        filters: [
-          { propertyName: "partenaire__lead_", operator: "HAS_PROPERTY" },
-          { propertyName: "lastmodifieddate", operator: "GTE", value: since },
-        ],
-      }],
+      filterGroups: [{ filters }],
       properties: PROPERTIES,
       limit: 100,
       ...(after ? { after } : {}),
@@ -140,7 +142,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const contacts = await fetchRecentContacts();
+    const url = new URL(request.url);
+    const full = url.searchParams.get("full") === "true";
+    const contacts = await fetchRecentContacts(full);
     const supabase = createServiceClient();
     const results = { total: contacts.length, created: 0, updated: 0, transferred: 0, skipped: 0 };
 
