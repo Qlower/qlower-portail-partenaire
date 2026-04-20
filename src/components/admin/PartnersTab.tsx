@@ -200,6 +200,7 @@ export default function PartnersTab() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [linkLoading, setLinkLoading] = useState<string | null>(null);
+  const [confirmAccess, setConfirmAccess] = useState<Partner | null>(null);
 
   const filteredPartners = partners.filter((p) => {
     if (!partnerSearch.trim()) return true;
@@ -589,14 +590,14 @@ export default function PartnersTab() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleSendEmail(p.id)}
+                              onClick={() => setConfirmAccess(p)}
                               disabled={!!linkLoading}
                               title={`Envoyer un lien de connexion à ${p.email}`}
                             >
                               {linkLoading === p.id + "-send" ? (
                                 <><Loader2 className="size-3.5 mr-1 animate-spin" /> Envoi...</>
                               ) : (
-                                <><Mail className="size-3.5 mr-1" /> Envoyer l'accès</>
+                                <><Mail className="size-3.5 mr-1" /> Envoyer l&apos;accès</>
                               )}
                             </Button>
                             {p.lien_envoye_le && (
@@ -918,6 +919,84 @@ export default function PartnersTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Confirmation modal: Envoyer l'accès */}
+      {confirmAccess && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => {
+            if (!linkLoading) setConfirmAccess(null);
+          }}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="bg-[#FFF6EC] p-2 rounded-full">
+                <Mail className="size-5 text-[#B8864E]" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Envoyer l&apos;email d&apos;accès ?
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Un lien de connexion magique va être envoyé à :
+                </p>
+                <p className="text-sm font-mono font-semibold text-[#0A3855] mt-2 bg-gray-50 p-2 rounded break-all">
+                  {confirmAccess.email || "(aucun email renseigné)"}
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Partenaire : <strong>{confirmAccess.nom}</strong>
+                </p>
+                {confirmAccess.lien_envoye_le && (
+                  <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                    <AlertCircle className="size-3.5 flex-shrink-0" />
+                    <span>
+                      Un accès a déjà été envoyé le{" "}
+                      {new Date(confirmAccess.lien_envoye_le).toLocaleDateString("fr-FR", {
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end pt-2 border-t">
+              <Button
+                variant="ghost"
+                onClick={() => setConfirmAccess(null)}
+                disabled={!!linkLoading}
+              >
+                Annuler
+              </Button>
+              <Button
+                className="bg-[#F6CCA4] text-[#6B4D2D] hover:bg-[#F0BF8E] border border-[#E8B88A]"
+                onClick={async () => {
+                  const id = confirmAccess.id;
+                  await handleSendEmail(id);
+                  setConfirmAccess(null);
+                }}
+                disabled={!confirmAccess.email || !!linkLoading}
+              >
+                {linkLoading === confirmAccess.id + "-send" ? (
+                  <>
+                    <Loader2 className="size-4 mr-1.5 animate-spin" />
+                    Envoi...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="size-4 mr-1.5" />
+                    Confirmer &amp; envoyer
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
