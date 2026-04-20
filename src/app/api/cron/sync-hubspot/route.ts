@@ -95,9 +95,10 @@ async function upsertLead(
   return "created";
 }
 
-// Only sync contacts modified in the last 20 minutes (cron runs every 15 min)
+// Sync contacts modified in the last 26 hours (cron runs once per day around midnight Paris time)
+// 24h + 2h safety margin to cover DST transitions and any missed run
 async function fetchRecentContacts() {
-  const since = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+  const since = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
   const contacts: Array<{ id: string; properties: Record<string, string | null> }> = [];
   let after: string | undefined;
 
