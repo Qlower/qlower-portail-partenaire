@@ -151,7 +151,7 @@ function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName
               <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Statut</th>
               <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Source</th>
               <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Recommandé le</th>
-              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Abonné le</th>
+              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Abonné depuis</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -190,37 +190,31 @@ function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName
                   {new Date(lead.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
                 </td>
                 <td className="px-3 py-2 text-[10px]">
-                  {lead.subscribed_at ? (
-                    <div className="flex flex-col leading-tight">
-                      <span className="text-gray-600 font-medium">
-                        {new Date(lead.subscribed_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-                      </span>
-                      {(() => {
-                        if (!lead.unsubscribed_at) return null;
-                        const subD = new Date(lead.subscribed_at);
-                        const unsubD = new Date(lead.unsubscribed_at);
-                        const isResub = lead.stage === "Abonne" && unsubD < subD;
-                        const isReallyUnsub = lead.stage !== "Abonne" && unsubD >= subD;
-                        if (isReallyUnsub) {
-                          return (
-                            <span className="text-orange-600" title={`Désabonné le ${unsubD.toLocaleDateString("fr-FR")}`}>
-                              Désabo {unsubD.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-                            </span>
-                          );
-                        }
-                        if (isResub) {
-                          return (
-                            <span className="text-blue-600" title={`Ancien désabo ${unsubD.toLocaleDateString("fr-FR")} — réabonné`}>
-                              Réabo
-                            </span>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  ) : (
-                    <span className="text-gray-300">—</span>
-                  )}
+                  {(() => {
+                    const displayDate = lead.first_paid_at || lead.subscribed_at;
+                    if (!displayDate) return <span className="text-gray-300">—</span>;
+                    const mainD = new Date(displayDate);
+                    const unsubD = lead.unsubscribed_at ? new Date(lead.unsubscribed_at) : null;
+                    const isResub = lead.stage === "Abonne" && unsubD && unsubD < new Date(lead.subscribed_at || displayDate);
+                    const isReallyUnsub = lead.stage !== "Abonne" && unsubD && unsubD >= mainD;
+                    return (
+                      <div className="flex flex-col leading-tight">
+                        <span className="text-gray-600 font-medium">
+                          {mainD.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                        </span>
+                        {isReallyUnsub && unsubD && (
+                          <span className="text-orange-600" title={`Désabonné le ${unsubD.toLocaleDateString("fr-FR")}`}>
+                            Désabo {unsubD.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                          </span>
+                        )}
+                        {isResub && !isReallyUnsub && unsubD && (
+                          <span className="text-blue-600" title={`Ancien désabo ${unsubD.toLocaleDateString("fr-FR")} — réabonné`}>
+                            Réabo
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </td>
               </tr>
             ))}

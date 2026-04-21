@@ -44,11 +44,12 @@ export function Dashboard({
   const payeurs = leads.filter((l) => l.stage === "Payeur").length;
   const nonPayeurs = leads.filter((l) => l.stage === "Non payeur").length;
 
-  // Activity in a given year: recommended OR subscribed OR unsubscribed during that year
+  // Activity in a given year: recommended OR first-paid OR subscribed (fallback) OR unsubscribed in that year
   const hasActivityInYear = (lead: typeof leads[number], y: number): boolean => {
     const yr = (s?: string | null) => (s ? new Date(s).getFullYear() : null);
     return (
       yr(lead.created_at) === y ||
+      yr(lead.first_paid_at) === y ||
       yr(lead.subscribed_at) === y ||
       yr(lead.unsubscribed_at) === y
     );
@@ -295,7 +296,7 @@ export function Dashboard({
                     Recommandé le
                   </th>
                   <th className="px-4 py-3 text-[11px] font-semibold text-[#0A3855]/60 uppercase tracking-wider">
-                    Abonné le
+                    Abonné depuis
                   </th>
                 </tr>
               </thead>
@@ -349,43 +350,41 @@ export function Dashboard({
                         {formatDate(lead.created_at)}
                       </td>
                       <td className="px-4 py-3.5 text-xs">
-                        {lead.subscribed_at ? (
-                          <div className="flex flex-col">
-                            <span className="text-gray-600 font-medium">
-                              {formatDate(lead.subscribed_at)}
-                            </span>
-                            {(() => {
-                              if (!lead.unsubscribed_at) return null;
-                              const subD = new Date(lead.subscribed_at);
-                              const unsubD = new Date(lead.unsubscribed_at);
-                              const isResub = lead.stage === "Abonne" && unsubD < subD;
-                              const isReallyUnsub = lead.stage !== "Abonne" && unsubD >= subD;
-                              if (isReallyUnsub) {
-                                return (
-                                  <span
-                                    className="text-[10px] text-orange-600"
-                                    title={`Désabonné le ${unsubD.toLocaleDateString("fr-FR")}`}
-                                  >
-                                    Désabonné le {formatDate(lead.unsubscribed_at)}
-                                  </span>
-                                );
-                              }
-                              if (isResub) {
-                                return (
-                                  <span
-                                    className="text-[10px] text-blue-600"
-                                    title={`Déjà désabonné le ${unsubD.toLocaleDateString("fr-FR")} puis ré-abonné`}
-                                  >
-                                    Réabonnement
-                                  </span>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </div>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
+                        {(() => {
+                          // Source principale : first_paid_at (date premier paiement, immuable).
+                          // Fallback : subscribed_at (hs_v2_date_entered_999998694).
+                          const displayDate = lead.first_paid_at || lead.subscribed_at;
+                          if (!displayDate) return <span className="text-gray-300">—</span>;
+
+                          const mainD = new Date(displayDate);
+                          const unsubD = lead.unsubscribed_at ? new Date(lead.unsubscribed_at) : null;
+                          const isResub = lead.stage === "Abonne" && unsubD && unsubD < new Date(lead.subscribed_at || displayDate);
+                          const isReallyUnsub = lead.stage !== "Abonne" && unsubD && unsubD >= mainD;
+
+                          return (
+                            <div className="flex flex-col">
+                              <span className="text-gray-600 font-medium">
+                                {formatDate(mainD.toISOString())}
+                              </span>
+                              {isReallyUnsub && unsubD && (
+                                <span
+                                  className="text-[10px] text-orange-600"
+                                  title={`Désabonné le ${unsubD.toLocaleDateString("fr-FR")}`}
+                                >
+                                  Désabonné le {formatDate(unsubD.toISOString())}
+                                </span>
+                              )}
+                              {isResub && !isReallyUnsub && unsubD && (
+                                <span
+                                  className="text-[10px] text-blue-600"
+                                  title={`Déjà désabonné le ${unsubD.toLocaleDateString("fr-FR")} puis ré-abonné`}
+                                >
+                                  Réabonnement
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))

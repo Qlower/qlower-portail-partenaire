@@ -11,6 +11,7 @@ const PROPERTIES = [
   "partenaire__lead_",
   "hs_v2_date_entered_999998694",
   "hs_v2_date_exited_999998694",
+  "date_premier_paiement_abonnement",
   "lifecyclestage",
 ];
 
@@ -183,8 +184,11 @@ export async function GET(request: NextRequest) {
   let totalCommissionPreviousYear = 0;
 
   for (const contact of contacts) {
-    const entryDateStr = contact.properties.hs_v2_date_entered_999998694;
-    if (!entryDateStr) continue; // never entered subscriber stage
+    // Source principale : date_premier_paiement_abonnement (immuable, business-accurate)
+    // Fallback : hs_v2_date_entered_999998694 (dernière entrée au stage, peut être écrasé)
+    const firstPaidStr = contact.properties.date_premier_paiement_abonnement;
+    const entryDateStr = firstPaidStr || contact.properties.hs_v2_date_entered_999998694;
+    if (!entryDateStr) continue; // never paid / never entered subscriber stage
 
     const exitDateStr = contact.properties.hs_v2_date_exited_999998694;
     const currentLifecycle = (contact.properties.lifecyclestage || "").toLowerCase();

@@ -10,6 +10,7 @@ const PROPERTIES = [
   "partenaire__lead_", "utm_source",
   "hs_lifecyclestage", "lifecyclestage",
   "hs_v2_date_entered_999998694", "hs_v2_date_exited_999998694", "createdate",
+  "date_premier_paiement_abonnement",
   "lastmodifieddate",
 ];
 
@@ -71,6 +72,9 @@ async function upsertLead(
   const unsubscribedAt = props.hs_v2_date_exited_999998694
     ? new Date(props.hs_v2_date_exited_999998694).toISOString()
     : null;
+  const firstPaidAt = props.date_premier_paiement_abonnement
+    ? new Date(props.date_premier_paiement_abonnement).toISOString()
+    : null;
 
   if (existing) {
     const newCommissionDue = existing.commission_due || commissionDue;
@@ -78,6 +82,7 @@ async function upsertLead(
       stage, hs_contact_id: contactId, commission_due: newCommissionDue,
       subscribed_at: subscribedAt,
       unsubscribed_at: unsubscribedAt,
+      first_paid_at: firstPaidAt,
       ...(props.createdate ? { created_at: new Date(props.createdate).toISOString() } : {}),
     }).eq("id", existing.id);
 
@@ -96,6 +101,7 @@ async function upsertLead(
     created_at: hsCreateDate.toISOString(),
     subscribed_at: subscribedAt,
     unsubscribed_at: unsubscribedAt,
+    first_paid_at: firstPaidAt,
   });
 
   await supabase.rpc("increment_partner_leads", { p_id: partner.id });
