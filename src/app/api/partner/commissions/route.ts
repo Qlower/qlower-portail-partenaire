@@ -140,12 +140,16 @@ export async function GET(request: NextRequest) {
   ): number {
     if (targetYear < subYear) return 0;
 
+    // Same-year churn (subscribed AND first churn same year) → never any commission,
+    // even for later resubs (règle Qlower : pas de commission si l'abonné ne "tient" pas
+    // au moins 1 an).
+    if (unsubYear && subYear === unsubYear) return 0;
+
     if (!isCurrentlySubscriber) {
       if (!unsubYear) return 0; // edge case: left stage but no exit date
-      if (subYear === unsubYear) return 0; // same-year churn
       if (targetYear > unsubYear) return 0; // already gone
     }
-    // Currently subscribed: ignore unsubYear (prior cycle)
+    // Currently subscribed: commission continues (even if there was a prior-year exit)
 
     if (useLegacyDefault) {
       return LEGACY_ANNUAL;
@@ -157,8 +161,9 @@ export async function GET(request: NextRequest) {
     if (annuelleRule?.montant) amount += annuelleRule.montant;
     if (pctRule?.pct && pctAmount > 0) amount += pctAmount;
 
-    // One-shot rules — paid in subYear, but NOT redeclenched on a resub
-    // (isResubscription means: currently subscribed AND has a prior exit before current entry)
+    // One-shot rules — paid in subYear, 1 fois a vie.
+    // isResubscription = true means the "current" cycle is a resub, ne redeclenche PAS
+    // la prime (elle a deja ete payee sur le cycle initial).
     if (targetYear === subYear && !isResubscription) {
       if (souscRule?.montant) amount += souscRule.montant;
       if (biensRule && biensMontant > 0) amount += biensMontant;
