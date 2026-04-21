@@ -150,8 +150,8 @@ function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName
               <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Email</th>
               <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Statut</th>
               <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Source</th>
-              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-center">Biens</th>
-              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Date HubSpot</th>
+              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Recommandé le</th>
+              <th className="px-3 py-2 text-[10px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-left">Abonné le</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -186,9 +186,24 @@ function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName
                     {lead.source}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-xs text-gray-500 text-center tabular-nums">{lead.biens}</td>
                 <td className="px-3 py-2 text-[10px] text-gray-400">
                   {new Date(lead.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                </td>
+                <td className="px-3 py-2 text-[10px]">
+                  {lead.subscribed_at ? (
+                    <div className="flex flex-col leading-tight">
+                      <span className="text-gray-600 font-medium">
+                        {new Date(lead.subscribed_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                      </span>
+                      {lead.unsubscribed_at && (
+                        <span className="text-orange-600" title={`Désabonné le ${new Date(lead.unsubscribed_at).toLocaleDateString("fr-FR")}`}>
+                          Désabo {new Date(lead.unsubscribed_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-gray-300">—</span>
+                  )}
                 </td>
               </tr>
             ))}

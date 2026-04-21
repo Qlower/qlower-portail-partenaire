@@ -72,6 +72,8 @@ export interface Lead {
   created_at: string;
   hs_deleted?: boolean;
   hs_deleted_at?: string | null;
+  subscribed_at?: string | null;
+  unsubscribed_at?: string | null;
 }
 
 // ── Stats ─────────────────────────────────────────────────────

@@ -30,23 +30,38 @@ export function Dashboard({
   const { data: monthlyStats = [], isLoading: statsLoading } = useMonthlyStats(partnerId);
   const { data: actions = [] } = useActions(partnerId);
   const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-  const { data: commissionData } = useCommissions(partnerId, selectedYear);
+  type YearFilter = number | "all";
+  const [selectedYear, setSelectedYear] = useState<YearFilter>(currentYear);
+  const yearForCommission = selectedYear === "all" ? currentYear : selectedYear;
+  const { data: commissionData } = useCommissions(partnerId, yearForCommission);
 
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
-  const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
+  const yearOptions: YearFilter[] = ["all", currentYear, currentYear - 1, currentYear - 2];
 
-  // Computed values
+  // Computed values (all-time totals — independent of year filter)
   const abonnes = leads.filter((l) => l.stage === "Abonne").length;
   const payeurs = leads.filter((l) => l.stage === "Payeur").length;
   const nonPayeurs = leads.filter((l) => l.stage === "Non payeur").length;
 
-  // Filtered leads
+  // Activity in a given year: recommended OR subscribed OR unsubscribed during that year
+  const hasActivityInYear = (lead: typeof leads[number], y: number): boolean => {
+    const yr = (s?: string | null) => (s ? new Date(s).getFullYear() : null);
+    return (
+      yr(lead.created_at) === y ||
+      yr(lead.subscribed_at) === y ||
+      yr(lead.unsubscribed_at) === y
+    );
+  };
+
+  // Filtered leads (stage tab + search + year activity)
   const filteredLeads = useMemo(() => {
     let result = leads;
     if (activeTab !== "all") {
       result = result.filter((l) => l.stage === activeTab);
+    }
+    if (selectedYear !== "all") {
+      result = result.filter((l) => hasActivityInYear(l, selectedYear));
     }
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -57,7 +72,8 @@ export function Dashboard({
       );
     }
     return result;
-  }, [leads, activeTab, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, activeTab, search, selectedYear]);
 
   // Chart data
   const chartData = monthlyStats.map((s) => ({
@@ -134,12 +150,17 @@ export function Dashboard({
                 Commission
               </p>
               <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                value={String(selectedYear)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSelectedYear(v === "all" ? "all" : Number(v));
+                }}
                 className="bg-white/10 backdrop-blur-sm rounded-lg px-2.5 py-1 border border-white/10 text-xs font-bold text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/20"
               >
                 {yearOptions.map((y) => (
-                  <option key={y} value={y} className="bg-[#0A3855] text-white">{y}</option>
+                  <option key={String(y)} value={String(y)} className="bg-[#0A3855] text-white">
+                    {y === "all" ? "Toutes années" : y}
+                  </option>
                 ))}
               </select>
             </div>
@@ -152,12 +173,12 @@ export function Dashboard({
           </div>
           <div className="flex flex-wrap gap-3">
             <div className="bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-xl px-4 py-3 min-w-[140px]">
-              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Abonnés {selectedYear}</p>
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Abonnés {yearForCommission}</p>
               <p className="text-lg font-bold text-white">{commissionData?.totalSubscribers ?? 0}</p>
               <p className="text-[10px] text-white/40 mt-0.5">sur {commissionData?.totalContacts ?? 0} contacts</p>
             </div>
             <div className="bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-xl px-4 py-3 min-w-[140px]">
-              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Année {selectedYear - 1}</p>
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Année {yearForCommission - 1}</p>
               <p className="text-lg font-bold text-white">{(commissionData?.previousYear.totalCommission ?? 0).toLocaleString("fr-FR")}&nbsp;&euro;</p>
               <p className="text-[10px] text-white/40 mt-0.5">{commissionData?.previousYear.totalSubscribers ?? 0} abonné{(commissionData?.previousYear.totalSubscribers ?? 0) > 1 ? "s" : ""}</p>
             </div>
@@ -270,11 +291,11 @@ export function Dashboard({
                   <th className="px-4 py-3 text-[11px] font-semibold text-[#0A3855]/60 uppercase tracking-wider">
                     Source
                   </th>
-                  <th className="px-4 py-3 text-[11px] font-semibold text-[#0A3855]/60 uppercase tracking-wider text-center">
-                    Biens
+                  <th className="px-4 py-3 text-[11px] font-semibold text-[#0A3855]/60 uppercase tracking-wider">
+                    Recommandé le
                   </th>
                   <th className="px-4 py-3 text-[11px] font-semibold text-[#0A3855]/60 uppercase tracking-wider">
-                    Date
+                    Abonné le
                   </th>
                 </tr>
               </thead>
@@ -324,11 +345,27 @@ export function Dashboard({
                       </td>
                       <td className="px-4 py-3.5">{stageBadge(lead.stage)}</td>
                       <td className="px-4 py-3.5">{sourceBadge(lead.source)}</td>
-                      <td className="px-4 py-3.5 text-sm text-gray-500 text-center tabular-nums">
-                        {lead.biens}
-                      </td>
                       <td className="px-4 py-3.5 text-xs text-gray-400">
                         {formatDate(lead.created_at)}
+                      </td>
+                      <td className="px-4 py-3.5 text-xs">
+                        {lead.subscribed_at ? (
+                          <div className="flex flex-col">
+                            <span className="text-gray-600 font-medium">
+                              {formatDate(lead.subscribed_at)}
+                            </span>
+                            {lead.unsubscribed_at && (
+                              <span
+                                className="text-[10px] text-orange-600"
+                                title={`Désabonné le ${new Date(lead.unsubscribed_at).toLocaleDateString("fr-FR")}`}
+                              >
+                                Désabonné le {formatDate(lead.unsubscribed_at)}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
                     </tr>
                   ))

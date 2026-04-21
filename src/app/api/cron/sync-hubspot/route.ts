@@ -9,7 +9,7 @@ const PROPERTIES = [
   "firstname", "lastname", "email", "phone",
   "partenaire__lead_", "utm_source",
   "hs_lifecyclestage", "lifecyclestage",
-  "hs_v2_date_entered_999998694", "createdate",
+  "hs_v2_date_entered_999998694", "hs_v2_date_exited_999998694", "createdate",
   "lastmodifieddate",
 ];
 
@@ -65,10 +65,19 @@ async function upsertLead(
     .eq("email", email)
     .maybeSingle();
 
+  const subscribedAt = props.hs_v2_date_entered_999998694
+    ? new Date(props.hs_v2_date_entered_999998694).toISOString()
+    : null;
+  const unsubscribedAt = props.hs_v2_date_exited_999998694
+    ? new Date(props.hs_v2_date_exited_999998694).toISOString()
+    : null;
+
   if (existing) {
     const newCommissionDue = existing.commission_due || commissionDue;
     await supabase.from("leads").update({
       stage, hs_contact_id: contactId, commission_due: newCommissionDue,
+      subscribed_at: subscribedAt,
+      unsubscribed_at: unsubscribedAt,
       ...(props.createdate ? { created_at: new Date(props.createdate).toISOString() } : {}),
     }).eq("id", existing.id);
 
@@ -85,6 +94,8 @@ async function upsertLead(
     mois: hsCreateDate.toLocaleDateString("fr-FR", { month: "short", year: "numeric" }),
     biens: 0, hs_contact_id: contactId, commission_due: commissionDue,
     created_at: hsCreateDate.toISOString(),
+    subscribed_at: subscribedAt,
+    unsubscribed_at: unsubscribedAt,
   });
 
   await supabase.rpc("increment_partner_leads", { p_id: partner.id });
