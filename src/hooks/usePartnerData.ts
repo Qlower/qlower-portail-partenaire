@@ -125,12 +125,22 @@ export interface CommissionData {
     totalSubscribers: number;
     totalCommission: number;
   };
+  ruleDetails?: Array<{ label: string; montant: number; type: "one_shot" | "recurring" }>;
   months: Array<{
     month: number;
     label: string;
     subscribers: number;
     commission: number;
     subscriberNames: string[];
+    subscriberDetails?: Array<{
+      name: string;
+      commission: number;
+      entryDate: string;
+      exitDate: string | null;
+      isCurrentlySubscriber: boolean;
+      isResubscription: boolean;
+      unsubscribedDuringYear: boolean;
+    }>;
     previousYear: number;
     previousYearCommission: number;
   }>;

@@ -206,11 +206,45 @@ export default function Revenus({ partner }: RevenusProps) {
                         <td className="px-6 py-3">
                           {m.subscriberNames.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
-                              {m.subscriberNames.map((name, i) => (
-                                <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#E5EDF1] text-[#0A3855] text-[10px] font-medium">
-                                  {name}
-                                </span>
-                              ))}
+                              {(m.subscriberDetails && m.subscriberDetails.length > 0
+                                ? m.subscriberDetails
+                                : m.subscriberNames.map((n) => ({
+                                    name: n,
+                                    isCurrentlySubscriber: true,
+                                    isResubscription: false,
+                                    unsubscribedDuringYear: false,
+                                    exitDate: null as string | null,
+                                  }))
+                              ).map((s, i) => {
+                                const showUnsubBadge = s.unsubscribedDuringYear || (!s.isCurrentlySubscriber && s.exitDate);
+                                return (
+                                  <span
+                                    key={i}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium ${
+                                      showUnsubBadge
+                                        ? "bg-orange-50 text-orange-700 border border-orange-200"
+                                        : s.isResubscription
+                                        ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                        : "bg-[#E5EDF1] text-[#0A3855]"
+                                    }`}
+                                    title={
+                                      showUnsubBadge && s.exitDate
+                                        ? `Désabonné le ${new Date(s.exitDate).toLocaleDateString("fr-FR")} — commission conservée (règle N+1)`
+                                        : s.isResubscription
+                                        ? "Réabonnement — prime de souscription non redéclenchée"
+                                        : undefined
+                                    }
+                                  >
+                                    {s.name}
+                                    {showUnsubBadge && (
+                                      <span className="text-[9px] font-semibold">· Désabonné</span>
+                                    )}
+                                    {s.isResubscription && !showUnsubBadge && (
+                                      <span className="text-[9px] font-semibold">· Réabo</span>
+                                    )}
+                                  </span>
+                                );
+                              })}
                             </div>
                           ) : (
                             <span className="text-gray-300 text-xs">-</span>

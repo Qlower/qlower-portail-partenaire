@@ -14,6 +14,26 @@ const PROPERTIES = [
   "lifecyclestage",
 ];
 
+// ── Types ────────────────────────────────────────────────────
+type Tranche = { max: number; montant: number };
+type Rule = {
+  type: "souscription" | "annuelle" | "biens" | "pct_ca";
+  montant?: number;
+  pct?: number;
+  tranches?: Tranche[];
+  actif: boolean;
+};
+
+type SubscriberDetail = {
+  name: string;
+  commission: number;
+  entryDate: string; // ISO
+  exitDate: string | null;
+  isCurrentlySubscriber: boolean;
+  isResubscription: boolean; // currently sub, but had a previous exit
+  unsubscribedDuringYear: boolean; // unsubYear === targetYear (shows "Désabonné" badge on that year)
+};
+
 // GET /api/partner/commissions?partner_id=xxx&year=2026
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -26,7 +46,6 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServiceClient();
 
-  // Get partner UTM, commission rules and volumetric attributes
   const { data: partner, error: partnerError } = await supabase
     .from("partners")
     .select("utm, comm_rules, biens_moyens, ca_par_client")
@@ -44,11 +63,7 @@ export async function GET(request: NextRequest) {
   do {
     const body: Record<string, unknown> = {
       filterGroups: [
-        {
-          filters: [
-            { propertyName: "partenaire__lead_", operator: "EQ", value: partner.utm },
-          ],
-        },
+        { filters: [{ propertyName: "partenaire__lead_", operator: "EQ", value: partner.utm }] },
       ],
       properties: PROPERTIES,
       limit: 100,
@@ -57,10 +72,7 @@ export async function GET(request: NextRequest) {
 
     const res = await fetch(`${HS_BASE}/crm/v3/objects/contacts/search`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${HS_TOKEN}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${HS_TOKEN}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
@@ -73,16 +85,7 @@ export async function GET(request: NextRequest) {
     after = data.paging?.next?.after;
   } while (after);
 
-  // ── Extract active commission rules from admin config ────────
-  type Tranche = { max: number; montant: number };
-  type Rule = {
-    type: "souscription" | "annuelle" | "biens" | "pct_ca";
-    montant?: number;
-    pct?: number;
-    tranches?: Tranche[];
-    actif: boolean;
-  };
-
+  // ── Extract active commission rules ─────────────────────────
   const rules = (partner.comm_rules || []) as Rule[];
   const activeRules = rules.filter((r) => r.actif);
   const souscRule = activeRules.find((r) => r.type === "souscription");
@@ -90,12 +93,9 @@ export async function GET(request: NextRequest) {
   const biensRule = activeRules.find((r) => r.type === "biens");
   const pctRule = activeRules.find((r) => r.type === "pct_ca");
 
-  // Legacy fallback: if NO rule is active, default to 100€/year per subscriber
-  // (preserves existing partner behaviour until admin configures explicit rules)
   const useLegacyDefault = activeRules.length === 0;
   const LEGACY_ANNUAL = 100;
 
-  // Biens tranche resolved from partner.biens_moyens
   const biensMoyens = partner.biens_moyens ?? 2;
   const biensTranches = biensRule?.tranches ?? [];
   const biensMontant = (() => {
@@ -104,11 +104,10 @@ export async function GET(request: NextRequest) {
     return (hit || biensTranches[biensTranches.length - 1])?.montant || 0;
   })();
 
-  // % CA resolved from partner.ca_par_client
   const caParClient = partner.ca_par_client ?? 0;
   const pctAmount = pctRule?.pct ? Math.round((caParClient * pctRule.pct) / 100) : 0;
 
-  // Rule breakdown for UI (all active rules with resolved amount)
+  // Rule breakdown for UI
   const ruleDetails: Array<{ label: string; montant: number; type: "one_shot" | "recurring" }> = [];
   if (souscRule?.montant) ruleDetails.push({ label: "Souscription", montant: souscRule.montant, type: "one_shot" });
   if (biensRule && biensMontant > 0) ruleDetails.push({ label: `Variable biens (${biensMoyens} biens/client)`, montant: biensMontant, type: "one_shot" });
@@ -117,37 +116,60 @@ export async function GET(request: NextRequest) {
   if (useLegacyDefault) ruleDetails.push({ label: "Annuelle (défaut)", montant: LEGACY_ANNUAL, type: "recurring" });
 
   /**
-   * Commission contributed by a single subscriber for a given target year.
-   * - Entry year: one-shot rules (souscription, biens) + recurring (annuelle, %CA)
-   * - Later years while active: recurring only (annuelle, %CA)
-   * - Legacy mode (no rule active): 100€ flat only in entry year (preserves old behavior)
+   * Compute commission for a single subscriber in a given target year.
+   *
+   * Rules (Qlower affiliate commission model):
+   * - Commission is EARNED the year the subscriber was active (invoicing happens in N+1 but that's accounting).
+   * - Same-year churn (subYear === unsubYear) → never any commission.
+   * - Different-year churn → commission for subYear through unsubYear inclusive.
+   * - Currently subscribed → commission from subYear onwards, exit date ignored (it's from a prior cycle).
+   * - Souscription / biens (one-shot rules) apply only in subYear AND only if this is an ORIGINAL first cycle
+   *   (no exit date at all). Re-subscriptions don't re-trigger the one-shot bonus.
+   * - Annuelle / %CA (recurring rules) apply every active year.
    */
-  function commissionForSubscriber(subYear: number, targetYear: number): number {
-    if (subYear > targetYear) return 0;
+  function commissionForSubscriber(
+    subYear: number,
+    unsubYear: number | null,
+    isCurrentlySubscriber: boolean,
+    hasAnyExit: boolean,
+    targetYear: number
+  ): number {
+    if (targetYear < subYear) return 0;
+
+    if (!isCurrentlySubscriber) {
+      if (!unsubYear) return 0; // edge case: left stage but no exit date
+      if (subYear === unsubYear) return 0; // same-year churn
+      if (targetYear > unsubYear) return 0; // already gone
+    }
+    // Currently subscribed: ignore unsubYear (prior cycle)
 
     if (useLegacyDefault) {
-      return subYear === targetYear ? LEGACY_ANNUAL : 0;
+      return LEGACY_ANNUAL;
     }
 
     let amount = 0;
-    // One-shot rules paid only in entry year
-    if (subYear === targetYear) {
+
+    // Recurring rules — every active year
+    if (annuelleRule?.montant) amount += annuelleRule.montant;
+    if (pctRule?.pct && pctAmount > 0) amount += pctAmount;
+
+    // One-shot rules — only in subYear AND only for original first cycle
+    const isOriginalFirstCycle = !hasAnyExit;
+    if (targetYear === subYear && isOriginalFirstCycle) {
       if (souscRule?.montant) amount += souscRule.montant;
       if (biensRule && biensMontant > 0) amount += biensMontant;
     }
-    // Recurring rules paid every active year (including entry year)
-    if (annuelleRule?.montant) amount += annuelleRule.montant;
-    if (pctRule?.pct && pctAmount > 0) amount += pctAmount;
+
     return amount;
   }
 
-  // ── Aggregate per month for selected year + totals for previous year ──
+  // ── Aggregate per month + build subscriber details ──────────
   const monthlyData: Record<
     number,
-    { subscribers: string[]; count: number; commission: number }
+    { subscribers: string[]; details: SubscriberDetail[]; count: number; commission: number }
   > = {};
   for (let m = 1; m <= 12; m++) {
-    monthlyData[m] = { subscribers: [], count: 0, commission: 0 };
+    monthlyData[m] = { subscribers: [], details: [], count: 0, commission: 0 };
   }
 
   const previousYearMonthly: Record<number, { count: number; commission: number }> = {};
@@ -161,35 +183,50 @@ export async function GET(request: NextRequest) {
   let totalCommissionPreviousYear = 0;
 
   for (const contact of contacts) {
-    const dateStr = contact.properties.hs_v2_date_entered_999998694;
-    if (!dateStr) continue; // Never entered subscriber stage
+    const entryDateStr = contact.properties.hs_v2_date_entered_999998694;
+    if (!entryDateStr) continue; // never entered subscriber stage
 
     const exitDateStr = contact.properties.hs_v2_date_exited_999998694;
     const currentLifecycle = (contact.properties.lifecyclestage || "").toLowerCase();
     const isCurrentlySubscriber = currentLifecycle === "999998694";
-    const enteredAndNeverExited = !exitDateStr;
-    if (!isCurrentlySubscriber && !enteredAndNeverExited) continue; // Churned
+    const hasAnyExit = !!exitDateStr;
 
-    const subDate = new Date(dateStr);
-    const subYear = subDate.getFullYear();
-    const subMonth = subDate.getMonth() + 1;
+    const entryDate = new Date(entryDateStr);
+    const subYear = entryDate.getFullYear();
+    const subMonth = entryDate.getMonth() + 1;
+
+    const exitDate = exitDateStr ? new Date(exitDateStr) : null;
+    const unsubYear = exitDate ? exitDate.getFullYear() : null;
+
+    // A re-subscription is someone currently subscribed who has a prior exit (exit < entry)
+    const isResubscription = isCurrentlySubscriber && !!exitDate && exitDate < entryDate;
+
     const name =
       [contact.properties.firstname, contact.properties.lastname]
         .filter(Boolean)
         .join(" ") || contact.properties.email || "Inconnu";
 
-    // Current year contribution
-    const curCom = commissionForSubscriber(subYear, year);
+    // Current year
+    const curCom = commissionForSubscriber(subYear, unsubYear, isCurrentlySubscriber, hasAnyExit, year);
     if (curCom > 0) {
       totalSubscribersCurrentYear++;
       totalCommissionCurrentYear += curCom;
       monthlyData[subMonth].count++;
       monthlyData[subMonth].commission += curCom;
       monthlyData[subMonth].subscribers.push(name);
+      monthlyData[subMonth].details.push({
+        name,
+        commission: curCom,
+        entryDate: entryDateStr,
+        exitDate: exitDateStr,
+        isCurrentlySubscriber,
+        isResubscription,
+        unsubscribedDuringYear: unsubYear === year,
+      });
     }
 
-    // Previous year contribution
-    const prevCom = commissionForSubscriber(subYear, year - 1);
+    // Previous year (for the month-by-month comparison)
+    const prevCom = commissionForSubscriber(subYear, unsubYear, isCurrentlySubscriber, hasAnyExit, year - 1);
     if (prevCom > 0) {
       totalSubscribersPreviousYear++;
       totalCommissionPreviousYear += prevCom;
@@ -198,7 +235,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Steady-state recurring amount per subscriber (for the "× X€" display)
+  // Display helper: per-subscriber steady-state recurring amount
   const montantParAbonne = useLegacyDefault
     ? LEGACY_ANNUAL
     : (annuelleRule?.montant || 0) + pctAmount;
@@ -212,6 +249,7 @@ export async function GET(request: NextRequest) {
       subscribers: monthlyData[m].count,
       commission: monthlyData[m].commission,
       subscriberNames: monthlyData[m].subscribers,
+      subscriberDetails: monthlyData[m].details,
       previousYear: previousYearMonthly[m].count,
       previousYearCommission: previousYearMonthly[m].commission,
     });
