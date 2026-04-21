@@ -104,7 +104,7 @@ function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName
   const filteredLeads = leads.filter((l) => {
     if (!leadSearch.trim()) return true;
     const q = leadSearch.toLowerCase();
-    return l.nom.toLowerCase().includes(q) || l.email.toLowerCase().includes(q);
+    return l.nom.toLowerCase().includes(q) || (l.email || "").toLowerCase().includes(q);
   });
 
   const stageBadge = (stage: LeadStage) => {
@@ -156,9 +156,30 @@ function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filteredLeads.map((lead) => (
-              <tr key={lead.id} className="hover:bg-[#E5EDF1]/20 transition-colors">
-                <td className="px-3 py-2 text-xs font-semibold text-gray-900">{lead.nom}</td>
-                <td className="px-3 py-2 text-xs text-gray-500">{lead.email}</td>
+              <tr
+                key={lead.id}
+                className={`hover:bg-[#E5EDF1]/20 transition-colors ${lead.hs_deleted ? "opacity-70" : ""}`}
+              >
+                <td className="px-3 py-2 text-xs font-semibold text-gray-900">
+                  <div className="flex items-center gap-1.5">
+                    <span className={lead.hs_deleted ? "text-gray-400 italic" : ""}>{lead.nom}</span>
+                    {lead.hs_deleted && (
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-gray-100 text-gray-500 border border-gray-200"
+                        title={
+                          lead.hs_deleted_at
+                            ? `Supprimé le ${new Date(lead.hs_deleted_at).toLocaleDateString("fr-FR")}`
+                            : "Compte supprimé (droit à l'effacement)"
+                        }
+                      >
+                        Supprimé
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-2 text-xs text-gray-500">
+                  <span className={lead.hs_deleted ? "italic text-gray-400" : ""}>{lead.email || "—"}</span>
+                </td>
                 <td className="px-3 py-2">{stageBadge(lead.stage)}</td>
                 <td className="px-3 py-2">
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600">

@@ -53,7 +53,7 @@ export function Dashboard({
       result = result.filter(
         (l) =>
           l.nom.toLowerCase().includes(q) ||
-          l.email.toLowerCase().includes(q)
+          (l.email || "").toLowerCase().includes(q)
       );
     }
     return result;
@@ -296,12 +296,32 @@ export function Dashboard({
                       key={lead.id}
                       className={`group transition-colors hover:bg-[#E5EDF1]/30 ${
                         idx !== filteredLeads.length - 1 ? "border-b border-gray-100/80" : ""
-                      }`}
+                      } ${lead.hs_deleted ? "opacity-70" : ""}`}
                     >
                       <td className="px-4 py-3.5 text-sm font-semibold text-gray-900">
-                        {lead.nom}
+                        <div className="flex items-center gap-2">
+                          <span className={lead.hs_deleted ? "text-gray-400 italic" : ""}>
+                            {lead.nom}
+                          </span>
+                          {lead.hs_deleted && (
+                            <span
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-500 border border-gray-200"
+                              title={
+                                lead.hs_deleted_at
+                                  ? `Supprimé le ${new Date(lead.hs_deleted_at).toLocaleDateString("fr-FR")}`
+                                  : "Compte supprimé (droit à l'effacement)"
+                              }
+                            >
+                              Supprimé
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-4 py-3.5 text-sm text-gray-500">{lead.email}</td>
+                      <td className="px-4 py-3.5 text-sm text-gray-500">
+                        <span className={lead.hs_deleted ? "italic text-gray-400" : ""}>
+                          {lead.email || "—"}
+                        </span>
+                      </td>
                       <td className="px-4 py-3.5">{stageBadge(lead.stage)}</td>
                       <td className="px-4 py-3.5">{sourceBadge(lead.source)}</td>
                       <td className="px-4 py-3.5 text-sm text-gray-500 text-center tabular-nums">

@@ -134,6 +134,60 @@ async function fetchRecentContacts(full = false) {
   return contacts;
 }
 
+// Anonymize a lead whose HubSpot contact no longer exists (RGPD erasure).
+// Keeps 3 first chars of name + local-part of email + full domain.
+// Erases phone. Flags hs_deleted=true.
+async function anonymizeDeletedLead(
+  supabase: ReturnType<typeof createServiceClient>,
+  leadId: number
+): Promise<void> {
+  const { data: current } = await supabase
+    .from("leads")
+    .select("nom, email")
+    .eq("id", leadId)
+    .single();
+
+  const nomTronque = current?.nom ? current.nom.slice(0, 3) + "…" : "Compte supprimé";
+  let emailTronque: string | null = null;
+  if (current?.email && current.email.includes("@")) {
+    const [local, domain] = current.email.split("@");
+    emailTronque = local.slice(0, 3) + "…@" + domain;
+  }
+
+  await supabase
+    .from("leads")
+    .update({
+      nom: nomTronque,
+      email: emailTronque,
+      phone: null,
+      hs_deleted: true,
+      hs_deleted_at: new Date().toISOString(),
+    })
+    .eq("id", leadId);
+}
+
+// Detect leads whose HubSpot contact was deleted: present in Supabase with a
+// hs_contact_id, absent from the full HubSpot fetch. Only reliable in full mode.
+async function detectDeletions(
+  supabase: ReturnType<typeof createServiceClient>,
+  hsIds: Set<string>
+): Promise<number> {
+  const { data: supaLeads } = await supabase
+    .from("leads")
+    .select("id, hs_contact_id")
+    .not("hs_contact_id", "is", null)
+    .eq("hs_deleted", false);
+
+  let count = 0;
+  for (const lead of supaLeads || []) {
+    if (!lead.hs_contact_id) continue;
+    if (hsIds.has(lead.hs_contact_id)) continue;
+    await anonymizeDeletedLead(supabase, lead.id);
+    count++;
+  }
+  return count;
+}
+
 export async function GET(request: NextRequest) {
   // Verify cron secret (Vercel sends Authorization: Bearer <CRON_SECRET>)
   const authHeader = request.headers.get("authorization");
@@ -146,7 +200,14 @@ export async function GET(request: NextRequest) {
     const full = url.searchParams.get("full") === "true";
     const contacts = await fetchRecentContacts(full);
     const supabase = createServiceClient();
-    const results = { total: contacts.length, created: 0, updated: 0, transferred: 0, skipped: 0 };
+    const results = {
+      total: contacts.length,
+      created: 0,
+      updated: 0,
+      transferred: 0,
+      skipped: 0,
+      deleted: 0,
+    };
 
     for (const contact of contacts) {
       const status = await upsertLead(supabase, contact.id, contact.properties);
@@ -154,6 +215,12 @@ export async function GET(request: NextRequest) {
       else if (status === "updated") results.updated++;
       else if (status.startsWith("transferred")) results.transferred++;
       else results.skipped++;
+    }
+
+    // Deletion detection only reliable when we have the complete HubSpot snapshot
+    if (full) {
+      const hsIds = new Set(contacts.map((c) => c.id));
+      results.deleted = await detectDeletions(supabase, hsIds);
     }
 
     return NextResponse.json(results);

@@ -62,7 +62,7 @@ export interface Lead {
   id: number;
   partner_id: string;
   nom: string;
-  email: string;
+  email: string | null;
   source: LeadSource;
   stage: LeadStage;
   mois: string | null;
@@ -70,6 +70,8 @@ export interface Lead {
   hs_contact_id: string | null;
   commission_due: boolean;
   created_at: string;
+  hs_deleted?: boolean;
+  hs_deleted_at?: string | null;
 }
 
 // ── Stats ─────────────────────────────────────────────────────
