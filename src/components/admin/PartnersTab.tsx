@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { Partner, CommissionRule, ContratType, PartnerType, PartnerStatut } from "@/types";
 import { PARTNER_TYPES } from "@/services/constants";
-import { calcCommission, DEFAULT_TRANCHES } from "@/services/commission";
+import { DEFAULT_TRANCHES } from "@/services/commission";
 import { slug } from "@/services/links";
 import { useAdminPartners, useCreatePartner, useUpdatePartner, useDeletePartner, useAdminLeads } from "@/hooks/useAdminData";
 import { STAGE_STYLES } from "@/services/constants";
@@ -237,6 +238,19 @@ function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName
 
 export default function PartnersTab() {
   const { data: partners = [], isLoading: loading } = useAdminPartners();
+
+  // Live commission data — same logic as partner dashboard (HubSpot live + rules per year)
+  type CommSummary = { partnerId: string; totalSubscribers: number; totalCommission: number };
+  const { data: commSummaries = [] } = useQuery<CommSummary[]>({
+    queryKey: ["admin-partners-commissions"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/partners-commissions");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+  const commByPartner = new Map(commSummaries.map((c) => [c.partnerId, c]));
   const createPartner = useCreatePartner();
   const updatePartner = useUpdatePartner();
   const deletePartner = useDeletePartner();
@@ -551,7 +565,9 @@ export default function PartnersTab() {
       ) : (
         <div className="space-y-3">
           {filteredPartners.map((p) => {
-            const commission = calcCommission(p.comm_rules, p.abonnes, p.biens_moyens, p.ca_par_client);
+            const live = commByPartner.get(p.id);
+            const displayAbonnes = live?.totalSubscribers ?? p.abonnes;
+            const displayCommission = live?.totalCommission ?? 0;
             const isEditing = editingId === p.id;
 
             return (
@@ -579,9 +595,14 @@ export default function PartnersTab() {
                     <div className="flex items-center gap-3 text-xs text-gray-500">
                       <span>{p.leads} leads</span>
                       <span className="text-gray-300">|</span>
-                      <span>{p.abonnes} abonnes</span>
+                      <span>{displayAbonnes} abonnes</span>
                       <span className="text-gray-300">|</span>
-                      <span className="font-semibold text-[#0A3855]">{commission.total} EUR</span>
+                      <span
+                        className="font-semibold text-[#0A3855]"
+                        title="Cumul commission (vue partenaire — règles appliquées année par année)"
+                      >
+                        {displayCommission} EUR
+                      </span>
                     </div>
 
                     <div className="flex items-center gap-1.5 ml-1">
