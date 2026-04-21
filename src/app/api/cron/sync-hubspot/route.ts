@@ -61,7 +61,7 @@ async function upsertLead(
 
   const { data: existing } = await supabase
     .from("leads")
-    .select("id, stage, commission_due")
+    .select("id, stage, commission_due, hs_deleted")
     .eq("partner_id", partner.id)
     .eq("email", email)
     .maybeSingle();
@@ -78,11 +78,14 @@ async function upsertLead(
 
   if (existing) {
     const newCommissionDue = existing.commission_due || commissionDue;
+    // Do NOT overwrite name/email if the lead has been pseudonymized (RGPD erasure)
+    const preserveIdentity = existing.hs_deleted === true;
     await supabase.from("leads").update({
       stage, hs_contact_id: contactId, commission_due: newCommissionDue,
       subscribed_at: subscribedAt,
       unsubscribed_at: unsubscribedAt,
       first_paid_at: firstPaidAt,
+      ...(preserveIdentity ? {} : { nom, email }),
       ...(props.createdate ? { created_at: new Date(props.createdate).toISOString() } : {}),
     }).eq("id", existing.id);
 
