@@ -194,9 +194,12 @@ function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName
                     const displayDate = lead.first_paid_at || lead.subscribed_at;
                     if (!displayDate) return <span className="text-gray-300">—</span>;
                     const mainD = new Date(displayDate);
+                    const subD = lead.subscribed_at ? new Date(lead.subscribed_at) : null;
                     const unsubD = lead.unsubscribed_at ? new Date(lead.unsubscribed_at) : null;
-                    const isResub = lead.stage === "Abonne" && unsubD && unsubD < new Date(lead.subscribed_at || displayDate);
-                    const isReallyUnsub = lead.stage !== "Abonne" && unsubD && unsubD >= mainD;
+                    // Detect HubSpot glitch (entry/exit < 60s apart)
+                    const isGlitch = !!(subD && unsubD && Math.abs(subD.getTime() - unsubD.getTime()) < 60000);
+                    const isResub = !isGlitch && lead.stage === "Abonne" && unsubD && subD && unsubD < subD;
+                    const isReallyUnsub = !isGlitch && lead.stage !== "Abonne" && unsubD && unsubD >= mainD;
                     return (
                       <div className="flex flex-col leading-tight">
                         <span className="text-gray-600 font-medium">

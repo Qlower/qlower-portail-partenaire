@@ -191,18 +191,31 @@ export async function GET(request: NextRequest) {
     if (!entryDateStr) continue; // never paid / never entered subscriber stage
 
     const exitDateStr = contact.properties.hs_v2_date_exited_999998694;
+    const hsEnteredStr = contact.properties.hs_v2_date_entered_999998694;
     const currentLifecycle = (contact.properties.lifecyclestage || "").toLowerCase();
     const isCurrentlySubscriber = currentLifecycle === "999998694";
-    const hasAnyExit = !!exitDateStr;
+
+    // HubSpot glitch detection: if hs entered & exited are within 60s, it's a
+    // bulk re-processing, not a real churn. We discard the exit date.
+    let effectiveExitStr: string | null = exitDateStr ?? null;
+    if (hsEnteredStr && exitDateStr) {
+      const eD = new Date(hsEnteredStr).getTime();
+      const xD = new Date(exitDateStr).getTime();
+      if (Math.abs(eD - xD) < 60000) {
+        effectiveExitStr = null;
+      }
+    }
+    const hasAnyExit = !!effectiveExitStr;
 
     const entryDate = new Date(entryDateStr);
     const subYear = entryDate.getFullYear();
     const subMonth = entryDate.getMonth() + 1;
 
-    const exitDate = exitDateStr ? new Date(exitDateStr) : null;
+    const exitDate = effectiveExitStr ? new Date(effectiveExitStr) : null;
     const unsubYear = exitDate ? exitDate.getFullYear() : null;
 
-    // A re-subscription is someone currently subscribed who has a prior exit (exit < entry)
+    // A re-subscription is someone currently subscribed who has a prior exit (exit < entry),
+    // and NOT a HubSpot glitch (already filtered into effectiveExitStr above).
     const isResubscription = isCurrentlySubscriber && !!exitDate && exitDate < entryDate;
 
     const name =

@@ -357,9 +357,15 @@ export function Dashboard({
                           if (!displayDate) return <span className="text-gray-300">—</span>;
 
                           const mainD = new Date(displayDate);
+                          const subD = lead.subscribed_at ? new Date(lead.subscribed_at) : null;
                           const unsubD = lead.unsubscribed_at ? new Date(lead.unsubscribed_at) : null;
-                          const isResub = lead.stage === "Abonne" && unsubD && unsubD < new Date(lead.subscribed_at || displayDate);
-                          const isReallyUnsub = lead.stage !== "Abonne" && unsubD && unsubD >= mainD;
+
+                          // Detect HubSpot workflow glitch: entry and exit within a few seconds
+                          // = bulk re-processing, not a real cycle. Ignore the exit entirely.
+                          const isGlitch = !!(subD && unsubD && Math.abs(subD.getTime() - unsubD.getTime()) < 60000);
+
+                          const isResub = !isGlitch && lead.stage === "Abonne" && unsubD && subD && unsubD < subD;
+                          const isReallyUnsub = !isGlitch && lead.stage !== "Abonne" && unsubD && unsubD >= mainD;
 
                           return (
                             <div className="flex flex-col">
