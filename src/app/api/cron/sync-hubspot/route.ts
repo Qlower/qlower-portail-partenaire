@@ -154,16 +154,20 @@ async function anonymizeDeletedLead(
     emailTronque = local.slice(0, 3) + "…@" + domain;
   }
 
-  await supabase
+  const { error } = await supabase
     .from("leads")
     .update({
       nom: nomTronque,
       email: emailTronque,
-      phone: null,
       hs_deleted: true,
       hs_deleted_at: new Date().toISOString(),
     })
     .eq("id", leadId);
+
+  if (error) {
+    console.error(`Failed to anonymize lead ${leadId}:`, error.message);
+    throw error;
+  }
 }
 
 // Detect leads whose HubSpot contact was deleted: present in Supabase with a
@@ -182,8 +186,12 @@ async function detectDeletions(
   for (const lead of supaLeads || []) {
     if (!lead.hs_contact_id) continue;
     if (hsIds.has(lead.hs_contact_id)) continue;
-    await anonymizeDeletedLead(supabase, lead.id);
-    count++;
+    try {
+      await anonymizeDeletedLead(supabase, lead.id);
+      count++;
+    } catch {
+      // already logged inside anonymizeDeletedLead
+    }
   }
   return count;
 }
