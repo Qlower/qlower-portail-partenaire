@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
     subYear: number,
     unsubYear: number | null,
     isCurrentlySubscriber: boolean,
-    hasAnyExit: boolean,
+    isResubscription: boolean,
     targetYear: number
   ): number {
     if (targetYear < subYear) return 0;
@@ -157,9 +157,9 @@ export async function GET(request: NextRequest) {
     if (annuelleRule?.montant) amount += annuelleRule.montant;
     if (pctRule?.pct && pctAmount > 0) amount += pctAmount;
 
-    // One-shot rules — only in subYear AND only for original first cycle
-    const isOriginalFirstCycle = !hasAnyExit;
-    if (targetYear === subYear && isOriginalFirstCycle) {
+    // One-shot rules — paid in subYear, but NOT redeclenched on a resub
+    // (isResubscription means: currently subscribed AND has a prior exit before current entry)
+    if (targetYear === subYear && !isResubscription) {
       if (souscRule?.montant) amount += souscRule.montant;
       if (biensRule && biensMontant > 0) amount += biensMontant;
     }
@@ -212,7 +212,7 @@ export async function GET(request: NextRequest) {
         effectiveExitStr = null;
       }
     }
-    const hasAnyExit = !!effectiveExitStr;
+    // (unused in commission calc — resub detection uses effectiveExit comparison below)
 
     const entryDate = new Date(entryDateStr);
     const subYear = entryDate.getFullYear();
@@ -231,7 +231,7 @@ export async function GET(request: NextRequest) {
         .join(" ") || contact.properties.email || "Inconnu";
 
     // Current year
-    const curCom = commissionForSubscriber(subYear, unsubYear, isCurrentlySubscriber, hasAnyExit, year);
+    const curCom = commissionForSubscriber(subYear, unsubYear, isCurrentlySubscriber, isResubscription, year);
     if (curCom > 0) {
       totalSubscribersCurrentYear++;
       totalCommissionCurrentYear += curCom;
@@ -250,7 +250,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Previous year (for the month-by-month comparison)
-    const prevCom = commissionForSubscriber(subYear, unsubYear, isCurrentlySubscriber, hasAnyExit, year - 1);
+    const prevCom = commissionForSubscriber(subYear, unsubYear, isCurrentlySubscriber, isResubscription, year - 1);
     if (prevCom > 0) {
       totalSubscribersPreviousYear++;
       totalCommissionPreviousYear += prevCom;
@@ -264,7 +264,7 @@ export async function GET(request: NextRequest) {
       let contribSum = 0;
       const nowYear = new Date().getFullYear();
       for (let y = subYear; y <= nowYear; y++) {
-        contribSum += commissionForSubscriber(subYear, unsubYear, isCurrentlySubscriber, hasAnyExit, y);
+        contribSum += commissionForSubscriber(subYear, unsubYear, isCurrentlySubscriber, isResubscription, y);
       }
       if (contribSum > 0) {
         cumulCommissionAllYears += contribSum;
