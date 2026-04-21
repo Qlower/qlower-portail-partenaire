@@ -354,14 +354,34 @@ export function Dashboard({
                             <span className="text-gray-600 font-medium">
                               {formatDate(lead.subscribed_at)}
                             </span>
-                            {lead.unsubscribed_at && (
-                              <span
-                                className="text-[10px] text-orange-600"
-                                title={`Désabonné le ${new Date(lead.unsubscribed_at).toLocaleDateString("fr-FR")}`}
-                              >
-                                Désabonné le {formatDate(lead.unsubscribed_at)}
-                              </span>
-                            )}
+                            {(() => {
+                              if (!lead.unsubscribed_at) return null;
+                              const subD = new Date(lead.subscribed_at);
+                              const unsubD = new Date(lead.unsubscribed_at);
+                              const isResub = lead.stage === "Abonne" && unsubD < subD;
+                              const isReallyUnsub = lead.stage !== "Abonne" && unsubD >= subD;
+                              if (isReallyUnsub) {
+                                return (
+                                  <span
+                                    className="text-[10px] text-orange-600"
+                                    title={`Désabonné le ${unsubD.toLocaleDateString("fr-FR")}`}
+                                  >
+                                    Désabonné le {formatDate(lead.unsubscribed_at)}
+                                  </span>
+                                );
+                              }
+                              if (isResub) {
+                                return (
+                                  <span
+                                    className="text-[10px] text-blue-600"
+                                    title={`Déjà désabonné le ${unsubD.toLocaleDateString("fr-FR")} puis ré-abonné`}
+                                  >
+                                    Réabonnement
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         ) : (
                           <span className="text-gray-300">—</span>
