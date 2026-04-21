@@ -147,12 +147,12 @@ export interface CommissionData {
   totalContacts: number;
 }
 
-export function useCommissions(partnerId: string | undefined, year?: number) {
-  const currentYear = year || new Date().getFullYear();
+export function useCommissions(partnerId: string | undefined, year?: number | "all") {
+  const yearParam = year === "all" ? "all" : (year || new Date().getFullYear());
   return useQuery<CommissionData>({
-    queryKey: ["commissions", partnerId, currentYear],
+    queryKey: ["commissions", partnerId, yearParam],
     queryFn: async () => {
-      const res = await fetch(`/api/partner/commissions?partner_id=${partnerId}&year=${currentYear}`);
+      const res = await fetch(`/api/partner/commissions?partner_id=${partnerId}&year=${yearParam}`);
       if (!res.ok) throw new Error("Failed to fetch commissions");
       return res.json();
     },

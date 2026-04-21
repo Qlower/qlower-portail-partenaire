@@ -36,10 +36,13 @@ type SubscriberDetail = {
 };
 
 // GET /api/partner/commissions?partner_id=xxx&year=2026
+// year=all -> cumulative view across all years (for dashboard "Toutes années")
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const partnerId = searchParams.get("partner_id");
-  const year = parseInt(searchParams.get("year") || new Date().getFullYear().toString());
+  const yearParam = searchParams.get("year") || new Date().getFullYear().toString();
+  const isAllYears = yearParam === "all";
+  const year = isAllYears ? new Date().getFullYear() : parseInt(yearParam);
 
   if (!partnerId) {
     return NextResponse.json({ error: "partner_id is required" }, { status: 400 });
@@ -183,6 +186,10 @@ export async function GET(request: NextRequest) {
   let totalSubscribersPreviousYear = 0;
   let totalCommissionPreviousYear = 0;
 
+  // For "all years" mode, also track cumulative commission from earliest year to current
+  let cumulCommissionAllYears = 0;
+  let cumulSubscribersCountedInAllYears = 0;
+
   for (const contact of contacts) {
     // Source principale : date_premier_paiement_abonnement (immuable, business-accurate)
     // Fallback : hs_v2_date_entered_999998694 (dernière entrée au stage, peut être écrasé)
@@ -250,6 +257,20 @@ export async function GET(request: NextRequest) {
       previousYearMonthly[subMonth].count++;
       previousYearMonthly[subMonth].commission += prevCom;
     }
+
+    // Cumul "Toutes années" : on additionne la commission de chaque année
+    // depuis subYear jusqu'à l'année courante (ou unsubYear si désabonné)
+    if (isAllYears) {
+      let contribSum = 0;
+      const nowYear = new Date().getFullYear();
+      for (let y = subYear; y <= nowYear; y++) {
+        contribSum += commissionForSubscriber(subYear, unsubYear, isCurrentlySubscriber, hasAnyExit, y);
+      }
+      if (contribSum > 0) {
+        cumulCommissionAllYears += contribSum;
+        cumulSubscribersCountedInAllYears++;
+      }
+    }
   }
 
   // Display helper: per-subscriber steady-state recurring amount
@@ -273,12 +294,12 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    year,
+    year: isAllYears ? "all" : year,
     partnerId,
     montantParAbonne,
     ruleDetails,
-    totalSubscribers: totalSubscribersCurrentYear,
-    totalCommission: totalCommissionCurrentYear,
+    totalSubscribers: isAllYears ? cumulSubscribersCountedInAllYears : totalSubscribersCurrentYear,
+    totalCommission: isAllYears ? cumulCommissionAllYears : totalCommissionCurrentYear,
     previousYear: {
       year: year - 1,
       totalSubscribers: totalSubscribersPreviousYear,
@@ -286,5 +307,6 @@ export async function GET(request: NextRequest) {
     },
     months,
     totalContacts: contacts.length,
+    isAllYears,
   });
 }

@@ -32,12 +32,28 @@ export function Dashboard({
   const currentYear = new Date().getFullYear();
   type YearFilter = number | "all";
   const [selectedYear, setSelectedYear] = useState<YearFilter>(currentYear);
-  const yearForCommission = selectedYear === "all" ? currentYear : selectedYear;
-  const { data: commissionData } = useCommissions(partnerId, yearForCommission);
+  const { data: commissionData } = useCommissions(partnerId, selectedYear);
 
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
-  const yearOptions: YearFilter[] = ["all", currentYear, currentYear - 1, currentYear - 2];
+
+  // Dropdown années : de la plus vieille date d'activité connue → année courante
+  const yearOptions = useMemo<YearFilter[]>(() => {
+    const years = new Set<number>();
+    for (const l of leads) {
+      for (const d of [l.created_at, l.first_paid_at, l.subscribed_at, l.unsubscribed_at]) {
+        if (d) {
+          const y = new Date(d).getFullYear();
+          if (!isNaN(y)) years.add(y);
+        }
+      }
+    }
+    // Toujours proposer au moins currentYear et currentYear-1
+    years.add(currentYear);
+    years.add(currentYear - 1);
+    const sorted = Array.from(years).sort((a, b) => b - a); // desc
+    return ["all", ...sorted];
+  }, [leads, currentYear]);
 
   // Computed values (all-time totals — independent of year filter)
   const abonnes = leads.filter((l) => l.stage === "Abonne").length;
@@ -169,17 +185,25 @@ export function Dashboard({
               {(commissionData?.totalCommission ?? 0).toLocaleString("fr-FR")}&nbsp;&euro;
             </p>
             <p className="text-xs text-white/40 mt-1">
-              {commissionData?.totalSubscribers ?? 0} abonné{(commissionData?.totalSubscribers ?? 0) > 1 ? "s" : ""} × {commissionData?.montantParAbonne ?? 100}&nbsp;&euro;
+              {selectedYear === "all" ? (
+                <>Cumul sur {commissionData?.totalSubscribers ?? 0} abonné{(commissionData?.totalSubscribers ?? 0) > 1 ? "s" : ""}</>
+              ) : (
+                <>{commissionData?.totalSubscribers ?? 0} abonné{(commissionData?.totalSubscribers ?? 0) > 1 ? "s" : ""} × {commissionData?.montantParAbonne ?? 100}&nbsp;&euro;</>
+              )}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <div className="bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-xl px-4 py-3 min-w-[140px]">
-              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Abonnés {yearForCommission}</p>
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">
+                {selectedYear === "all" ? "Abonnés (toutes)" : `Abonnés ${selectedYear}`}
+              </p>
               <p className="text-lg font-bold text-white">{commissionData?.totalSubscribers ?? 0}</p>
               <p className="text-[10px] text-white/40 mt-0.5">sur {commissionData?.totalContacts ?? 0} contacts</p>
             </div>
             <div className="bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-xl px-4 py-3 min-w-[140px]">
-              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">Année {yearForCommission - 1}</p>
+              <p className="text-[11px] text-white/50 font-medium uppercase tracking-wide mb-1">
+                Année {commissionData?.previousYear?.year ?? currentYear - 1}
+              </p>
               <p className="text-lg font-bold text-white">{(commissionData?.previousYear.totalCommission ?? 0).toLocaleString("fr-FR")}&nbsp;&euro;</p>
               <p className="text-[10px] text-white/40 mt-0.5">{commissionData?.previousYear.totalSubscribers ?? 0} abonné{(commissionData?.previousYear.totalSubscribers ?? 0) > 1 ? "s" : ""}</p>
             </div>
