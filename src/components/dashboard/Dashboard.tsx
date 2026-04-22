@@ -31,7 +31,7 @@ export function Dashboard({
   const { data: actions = [] } = useActions(partnerId);
   const currentYear = new Date().getFullYear();
   type YearFilter = number | "all";
-  const [selectedYear, setSelectedYear] = useState<YearFilter>(currentYear);
+  const [selectedYear, setSelectedYear] = useState<YearFilter>("all");
   const { data: commissionData } = useCommissions(partnerId, selectedYear);
 
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
@@ -184,13 +184,35 @@ export function Dashboard({
             <p className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
               {(commissionData?.totalCommission ?? 0).toLocaleString("fr-FR")}&nbsp;&euro;
             </p>
+            {/* Résumé court (cumul / année) */}
             <p className="text-xs text-white/40 mt-1">
               {selectedYear === "all" ? (
-                <>Cumul sur {commissionData?.totalSubscribers ?? 0} abonné{(commissionData?.totalSubscribers ?? 0) > 1 ? "s" : ""}</>
+                <>Cumul historique sur {commissionData?.totalSubscribers ?? 0} abonné{(commissionData?.totalSubscribers ?? 0) > 1 ? "s" : ""}</>
               ) : (
-                <>{commissionData?.totalSubscribers ?? 0} abonné{(commissionData?.totalSubscribers ?? 0) > 1 ? "s" : ""} × {commissionData?.montantParAbonne ?? 100}&nbsp;&euro;</>
+                <>Pour l&apos;année {selectedYear} — {commissionData?.totalSubscribers ?? 0} abonné{(commissionData?.totalSubscribers ?? 0) > 1 ? "s" : ""}</>
               )}
             </p>
+            {/* Détail des règles actives — masque les inactives pour ne pas exposer les options */}
+            {commissionData?.ruleDetails && commissionData.ruleDetails.filter((r) => r.montant > 0).length > 0 && (
+              <div className="mt-3 pt-3 border-t border-white/10">
+                <p className="text-[10px] uppercase tracking-wider text-white/40 mb-1 font-semibold">
+                  Votre mode de calcul
+                </p>
+                <div className="space-y-0.5">
+                  {commissionData.ruleDetails
+                    .filter((r) => r.montant > 0)
+                    .map((r, i) => (
+                      <p key={i} className="text-[11px] text-white/60 leading-relaxed">
+                        <span className="font-semibold text-white/80">{r.label}</span> :{" "}
+                        {r.montant}&nbsp;€
+                        {r.type === "recurring"
+                          ? " par abonné actif, chaque année"
+                          : " par nouvel abonné (année de souscription)"}
+                      </p>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap gap-3">
             <div className="bg-white/[0.08] backdrop-blur-md border border-white/[0.1] rounded-xl px-4 py-3 min-w-[140px]">
