@@ -30,6 +30,28 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
   const [confirmSend, setConfirmSend] = useState<{ year: number; amount: number } | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewSubject, setPreviewSubject] = useState<string>("");
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  // Preload preview when modal opens
+  const loadPreview = async (year: number) => {
+    setLoadingPreview(true);
+    setPreviewHtml(null);
+    try {
+      const res = await fetch(
+        `/api/admin/invoice-call-preview?partner_id=${partnerId}&year=${year}`
+      );
+      if (!res.ok) throw new Error("Preview unavailable");
+      const data = await res.json();
+      setPreviewHtml(data.html);
+      setPreviewSubject(data.subject);
+    } catch {
+      setPreviewHtml("<p style='color:red'>Impossible de charger l'aperçu.</p>");
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
 
   const { data: invoices = [], isLoading } = useQuery<PartnerInvoice[]>({
     queryKey: ["admin-partner-invoices", partnerId],
@@ -239,12 +261,15 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
                   >
                     <Download className="size-3" />
                   </a>
-                  {!inv.file_url && !inv.historical && partnerEmail && (
+                  {!inv.file_url && !inv.historical && partnerEmail && inv.amount > 0 && (
                     <Button
                       size="sm"
                       variant="outline"
                       className="h-6 text-[10px] px-2"
-                      onClick={() => setConfirmSend({ year: inv.year, amount: inv.amount })}
+                      onClick={() => {
+                        setConfirmSend({ year: inv.year, amount: inv.amount });
+                        loadPreview(inv.year);
+                      }}
                       title={`Envoyer l'appel à facturation ${inv.year} par email`}
                     >
                       <Mail className="size-3 mr-0.5" />
@@ -280,17 +305,17 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
       </table>
     </div>
 
-    {/* Modale de confirmation d'envoi */}
+    {/* Modale de confirmation d'envoi avec preview email */}
     {confirmSend && (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
         onClick={() => !sending && setConfirmSend(null)}
       >
         <div
-          className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4"
+          className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col p-6 gap-4"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 flex-shrink-0">
             <div className="bg-[#FFF6EC] p-2 rounded-full">
               <Mail className="size-5 text-[#B8864E]" />
             </div>
@@ -298,46 +323,71 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
               <h3 className="text-lg font-semibold text-gray-900">
                 Envoyer l&apos;appel à facturation ?
               </h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Un email sera envoyé au partenaire avec le montant de commission dû
-                et un lien pour déposer sa facture.
-              </p>
-              <div className="mt-3 bg-gray-50 rounded-md p-3 space-y-1 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Partenaire</span>
+              <div className="mt-2 bg-gray-50 rounded-md p-3 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-gray-500 block">Partenaire</span>
                   <span className="font-semibold text-gray-900">{partnerName ?? "—"}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Destinataire</span>
-                  <span className="font-mono text-[11px] text-gray-700">{partnerEmail}</span>
+                <div>
+                  <span className="text-gray-500 block">Destinataire</span>
+                  <span className="font-mono text-[11px] text-gray-700 break-all">{partnerEmail}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Année</span>
+                <div>
+                  <span className="text-gray-500 block">Année</span>
                   <span className="font-semibold text-gray-900">{confirmSend.year}</span>
                 </div>
-                <div className="flex justify-between border-t border-gray-200 pt-1 mt-1">
-                  <span className="text-gray-500">Commission calculée</span>
+                <div>
+                  <span className="text-gray-500 block">Commission calculée</span>
                   <span className="font-bold text-[#0A3855]">
                     {confirmSend.amount.toLocaleString("fr-FR")}&nbsp;€
                   </span>
                 </div>
               </div>
-              {sendResult && (
-                <div className="mt-3 flex items-start gap-1.5 text-xs">
-                  <AlertCircle className="size-3.5 mt-0.5 flex-shrink-0" />
-                  <span>{sendResult}</span>
+            </div>
+          </div>
+
+          {/* Preview de l'email */}
+          <div className="flex-1 overflow-hidden flex flex-col min-h-[200px]">
+            <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
+              <span>Aperçu de l&apos;email qui sera envoyé</span>
+              {previewSubject && (
+                <span className="font-mono text-gray-400">Objet : {previewSubject}</span>
+              )}
+            </div>
+            <div className="flex-1 border border-gray-200 rounded-lg overflow-auto bg-gray-50">
+              {loadingPreview ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="size-4 animate-spin text-[#0A3855]" />
+                </div>
+              ) : previewHtml ? (
+                <div
+                  className="bg-white m-3 rounded shadow-sm"
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs text-gray-400">
+                  Aperçu indisponible
                 </div>
               )}
             </div>
           </div>
-          <div className="flex gap-2 justify-end pt-2 border-t">
+
+          {sendResult && (
+            <div className="flex items-start gap-1.5 text-xs flex-shrink-0">
+              <AlertCircle className="size-3.5 mt-0.5 flex-shrink-0" />
+              <span>{sendResult}</span>
+            </div>
+          )}
+
+          <div className="flex gap-2 justify-end pt-2 border-t flex-shrink-0">
             <Button variant="ghost" onClick={() => setConfirmSend(null)} disabled={sending}>
               Annuler
             </Button>
             <Button
               className="bg-[#F6CCA4] text-[#6B4D2D] hover:bg-[#F0BF8E] border border-[#E8B88A]"
               onClick={handleSendCall}
-              disabled={sending || !partnerEmail}
+              disabled={sending || !partnerEmail || confirmSend.amount <= 0}
+              title={confirmSend.amount <= 0 ? "Aucune commission due pour cette année" : "Envoyer l'email"}
             >
               {sending ? (
                 <>
