@@ -119,13 +119,38 @@ export async function GET(request: NextRequest) {
       y += 14;
     });
 
+    // Facturation info (bénéficiaire + RIB pour le virement)
+    y += 16;
+    doc.rect(50, y, 495, 2).fillColor("#e5e7eb").fill();
+    y += 12;
+    doc.fontSize(10).fillColor("#0A3855").text("Facturer a :", 50, y);
+    y += 16;
+    doc.fontSize(9).fillColor("#111827").font("Helvetica-Bold")
+      .text("ComptAppart SAS", 60, y);
+    y += 14;
+    doc.font("Helvetica").fontSize(9).fillColor("#374151")
+      .text("N° TVA intracommunautaire : FR03 883 386 757", 60, y);
+    y += 14;
+    doc.fontSize(9).fillColor("#6b7280")
+      .text("Reglement attendu par virement SEPA sur le compte suivant :", 60, y);
+    y += 16;
+    doc.fontSize(9).fillColor("#111827").font("Helvetica-Bold")
+      .text("IBAN :", 60, y);
+    doc.font("Helvetica").fontSize(9).fillColor("#111827")
+      .text("FR76 1695 8000 0121 0480 5641 741", 110, y);
+    y += 13;
+    doc.font("Helvetica-Bold").fontSize(9).fillColor("#111827")
+      .text("BIC :", 60, y);
+    doc.font("Helvetica").fontSize(9).fillColor("#111827")
+      .text("QNTOFRP1XXX", 110, y);
+
     // Footer
     doc.fontSize(8).fillColor("#9ca3af")
       .text(
         "Document non fiscal - simple recap de commission. La facture officielle doit etre emise par l'apporteur.",
         50, 770, { align: "center", width: 495 }
       )
-      .text("Qlower - Programme partenaire", 50, 785, { align: "center", width: 495 });
+      .text("Qlower / ComptAppart SAS - Programme partenaire", 50, 785, { align: "center", width: 495 });
 
     doc.end();
   });

@@ -103,9 +103,19 @@ export async function POST(request: NextRequest) {
                   Accéder à mon espace
                 </a>
               </p>
+              <div style="background: #F8FAFB; border: 1px solid #E5EDF1; border-radius: 8px; padding: 16px; margin: 24px 0; font-size: 13px;">
+                <p style="margin: 0 0 8px; color: #0A3855; font-weight: 700;">Facturer à :</p>
+                <p style="margin: 0; color: #111827;"><strong>ComptAppart SAS</strong></p>
+                <p style="margin: 4px 0; color: #555; font-size: 12px;">N° TVA : FR03 883 386 757</p>
+                <p style="margin: 12px 0 4px; color: #555; font-size: 12px;">Règlement par virement SEPA :</p>
+                <p style="margin: 0; color: #111827; font-family: monospace; font-size: 12px;">
+                  <strong>IBAN</strong> &nbsp;FR76 1695 8000 0121 0480 5641 741<br/>
+                  <strong>BIC</strong> &nbsp;&nbsp;&nbsp;QNTOFRP1XXX
+                </p>
+              </div>
               <p style="font-size: 12px; color: #666;">Pour toute question : partenaires@qlower.com</p>
               <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-              <p style="font-size: 11px; color: #999;">Qlower — Programme partenaire</p>
+              <p style="font-size: 11px; color: #999;">Qlower / ComptAppart SAS — Programme partenaire</p>
             </div>
           `,
         }),
