@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Check, X, FileText, Download, Mail, AlertCircle } from "lucide-react";
+import { Loader2, Check, X, FileText, Download, Mail, AlertCircle, Eye } from "lucide-react";
 
 interface PartnerInvoice {
   id: string;
@@ -92,6 +92,21 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
     enabled: eligibleYears.size > 0,
   });
 
+  // Active commission rules for the "Mode de calcul" block
+  type RuleDetail = { label: string; montant: number; type: "one_shot" | "recurring" };
+  const { data: ruleDetails = [] } = useQuery<RuleDetail[]>({
+    queryKey: ["admin-partner-rules", partnerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/partner/commissions?partner_id=${partnerId}&year=all`);
+      if (!res.ok) return [];
+      const d = await res.json();
+      return (d.ruleDetails ?? []).filter((r: RuleDetail) => r.montant > 0);
+    },
+  });
+
+  // Header action : choix de l'année pour envoyer l'appel
+  const [headerYear, setHeaderYear] = useState<number | "">("");
+
   const handleSendCall = async () => {
     if (!confirmSend) return;
     setSending(true);
@@ -167,16 +182,82 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
   }
   const displayRows = Array.from(rowsByYear.values()).sort((a, b) => b.year - a.year);
 
-  if (displayRows.length === 0) {
-    return (
-      <p className="text-xs text-gray-400 text-center py-3">
-        Aucune année éligible (contrat non renseigné ou pas d&apos;activité)
-      </p>
-    );
-  }
+  // (displayRows.length === 0 géré par le render pour garder le header actions)
+
+  const sortedEligibleYears = Array.from(eligibleYears).sort((a, b) => b - a);
 
   return (
     <>
+    {/* En-tête actions : mode de calcul, impersonate, envoyer appel avec dropdown */}
+    <div className="mb-3 bg-[#E5EDF1]/30 border border-gray-100 rounded-lg p-3 space-y-2">
+      {ruleDetails.length > 0 && (
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">
+            Mode de calcul configuré
+          </p>
+          <div className="space-y-0.5">
+            {ruleDetails.map((r, i) => (
+              <p key={i} className="text-[11px] text-gray-700 leading-relaxed">
+                <span className="font-semibold">{r.label}</span> : {r.montant}&nbsp;€
+                {r.type === "recurring"
+                  ? " par abonné actif, chaque année"
+                  : " par nouvel abonné (année de souscription)"}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="flex items-center gap-2 flex-wrap pt-1">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => window.open(`/dashboard?as=${partnerId}`, "_blank")}
+          title="Voir l'espace comme le partenaire"
+        >
+          <Eye className="size-3 mr-1" />
+          Voir comme partenaire
+        </Button>
+        <div className="flex items-center gap-1.5 ml-auto">
+          <span className="text-[11px] text-gray-500">Envoyer l&apos;appel pour :</span>
+          <select
+            value={headerYear === "" ? "" : String(headerYear)}
+            onChange={(e) => setHeaderYear(e.target.value ? Number(e.target.value) : "")}
+            className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-[#F6CCA4]"
+          >
+            <option value="">Choisir une année…</option>
+            {sortedEligibleYears
+              .filter((y) => (commissionsByYear[y] ?? 0) > 0)
+              .map((y) => (
+                <option key={y} value={y}>
+                  {y} — {(commissionsByYear[y] ?? 0).toLocaleString("fr-FR")} €
+                </option>
+              ))}
+          </select>
+          <Button
+            size="sm"
+            className="h-7 text-xs bg-[#F6CCA4] text-[#6B4D2D] hover:bg-[#F0BF8E] border border-[#E8B88A]"
+            disabled={!headerYear || !partnerEmail}
+            onClick={() => {
+              if (!headerYear) return;
+              const amount = commissionsByYear[headerYear] ?? 0;
+              setConfirmSend({ year: headerYear, amount });
+              loadPreview(headerYear);
+            }}
+            title={!partnerEmail ? "Aucun email renseigné" : "Envoyer l'appel"}
+          >
+            <Mail className="size-3 mr-1" />
+            Envoyer l&apos;appel
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    {displayRows.length === 0 ? (
+      <p className="text-xs text-gray-400 text-center py-3 border border-gray-100 rounded-lg">
+        Aucune année éligible (contrat non renseigné ou pas d&apos;activité)
+      </p>
+    ) : (
     <div className="overflow-x-auto rounded-lg border border-gray-100">
       <table className="w-full text-sm">
         <thead>
@@ -304,6 +385,7 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
         </tbody>
       </table>
     </div>
+    )}
 
     {/* Modale de confirmation d'envoi avec preview email */}
     {confirmSend && (
