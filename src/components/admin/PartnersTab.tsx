@@ -680,28 +680,36 @@ export default function PartnersTab() {
                       >
                         {p.contrat === "affiliation" ? "AF" : "MB"}
                       </Badge>
-                      <Badge
-                        variant="secondary"
-                        title={`Statut : ${STATUT_LABELS[p.statut] || p.statut || "Inconnu"}`}
-                        className={`${STATUT_STYLES[p.statut]?.bg || "bg-gray-50"} ${STATUT_STYLES[p.statut]?.text || "text-gray-500 border border-gray-200"}`}
+                      <div
+                        className={`relative inline-flex items-center rounded-full border ${STATUT_STYLES[p.statut]?.bg || "bg-gray-50"} ${STATUT_STYLES[p.statut]?.text || "text-gray-500 border-gray-200"}`}
+                        title={`Statut : ${STATUT_LABELS[p.statut] || p.statut || "Inconnu"} — cliquer pour changer`}
                       >
-                        {STATUT_LABELS[p.statut] || p.statut || "—"}
-                      </Badge>
-                      <button
-                        title={p.statut === "actif" ? "Compte actif — cliquer pour désactiver" : "Compte inactif — cliquer pour activer"}
-                        className="inline-flex items-center gap-1.5 cursor-pointer"
-                        onClick={() => updatePartner.mutateAsync({
-                          id: p.id,
-                          statut: (p.statut === "actif" ? "suspendu" : "actif") as PartnerStatut,
-                        })}
-                      >
-                        <div className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${p.statut === "actif" ? "bg-green-500" : "bg-red-400"}`}>
-                          <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${p.statut === "actif" ? "translate-x-[18px]" : "translate-x-0.5"}`} />
-                        </div>
-                        <span className={`text-xs font-medium ${p.statut === "actif" ? "text-green-700" : "text-red-600"}`}>
-                          {p.statut === "actif" ? "Actif" : "Inactif"}
-                        </span>
-                      </button>
+                        <select
+                          value={p.statut || "en_attente"}
+                          onChange={(e) =>
+                            updatePartner.mutateAsync({
+                              id: p.id,
+                              statut: e.target.value as PartnerStatut,
+                            })
+                          }
+                          className="appearance-none bg-transparent text-xs font-medium pl-3 pr-7 py-0.5 cursor-pointer focus:outline-none"
+                        >
+                          {STATUT_OPTIONS.map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                        <svg
+                          className="absolute right-1.5 w-3 h-3 opacity-60 pointer-events-none"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
                     </div>
 
                     <div className="ml-auto flex gap-2 flex-wrap">
