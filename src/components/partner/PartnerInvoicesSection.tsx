@@ -58,20 +58,26 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
   });
   const eligibleYears = new Set(activeYearsData?.years ?? []);
 
-  // Commission computed for the default year (for pre-filling the amount)
-  const { data: commData } = useQuery<{ totalCommission?: number }>({
-    queryKey: ["commissions-for-invoice", partnerId, defaultInvoiceYear],
+  // Commissions par année éligible (pour pré-remplir montants + afficher le tableau)
+  const yearsKey = Array.from(eligibleYears).sort().join(",");
+  const { data: commissionsByYear = {} } = useQuery<Record<number, number>>({
+    queryKey: ["commissions-by-year", partnerId, yearsKey],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/partner/commissions?partner_id=${partnerId}&year=${defaultInvoiceYear}`
+      const years = Array.from(eligibleYears);
+      const results = await Promise.all(
+        years.map(async (y) => {
+          const r = await fetch(`/api/partner/commissions?partner_id=${partnerId}&year=${y}`);
+          if (!r.ok) return [y, 0] as const;
+          const d = await r.json();
+          return [y, Math.round(Number(d.totalCommission ?? 0))] as const;
+        })
       );
-      if (!res.ok) return {};
-      return res.json();
+      return Object.fromEntries(results);
     },
-    enabled: !!partnerId,
+    enabled: eligibleYears.size > 0,
   });
-  const commissionDue = Math.round(commData?.totalCommission ?? 0);
 
+  const commissionDueForDefault = commissionsByYear[defaultInvoiceYear] ?? 0;
   const existingForDefault = invoices.find((i) => i.year === defaultInvoiceYear);
   const hasInvoiceForDefault = !!existingForDefault?.file_url;
 
@@ -87,7 +93,8 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
     const y = year ?? defaultInvoiceYear;
     setModalYear(y);
     const existing = invoices.find((i) => i.year === y);
-    setModalAmount(existing?.amount && existing.amount > 0 ? existing.amount : commissionDue);
+    const suggested = commissionsByYear[y] ?? 0;
+    setModalAmount(existing?.amount && existing.amount > 0 ? existing.amount : suggested);
     setModalFile(null);
     setError("");
     setSuccess("");
@@ -129,33 +136,40 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
     }
   };
 
-  // Visible invoices: only years where partner was eligible (activity + contract signed).
-  // Add N-1 placeholder only if N-1 is eligible.
+  // Visible invoices: all eligible years (activity + contract signed) ET commission > 0.
+  // Pour chaque année non encore facturée, on crée un placeholder avec le montant calculé.
   const displayRows = useMemo(() => {
     const map = new Map<number, PartnerInvoice>();
     for (const inv of invoices) {
-      // Filter: only show DB invoices for eligible years
       if (eligibleYears.size === 0 || eligibleYears.has(inv.year)) {
         map.set(inv.year, inv);
       }
     }
-    // Add placeholder for N-1 if eligible and nothing exists yet
-    if (eligibleYears.has(defaultInvoiceYear) && !map.has(defaultInvoiceYear)) {
-      map.set(defaultInvoiceYear, {
-        id: `placeholder-${defaultInvoiceYear}`,
-        partner_id: partnerId,
-        year: defaultInvoiceYear,
-        amount: commissionDue,
-        file_url: null,
-        uploaded_at: null,
-        is_paid: false,
-        paid_at: null,
-        historical: false,
-        notes: null,
-      });
+    for (const y of eligibleYears) {
+      const commissionForYear = commissionsByYear[y] ?? 0;
+      if (!map.has(y) && commissionForYear > 0) {
+        map.set(y, {
+          id: `placeholder-${y}`,
+          partner_id: partnerId,
+          year: y,
+          amount: commissionForYear,
+          file_url: null,
+          uploaded_at: null,
+          is_paid: false,
+          paid_at: null,
+          historical: false,
+          notes: null,
+        });
+      }
     }
     return Array.from(map.values()).sort((a, b) => b.year - a.year);
-  }, [invoices, defaultInvoiceYear, partnerId, commissionDue, eligibleYears]);
+  }, [invoices, partnerId, eligibleYears, commissionsByYear]);
+
+  // Années où il reste une facture à déposer (commission > 0, pas déjà uploadée, pas historique)
+  const yearsToInvoice = Array.from(eligibleYears)
+    .filter((y) => (commissionsByYear[y] ?? 0) > 0)
+    .filter((y) => !invoices.find((i) => i.year === y && i.file_url))
+    .sort((a, b) => b - a);
 
   return (
     <Card className="border-gray-200 shadow-sm">
@@ -164,14 +178,37 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
           <CardTitle className="text-sm font-semibold text-gray-900">
             Mes factures à Qlower
           </CardTitle>
-          {!hasInvoiceForDefault && commissionDue > 0 && (
+          {yearsToInvoice.length === 1 && (
             <Button
-              onClick={() => openModal(defaultInvoiceYear)}
+              onClick={() => openModal(yearsToInvoice[0])}
               className="bg-[#F6CCA4] text-[#6B4D2D] hover:bg-[#F0BF8E] border border-[#E8B88A]"
             >
               <Plus className="size-4 mr-1.5" />
-              Appel à facturation {defaultInvoiceYear}
+              Appel à facturation {yearsToInvoice[0]}
             </Button>
+          )}
+          {yearsToInvoice.length > 1 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Déposer pour :</span>
+              <select
+                className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-[#F6CCA4]"
+                defaultValue=""
+                onChange={(e) => {
+                  const y = e.target.value;
+                  if (y) {
+                    openModal(Number(y));
+                    e.target.value = "";
+                  }
+                }}
+              >
+                <option value="">Choisir une année…</option>
+                {yearsToInvoice.map((y) => (
+                  <option key={y} value={y}>
+                    {y} — {(commissionsByYear[y] ?? 0).toLocaleString("fr-FR")} €
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -314,7 +351,7 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
                     Déposer ma facture pour {modalYear}
                   </h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Commission due : <strong>{commissionDue.toLocaleString("fr-FR")} €</strong>
+                    Commission due : <strong>{(commissionsByYear[modalYear] ?? commissionDueForDefault).toLocaleString("fr-FR")} €</strong>
                   </p>
                 </div>
                 <button
