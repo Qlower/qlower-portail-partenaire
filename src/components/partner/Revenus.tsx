@@ -31,9 +31,11 @@ function statusBadge(statut: Invoice["statut"]) {
   return <Badge variant={style.variant} className={style.className}>{statut}</Badge>;
 }
 
+type YearFilter = number | "all";
+
 export default function Revenus({ partner }: RevenusProps) {
   const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedYear, setSelectedYear] = useState<YearFilter>("all");
   const { data: invoices, isLoading } = useInvoices(partner.id);
   const { data: leads } = useLeads(partner.id);
   const { data: commissionData, isLoading: commLoading } = useCommissions(partner.id, selectedYear);
@@ -63,7 +65,7 @@ export default function Revenus({ partner }: RevenusProps) {
         ? 1
         : 0;
 
-  const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
+  const yearOptions: YearFilter[] = ["all", currentYear, currentYear - 1, currentYear - 2];
 
   return (
     <div className="space-y-6">
@@ -77,25 +79,54 @@ export default function Revenus({ partner }: RevenusProps) {
           <div className="flex items-start justify-between mb-5">
             <div>
               <p className="text-[11px] text-white/50 uppercase tracking-widest font-semibold mb-1.5">
-                Commission {selectedYear}
+                Commission {selectedYear === "all" ? "cumul" : selectedYear}
               </p>
               <p className="text-4xl font-bold tracking-tight">
                 {commLoading ? "..." : `${totalCommission.toLocaleString("fr-FR")} €`}
               </p>
               <p className="text-xs text-white/40 mt-1">
-                {totalSubscribers} abonné{totalSubscribers > 1 ? "s" : ""} × {commissionData?.montantParAbonne ?? 100} €
+                {selectedYear === "all" ? (
+                  <>Cumul historique sur {totalSubscribers} abonné{totalSubscribers > 1 ? "s" : ""}</>
+                ) : (
+                  <>Pour l&apos;année {selectedYear} — {totalSubscribers} abonné{totalSubscribers > 1 ? "s" : ""}</>
+                )}
               </p>
+
+              {/* Détail des règles actives — masque les inactives */}
+              {commissionData?.ruleDetails && commissionData.ruleDetails.filter((r) => r.montant > 0).length > 0 && (
+                <div className="mt-3 pt-3 border-t border-white/10 max-w-md">
+                  <p className="text-[10px] uppercase tracking-wider text-white/40 mb-1 font-semibold">
+                    Votre mode de calcul
+                  </p>
+                  <div className="space-y-0.5">
+                    {commissionData.ruleDetails
+                      .filter((r) => r.montant > 0)
+                      .map((r, i) => (
+                        <p key={i} className="text-[11px] text-white/60 leading-relaxed">
+                          <span className="font-semibold text-white/80">{r.label}</span> :{" "}
+                          {r.montant}&nbsp;€
+                          {r.type === "recurring"
+                            ? " par abonné actif, chaque année"
+                            : " par nouvel abonné (année de souscription)"}
+                        </p>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {/* Year selector */}
               <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                value={String(selectedYear)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSelectedYear(v === "all" ? "all" : Number(v));
+                }}
                 className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-white/10 text-xs font-medium text-white/80 cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/20"
               >
                 {yearOptions.map((y) => (
-                  <option key={y} value={y} className="bg-[#0A3855] text-white">
-                    {y}
+                  <option key={String(y)} value={String(y)} className="bg-[#0A3855] text-white">
+                    {y === "all" ? "Toutes années" : y}
                   </option>
                 ))}
               </select>
@@ -105,12 +136,16 @@ export default function Revenus({ partner }: RevenusProps) {
           {/* Commission breakdown cards */}
           <div className="grid grid-cols-2 gap-3 mb-6">
             <div className="bg-white/[0.07] backdrop-blur-sm rounded-xl px-4 py-3 border border-white/[0.08]">
-              <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">Abonnés {selectedYear}</p>
+              <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">
+                {selectedYear === "all" ? "Abonnés (toutes)" : `Abonnés ${selectedYear}`}
+              </p>
               <p className="text-base font-bold text-white mt-1">{totalSubscribers}</p>
               <p className="text-[10px] text-white/30 mt-0.5">sur {commissionData?.totalContacts ?? 0} contacts total</p>
             </div>
             <div className="bg-white/[0.07] backdrop-blur-sm rounded-xl px-4 py-3 border border-white/[0.08]">
-              <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">Année {selectedYear - 1}</p>
+              <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">
+                Année {commissionData?.previousYear?.year ?? currentYear - 1}
+              </p>
               <p className="text-base font-bold text-white mt-1">
                 {(commissionData?.previousYear.totalCommission ?? 0).toLocaleString("fr-FR")} €
               </p>
@@ -141,7 +176,7 @@ export default function Revenus({ partner }: RevenusProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold text-gray-900">
-              Détail mensuel {selectedYear}
+              Détail mensuel {selectedYear === "all" ? currentYear : selectedYear}
             </CardTitle>
             <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855] text-xs shadow-none">
               {totalSubscribers} abonné{totalSubscribers > 1 ? "s" : ""} · {totalCommission.toLocaleString("fr-FR")} €
