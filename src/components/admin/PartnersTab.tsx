@@ -7,6 +7,7 @@ import { PARTNER_TYPES } from "@/services/constants";
 import { DEFAULT_TRANCHES } from "@/services/commission";
 import { slug } from "@/services/links";
 import { useAdminPartners, useCreatePartner, useUpdatePartner, useDeletePartner, useAdminLeads } from "@/hooks/useAdminData";
+import PartnerInvoicesAdmin from "./PartnerInvoicesAdmin";
 import { STAGE_STYLES } from "@/services/constants";
 import type { LeadStage } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -251,6 +252,37 @@ export default function PartnersTab() {
     staleTime: 60_000,
   });
   const commByPartner = new Map(commSummaries.map((c) => [c.partnerId, c]));
+
+  // Latest invoice per partner (for compact line display)
+  type AdminInvoice = {
+    id: string;
+    partner_id: string;
+    year: number;
+    amount: number;
+    is_paid: boolean;
+    paid_at: string | null;
+    uploaded_at: string | null;
+    historical: boolean;
+    file_url: string | null;
+  };
+  const { data: allInvoices = [] } = useQuery<AdminInvoice[]>({
+    queryKey: ["admin-all-invoices"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/invoices");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+  // Latest non-historical invoice per partner
+  const latestInvoiceByPartner = new Map<string, AdminInvoice>();
+  for (const inv of allInvoices) {
+    if (inv.historical) continue;
+    const current = latestInvoiceByPartner.get(inv.partner_id);
+    if (!current || inv.year > current.year || (inv.year === current.year && (inv.uploaded_at ?? "") > (current.uploaded_at ?? ""))) {
+      latestInvoiceByPartner.set(inv.partner_id, inv);
+    }
+  }
   const createPartner = useCreatePartner();
   const updatePartner = useUpdatePartner();
   const deletePartner = useDeletePartner();
@@ -417,6 +449,29 @@ export default function PartnersTab() {
             className="w-56 text-xs"
           />
         <Button
+          variant="outline"
+          onClick={async () => {
+            const year = new Date().getFullYear() - 1;
+            if (!confirm(`Envoyer un email d'appel à facturation ${year} à tous les partenaires éligibles (commission > 0 et pas encore de facture déposée) ?`)) return;
+            try {
+              const res = await fetch("/api/admin/send-invoice-call", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ year }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || "Erreur");
+              setSuccess(`Emails envoyés : ${data.sent} (ignorés : ${data.skipped})`);
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Erreur lors de l'envoi");
+            }
+          }}
+          className="text-xs"
+          title={`Envoyer l'appel à facturation ${new Date().getFullYear() - 1} à tous les partenaires éligibles`}
+        >
+          📧 Appel à facturation {new Date().getFullYear() - 1}
+        </Button>
+        <Button
           onClick={() => setShowCreate(!showCreate)}
           className={showCreate ? "bg-gray-100 text-gray-700 hover:bg-gray-200" : ""}
         >
@@ -568,6 +623,7 @@ export default function PartnersTab() {
             const live = commByPartner.get(p.id);
             const displayAbonnes = live?.totalSubscribers ?? p.abonnes;
             const displayCommission = live?.totalCommission ?? 0;
+            const latestInvoice = latestInvoiceByPartner.get(p.id);
             const isEditing = editingId === p.id;
 
             return (
@@ -603,6 +659,23 @@ export default function PartnersTab() {
                       >
                         {displayCommission} EUR
                       </span>
+                      {latestInvoice && (
+                        <>
+                          <span className="text-gray-300">|</span>
+                          <span
+                            className={`text-[10px] inline-flex items-center gap-1 ${
+                              latestInvoice.is_paid ? "text-emerald-700" : "text-amber-700"
+                            }`}
+                            title={
+                              latestInvoice.is_paid
+                                ? `Facture ${latestInvoice.year} payée le ${latestInvoice.paid_at ? new Date(latestInvoice.paid_at).toLocaleDateString("fr-FR") : ""}`
+                                : `Facture ${latestInvoice.year} en attente${latestInvoice.uploaded_at ? ` — déposée le ${new Date(latestInvoice.uploaded_at).toLocaleDateString("fr-FR")}` : " de dépôt"}`
+                            }
+                          >
+                            {latestInvoice.is_paid ? "✓" : "⏳"} Facture {latestInvoice.year} : {latestInvoice.amount.toLocaleString("fr-FR")}&nbsp;€
+                          </span>
+                        </>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1.5 ml-1">
@@ -754,15 +827,26 @@ export default function PartnersTab() {
 
                   {/* Leads panel */}
                   {viewingLeadsId === p.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Eye className="size-4 text-[#0A3855]" />
-                        <h4 className="text-sm font-semibold text-gray-900">Leads de {p.nom}</h4>
-                        <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855] text-[10px]">
-                          {p.leads} leads
-                        </Badge>
+                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-5">
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Eye className="size-4 text-[#0A3855]" />
+                          <h4 className="text-sm font-semibold text-gray-900">Leads de {p.nom}</h4>
+                          <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855] text-[10px]">
+                            {p.leads} leads
+                          </Badge>
+                        </div>
+                        <LeadsPanel partnerId={p.id} partnerName={p.nom} />
                       </div>
-                      <LeadsPanel partnerId={p.id} partnerName={p.nom} />
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <svg className="size-4 text-[#B8864E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <h4 className="text-sm font-semibold text-gray-900">Factures de {p.nom}</h4>
+                        </div>
+                        <PartnerInvoicesAdmin partnerId={p.id} />
+                      </div>
                     </div>
                   )}
 

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { Partner, Invoice } from "@/types";
+import PartnerInvoicesSection from "./PartnerInvoicesSection";
 
 interface RevenusProps {
   partner: Partner;
@@ -381,16 +382,18 @@ export default function Revenus({ partner }: RevenusProps) {
         </CardContent>
       </Card>
 
-      {/* Invoice table */}
+      {/* Nouveau système de factures partenaires (appel à facturation + upload) */}
+      <PartnerInvoicesSection partnerId={partner.id} />
+
+      {/* Ancien tableau de factures (historique legacy, à retirer plus tard) */}
+      {invoices && invoices.length > 0 && (
       <Card className="border-gray-200 shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold text-gray-900">Factures</CardTitle>
-            {invoices && invoices.length > 0 && (
-              <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855] text-xs shadow-none">
-                {invoices.length} facture{invoices.length > 1 ? "s" : ""}
-              </Badge>
-            )}
+            <CardTitle className="text-sm font-semibold text-gray-900">Historique (ancien système)</CardTitle>
+            <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855] text-xs shadow-none">
+              {invoices.length} facture{invoices.length > 1 ? "s" : ""}
+            </Badge>
           </div>
         </CardHeader>
         <CardContent>
@@ -455,6 +458,7 @@ export default function Revenus({ partner }: RevenusProps) {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }
