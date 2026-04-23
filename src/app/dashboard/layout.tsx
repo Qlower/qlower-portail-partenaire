@@ -116,6 +116,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
+  // Block dashboard if account is suspended
+  if (partner.statut === "suspendu" && !isAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-white to-[#FFE5E5]/40 flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Accès suspendu</h2>
+          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+            Votre espace partenaire <strong>{partner.nom}</strong> est actuellement suspendu.
+            <br />
+            Pour toute question, merci de contacter notre équipe à{" "}
+            <a href="mailto:partenaires@qlower.com" className="text-[#0A3855] underline font-semibold">
+              partenaires@qlower.com
+            </a>
+            .
+          </p>
+          <button
+            onClick={() => signOut()}
+            className="text-sm text-gray-500 underline hover:text-gray-700"
+          >
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Block dashboard if contract not signed yet
   if (partner.statut === "en_attente" && !isAdmin) {
     return (
