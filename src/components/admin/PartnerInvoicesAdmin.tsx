@@ -51,6 +51,25 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
   });
   const eligibleYears = new Set(activeYears?.years ?? []);
 
+  // Real commission amount per eligible year (for placeholders without uploaded invoice)
+  const yearsKey = Array.from(eligibleYears).sort().join(",");
+  const { data: commissionsByYear = {} } = useQuery<Record<number, number>>({
+    queryKey: ["admin-partner-commissions-by-year", partnerId, yearsKey],
+    queryFn: async () => {
+      const years = Array.from(eligibleYears);
+      const results = await Promise.all(
+        years.map(async (y) => {
+          const r = await fetch(`/api/partner/commissions?partner_id=${partnerId}&year=${y}`);
+          if (!r.ok) return [y, 0] as const;
+          const d = await r.json();
+          return [y, Number(d.totalCommission ?? 0)] as const;
+        })
+      );
+      return Object.fromEntries(results);
+    },
+    enabled: eligibleYears.size > 0,
+  });
+
   const handleSendCall = async () => {
     if (!confirmSend) return;
     setSending(true);
@@ -114,7 +133,7 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
         id: `placeholder-${y}`,
         partner_id: partnerId,
         year: y,
-        amount: 0,
+        amount: commissionsByYear[y] ?? 0,
         file_url: null,
         uploaded_at: null,
         is_paid: false,
@@ -153,7 +172,16 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
             <tr key={inv.id} className="hover:bg-[#E5EDF1]/20">
               <td className="px-3 py-2 text-xs font-semibold text-gray-900">{inv.year}</td>
               <td className="px-3 py-2 text-xs tabular-nums">
-                {inv.amount > 0 ? `${inv.amount.toLocaleString("fr-FR")}\u00a0€` : "—"}
+                {inv.amount > 0 ? (
+                  <div className="flex flex-col leading-tight">
+                    <span>{inv.amount.toLocaleString("fr-FR")}&nbsp;€</span>
+                    {inv.id.startsWith("placeholder-") && (
+                      <span className="text-[9px] text-gray-400 italic">Commission due</span>
+                    )}
+                  </div>
+                ) : (
+                  "—"
+                )}
               </td>
               <td className="px-3 py-2">
                 {inv.file_url ? (
