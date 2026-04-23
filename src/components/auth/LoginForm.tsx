@@ -22,6 +22,35 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Resend magic link
+  const [showResend, setShowResend] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState("");
+
+  const handleResend = async (e: FormEvent) => {
+    e.preventDefault();
+    setResendMsg("");
+    if (!isValidEmail(resendEmail)) {
+      setResendMsg("Adresse email invalide.");
+      return;
+    }
+    setResending(true);
+    try {
+      const res = await fetch("/api/auth/resend-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resendEmail }),
+      });
+      const data = await res.json();
+      setResendMsg(data.message || "Lien envoyé si l'email est reconnu.");
+    } catch {
+      setResendMsg("Erreur lors de l'envoi. Réessayez ou contactez partenaires@qlower.com.");
+    } finally {
+      setResending(false);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
@@ -125,6 +154,46 @@ export default function LoginForm() {
                 )}
               </Button>
             </form>
+          </CardContent>
+
+          <Separator />
+
+          <CardContent className="pt-4 pb-0">
+            {!showResend ? (
+              <button
+                type="button"
+                onClick={() => setShowResend(true)}
+                className="text-xs text-gray-500 hover:text-[#0A3855] transition-colors w-full text-center"
+              >
+                Lien de connexion expiré ? <span className="underline">Recevoir un nouveau lien</span>
+              </button>
+            ) : (
+              <form onSubmit={handleResend} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-700">Renvoyer un lien de connexion</p>
+                  <button
+                    type="button"
+                    onClick={() => { setShowResend(false); setResendMsg(""); }}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    Fermer
+                  </button>
+                </div>
+                <Input
+                  type="email"
+                  placeholder="vous@entreprise.com"
+                  value={resendEmail}
+                  onChange={(e) => setResendEmail(e.target.value)}
+                  className="text-sm"
+                />
+                <Button type="submit" disabled={resending} variant="outline" className="w-full">
+                  {resending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Envoyer le lien"}
+                </Button>
+                {resendMsg && (
+                  <p className="text-xs text-gray-600 text-center">{resendMsg}</p>
+                )}
+              </form>
+            )}
           </CardContent>
 
           <Separator />

@@ -42,6 +42,22 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
     enabled: !!partnerId,
   });
 
+  // Years eligible: partner had subscriber activity + contract was signed by then
+  const { data: activeYearsData } = useQuery<{
+    years: number[];
+    contract_year: number | null;
+    has_any_activity: boolean;
+  }>({
+    queryKey: ["partner-active-years", partnerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/partner/active-years?partner_id=${partnerId}`);
+      if (!res.ok) return { years: [], contract_year: null, has_any_activity: false };
+      return res.json();
+    },
+    enabled: !!partnerId,
+  });
+  const eligibleYears = new Set(activeYearsData?.years ?? []);
+
   // Commission computed for the default year (for pre-filling the amount)
   const { data: commData } = useQuery<{ totalCommission?: number }>({
     queryKey: ["commissions-for-invoice", partnerId, defaultInvoiceYear],
@@ -113,12 +129,18 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
     }
   };
 
-  // Visible invoices: merge DB + "à facturer" placeholder for N-1 if none exists yet
+  // Visible invoices: only years where partner was eligible (activity + contract signed).
+  // Add N-1 placeholder only if N-1 is eligible.
   const displayRows = useMemo(() => {
     const map = new Map<number, PartnerInvoice>();
-    for (const inv of invoices) map.set(inv.year, inv);
-    // Add placeholder for N-1 if nothing exists yet
-    if (!map.has(defaultInvoiceYear)) {
+    for (const inv of invoices) {
+      // Filter: only show DB invoices for eligible years
+      if (eligibleYears.size === 0 || eligibleYears.has(inv.year)) {
+        map.set(inv.year, inv);
+      }
+    }
+    // Add placeholder for N-1 if eligible and nothing exists yet
+    if (eligibleYears.has(defaultInvoiceYear) && !map.has(defaultInvoiceYear)) {
       map.set(defaultInvoiceYear, {
         id: `placeholder-${defaultInvoiceYear}`,
         partner_id: partnerId,
@@ -133,7 +155,7 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
       });
     }
     return Array.from(map.values()).sort((a, b) => b.year - a.year);
-  }, [invoices, defaultInvoiceYear, partnerId, commissionDue]);
+  }, [invoices, defaultInvoiceYear, partnerId, commissionDue, eligibleYears]);
 
   return (
     <Card className="border-gray-200 shadow-sm">
@@ -157,6 +179,20 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="size-5 text-[#0A3855] animate-spin" />
+          </div>
+        ) : displayRows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <div className="w-12 h-12 rounded-full bg-[#E5EDF1] flex items-center justify-center mb-3">
+              <FileText className="size-5 text-[#0A3855]/40" />
+            </div>
+            <p className="text-sm font-medium text-gray-500">
+              Aucune facture à générer pour le moment
+            </p>
+            <p className="text-xs text-gray-400 mt-1 max-w-md">
+              Aucun client à votre compte sur les années passées, ou contrat non signé à cette période.
+              <br />
+              Contactez-nous si vous pensez qu&apos;un rattrapage est nécessaire.
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -255,6 +291,10 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
                 })}
               </tbody>
             </table>
+            <p className="text-[11px] text-gray-400 mt-3 leading-relaxed italic">
+              Seules les années où vous aviez des clients actifs et un contrat signé sont affichées.
+              Pour toute question sur un historique antérieur, contactez-nous à partenaires@qlower.com.
+            </p>
           </div>
         )}
 

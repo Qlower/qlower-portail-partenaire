@@ -449,29 +449,6 @@ export default function PartnersTab() {
             className="w-56 text-xs"
           />
         <Button
-          variant="outline"
-          onClick={async () => {
-            const year = new Date().getFullYear() - 1;
-            if (!confirm(`Envoyer un email d'appel à facturation ${year} à tous les partenaires éligibles (commission > 0 et pas encore de facture déposée) ?`)) return;
-            try {
-              const res = await fetch("/api/admin/send-invoice-call", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ year }),
-              });
-              const data = await res.json();
-              if (!res.ok) throw new Error(data.error || "Erreur");
-              setSuccess(`Emails envoyés : ${data.sent} (ignorés : ${data.skipped})`);
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Erreur lors de l'envoi");
-            }
-          }}
-          className="text-xs"
-          title={`Envoyer l'appel à facturation ${new Date().getFullYear() - 1} à tous les partenaires éligibles`}
-        >
-          📧 Appel à facturation {new Date().getFullYear() - 1}
-        </Button>
-        <Button
           onClick={() => setShowCreate(!showCreate)}
           className={showCreate ? "bg-gray-100 text-gray-700 hover:bg-gray-200" : ""}
         >
@@ -845,7 +822,7 @@ export default function PartnersTab() {
                           </svg>
                           <h4 className="text-sm font-semibold text-gray-900">Factures de {p.nom}</h4>
                         </div>
-                        <PartnerInvoicesAdmin partnerId={p.id} />
+                        <PartnerInvoicesAdmin partnerId={p.id} partnerName={p.nom} partnerEmail={p.email} />
                       </div>
                     </div>
                   )}
@@ -892,6 +869,22 @@ export default function PartnersTab() {
                               setEditForm({ ...editForm, email: e.target.value })
                             }
                           />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Date de signature du contrat</Label>
+                          <Input
+                            type="date"
+                            value={editForm.contract_signed_at ?? (p as Partner & { contract_signed_at?: string }).contract_signed_at ?? ""}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                contract_signed_at: e.target.value || null,
+                              } as Partial<Partner> & { contract_signed_at?: string | null })
+                            }
+                          />
+                          <p className="text-[10px] text-gray-400">
+                            Les factures ne sont proposées que pour les années ≥ cette date.
+                          </p>
                         </div>
                         <Select
                           label="Type"
