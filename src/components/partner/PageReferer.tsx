@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import ReferralForm from "./ReferralForm";
 import type { Partner } from "@/types";
 
-type Mode = "link" | "form" | "rdv";
+type Mode = "link" | "page" | "form" | "rdv";
 
 interface PageRefererProps {
   partner: Partner;
@@ -25,6 +25,7 @@ export default function PageReferer({ partner }: PageRefererProps) {
 
   const signupLink = buildSignupLink(partner.utm, partner.code);
   const rdvLink = buildRdvLink(partner.utm);
+  const partnerPageLink = `https://www.qlower.com/qlower-x-partenaire?utm_source=${encodeURIComponent(partner.utm)}&utm_medium=affiliation&utm_campaign=${encodeURIComponent(partner.code || partner.utm)}`;
 
   const modes: { key: Mode; icon: ReactElement; title: string; desc: string }[] = [
     {
@@ -36,6 +37,16 @@ export default function PageReferer({ partner }: PageRefererProps) {
       ),
       title: "Lien direct",
       desc: "Partagez votre lien d'inscription",
+    },
+    {
+      key: "page",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
+        </svg>
+      ),
+      title: "Page de présentation",
+      desc: "Page Qlower x Partenaire (sans inscription)",
     },
     {
       key: "form",
@@ -67,7 +78,7 @@ export default function PageReferer({ partner }: PageRefererProps) {
       />
 
       {/* Mode selector cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         {modes.map((m) => (
           <button
             key={m.key}
@@ -126,6 +137,41 @@ export default function PageReferer({ partner }: PageRefererProps) {
               <p className="text-xs text-gray-500 leading-relaxed">
                 Chaque inscription via ce lien sera automatiquement track&eacute;e et attribu&eacute;e &agrave; votre compte partenaire.
               </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {mode === "page" && (
+          <Card className="border-gray-200 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold text-gray-900">
+                Page de présentation Qlower x {partner.nom}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <code className="block truncate text-sm text-[#0A3855] bg-[#E5EDF1]/50 rounded-lg border border-[#0A3855]/10 px-4 py-3 font-mono">
+                    {partnerPageLink}
+                  </code>
+                </div>
+                <CopyButton text={partnerPageLink} />
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Page de présentation publique du partenariat Qlower, sans formulaire d&apos;inscription. Idéal pour partager dans une newsletter ou sur LinkedIn — vos visiteurs peuvent découvrir Qlower sans pression. Le tracking UTM est intégré, donc s&apos;ils s&apos;inscrivent ensuite, l&apos;attribution est conservée.
+              </p>
+              <Separator />
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>Aperçu :</span>
+                <a
+                  href={partnerPageLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#0A3855] font-medium hover:underline"
+                >
+                  Ouvrir dans un nouvel onglet ↗
+                </a>
+              </div>
             </CardContent>
           </Card>
         )}
