@@ -54,11 +54,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://partenaire.qlower.com";
   const results = await Promise.allSettled(
     (partners ?? [])
       .filter((p) => p.email)
       .map(async (p) => {
         const link = `https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}`;
+
+        // Magic link 24h pour CTA "Accéder à mon espace"
+        let magicLink = `${siteUrl}/login`;
+        try {
+          const { data: linkData } = await supabase.auth.admin.generateLink({
+            type: "magiclink",
+            email: p.email!,
+            options: { redirectTo: `${siteUrl}/auth/callback?next=/dashboard` },
+          });
+          if (linkData?.properties?.action_link) {
+            magicLink = linkData.properties.action_link;
+          }
+        } catch {
+          // fallback déjà sur /login
+        }
+
         const vars: Record<string, string> = {
           nom: p.nom,
           email: p.email!,
@@ -67,6 +84,7 @@ export async function POST(request: NextRequest) {
           leads: String(p.leads ?? 0),
           abonnes: String(p.abonnes ?? 0),
           link,
+          magic_link: magicLink,
         };
 
         const subject = replaceVars(template.subject, vars);
