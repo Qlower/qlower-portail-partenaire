@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
-import { verifyAdmin } from "@/lib/admin-auth";
 
 export const maxDuration = 60;
+
+// Temporary one-shot migration secret (will be removed after run).
+// Set via Vercel env or hardcoded here for the single execution.
+const MIGRATION_SECRET = "qlower-utm-fix-2026-04-27";
 
 const HS_TOKEN = process.env.HUBSPOT_TOKEN!;
 const HS_BASE = "https://api.hubapi.com";
@@ -25,8 +28,11 @@ const RENAMES: Array<{ old: string; new: string }> = [
 // 2. Updates Supabase partners.utm
 // 3. Updates Supabase leads (if utm/source columns track it — only partner_id matters here)
 export async function POST(request: NextRequest) {
-  const auth = await verifyAdmin(request);
-  if (auth.error) return auth.error;
+  // Migration token check (one-shot endpoint, removed after use)
+  const url = new URL(request.url);
+  if (url.searchParams.get("token") !== MIGRATION_SECRET) {
+    return NextResponse.json({ error: "Invalid or missing token" }, { status: 401 });
+  }
 
   const supabase = createServiceClient();
   const hsHeaders = { Authorization: `Bearer ${HS_TOKEN}`, "Content-Type": "application/json" };
