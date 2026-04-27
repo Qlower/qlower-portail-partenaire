@@ -43,27 +43,30 @@ export async function POST(request: NextRequest) {
   const currentOptions: Opt[] = propData.options || [];
   const existing = new Set(currentOptions.map((o) => o.value));
 
-  // 2) Ensure both old AND new values exist in the enum (so we can update contacts)
+  // 2) Ensure NEW values exist in the enum (we don't touch old values — they may
+  //    have been removed by v1 but contacts still hold them as orphan values).
+  //    HubSpot accepts batch_update on a contact with the new value as long as it's in the enum.
   const needed: Opt[] = [...currentOptions];
   for (const r of RENAMES) {
-    if (!existing.has(r.old)) {
-      needed.push({ label: r.label, value: r.old, hidden: true, displayOrder: -1 });
-    }
     if (!existing.has(r.new)) {
-      needed.push({ label: r.label, value: r.new, hidden: false, displayOrder: -1 });
+      // Use a unique label suffix to avoid "duplicate label" errors with the old option
+      // (in case someone restored it). Hidden=false so it's selectable.
+      needed.push({ label: `${r.label} (kebab)`, value: r.new, hidden: false, displayOrder: -1 });
     }
   }
 
-  const ensureRes = await fetch(`${HS_BASE}/crm/v3/properties/contacts/partenaire__lead_`, {
-    method: "PATCH",
-    headers: hsHeaders,
-    body: JSON.stringify({ options: needed }),
-  });
-  if (!ensureRes.ok) {
-    return NextResponse.json(
-      { error: `Failed to PATCH property: ${await ensureRes.text()}` },
-      { status: 500 }
-    );
+  if (needed.length !== currentOptions.length) {
+    const ensureRes = await fetch(`${HS_BASE}/crm/v3/properties/contacts/partenaire__lead_`, {
+      method: "PATCH",
+      headers: hsHeaders,
+      body: JSON.stringify({ options: needed }),
+    });
+    if (!ensureRes.ok) {
+      return NextResponse.json(
+        { error: `Failed to PATCH property: ${await ensureRes.text()}` },
+        { status: 500 }
+      );
+    }
   }
 
   // 3) For each old value, find ALL contacts and update them to the new value
