@@ -24,11 +24,17 @@ export function layout(content: string): string {
     <!-- Body -->
     <div style="background:#ffffff;padding:32px;border-radius:0 0 16px 16px;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
       ${content}
-      <!-- Footer -->
+      <!-- Footer aide -->
       <div style="margin-top:32px;padding-top:20px;border-top:1px solid #e5e7eb;">
-        <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
-          Qlower — Gestion fiscale immobilière simplifiée<br>
-          <a href="https://qlower.com" style="color:#0A3855;text-decoration:none;">qlower.com</a>
+        <p style="margin:0 0 12px;font-size:12px;color:#6b7280;text-align:center;line-height:1.6;">
+          <strong style="color:#0A3855;">Une question&nbsp;?</strong>
+          <a href="mailto:coline@qlower.com?bcc=alexandre@qlower.com&amp;subject=Question%20programme%20partenaire%20Qlower" style="color:#0A3855;text-decoration:underline;">Nous contacter</a>
+        </p>
+        <p style="margin:0 0 16px;font-size:11px;color:#9ca3af;text-align:center;line-height:1.5;">
+          Lien d'accès expiré&nbsp;? Rendez-vous sur <a href="https://partenaire.qlower.com/login" style="color:#0A3855;">partenaire.qlower.com/login</a> pour demander un nouveau lien magique.
+        </p>
+        <p style="margin:0;font-size:11px;color:#9ca3af;text-align:center;">
+          Qlower — Gestion fiscale immobilière simplifiée · <a href="https://qlower.com" style="color:#0A3855;text-decoration:none;">qlower.com</a>
         </p>
       </div>
     </div>
@@ -36,6 +42,22 @@ export function layout(content: string): string {
 </body>
 </html>`;
 }
+
+/**
+ * Reusable footer for inline-composed emails (invoice-call, resend-access, etc.)
+ * — to inject just before the closing </div> of the body container.
+ * Already included in layout() for templates that use it.
+ */
+export const PARTNER_EMAIL_FOOTER = `
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 16px;" />
+  <p style="margin:0 0 8px;font-size:12px;color:#6b7280;text-align:center;line-height:1.6;">
+    <strong style="color:#0A3855;">Une question&nbsp;?</strong>
+    <a href="mailto:coline@qlower.com?bcc=alexandre@qlower.com&amp;subject=Question%20programme%20partenaire%20Qlower" style="color:#0A3855;text-decoration:underline;">Nous contacter</a>
+  </p>
+  <p style="margin:0;font-size:11px;color:#9ca3af;text-align:center;line-height:1.5;">
+    Lien d'accès expiré&nbsp;? Rendez-vous sur <a href="https://partenaire.qlower.com/login" style="color:#0A3855;">partenaire.qlower.com/login</a> pour demander un nouveau lien magique.
+  </p>
+`;
 
 function btn(text: string, href: string): string {
   return `<a href="${href}" style="display:inline-block;background:#0A3855;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:600;font-size:14px;letter-spacing:-0.2px;">${text}</a>`;

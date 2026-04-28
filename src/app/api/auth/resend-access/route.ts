@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { PARTNER_EMAIL_FOOTER } from "@/services/emailTemplates";
 
 // POST /api/auth/resend-access
 // Body: { email }
@@ -66,8 +67,8 @@ export async function POST(request: NextRequest) {
                 </a>
               </p>
               <p style="font-size: 12px; color: #666;">Si vous avez demandé ce lien plusieurs fois, utilisez le dernier reçu (les précédents sont invalidés).</p>
-              <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-              <p style="font-size: 11px; color: #999;">Qlower — Programme partenaire</p>
+              ${PARTNER_EMAIL_FOOTER}
+              <p style="font-size:11px;color:#999;text-align:center;margin-top:8px;">Qlower — Programme partenaire</p>
             </div>
           `,
         }),

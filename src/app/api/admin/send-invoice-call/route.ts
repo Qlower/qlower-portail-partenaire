@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { verifyAdmin } from "@/lib/admin-auth";
+import { PARTNER_EMAIL_FOOTER } from "@/services/emailTemplates";
 
 export const maxDuration = 60;
 
@@ -113,9 +114,8 @@ export async function POST(request: NextRequest) {
                   <strong>BIC</strong> &nbsp;&nbsp;&nbsp;QNTOFRP1XXX
                 </p>
               </div>
-              <p style="font-size: 12px; color: #666;">Pour toute question : partenaires@qlower.com</p>
-              <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-              <p style="font-size: 11px; color: #999;">Qlower / ComptAppart SAS — Programme partenaire</p>
+              ${PARTNER_EMAIL_FOOTER}
+              <p style="font-size:11px;color:#999;text-align:center;margin-top:8px;">Qlower / ComptAppart SAS — Programme partenaire</p>
             </div>
           `,
         }),
