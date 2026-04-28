@@ -39,5 +39,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/error`);
+  // Fallback : redirect to /auth/magic with original query/hash preserved.
+  // /auth/magic handles PKCE + implicit flow (hash tokens) and shows a clear error page.
+  return NextResponse.redirect(`${origin}/auth/magic${request.nextUrl.search}`);
 }

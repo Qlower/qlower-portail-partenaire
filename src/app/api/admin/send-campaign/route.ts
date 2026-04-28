@@ -62,12 +62,13 @@ export async function POST(request: NextRequest) {
         const link = `https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}`;
 
         // Magic link 24h pour CTA "Accéder à mon espace"
+        // /auth/magic gère PKCE + implicit flow (vs /auth/callback qui ne gère que PKCE)
         let magicLink = `${siteUrl}/login`;
         try {
           const { data: linkData } = await supabase.auth.admin.generateLink({
             type: "magiclink",
             email: p.email!,
-            options: { redirectTo: `${siteUrl}/auth/callback?next=/dashboard` },
+            options: { redirectTo: `${siteUrl}/auth/magic` },
           });
           if (linkData?.properties?.action_link) {
             magicLink = linkData.properties.action_link;
