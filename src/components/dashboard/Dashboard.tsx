@@ -183,6 +183,9 @@ export function Dashboard({
             </div>
             <p className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
               {(commissionData?.totalCommission ?? 0).toLocaleString("fr-FR")}&nbsp;&euro;
+              <span className="text-base font-medium text-white/50 ml-2">
+                {commissionData?.commissionHt ? "HT" : "TTC"}
+              </span>
             </p>
             {/* Résumé court (cumul / année) */}
             <p className="text-xs text-white/40 mt-1">
@@ -204,7 +207,7 @@ export function Dashboard({
                     .map((r, i) => (
                       <p key={i} className="text-[11px] text-white/60 leading-relaxed">
                         <span className="font-semibold text-white/80">{r.label}</span> :{" "}
-                        {r.montant}&nbsp;€
+                        {r.montant}&nbsp;€&nbsp;{commissionData.commissionHt ? "HT" : "TTC"}
                         {r.type === "recurring"
                           ? " par abonné actif, chaque année"
                           : " par nouvel abonné (année de souscription)"}

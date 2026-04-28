@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
   let partnerQuery = supabase
     .from("partners")
-    .select("id, nom, email, utm")
+    .select("id, nom, email, utm, commission_ht")
     .eq("active", true)
     .not("email", "is", null);
   if (Array.isArray(requestedIds) && requestedIds.length > 0) {
@@ -81,15 +81,16 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           from: "Qlower <partenaires@qlower.com>",
           to: [p.email],
-          subject: `Appel à facturation ${year} — ${amount.toLocaleString("fr-FR")}€ de commission`,
+          subject: `Appel à facturation ${year} — ${amount.toLocaleString("fr-FR")}€ ${p.commission_ht ? "HT" : "TTC"} de commission`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #0A3855;">
               <h2 style="color: #0A3855;">Votre commission ${year} est prête</h2>
               <p>Bonjour ${p.nom ?? ""},</p>
               <p>Votre commission pour l'année <strong>${year}</strong> dans le programme partenaire Qlower s'élève à :</p>
               <p style="text-align: center; font-size: 32px; font-weight: bold; color: #0A3855; margin: 24px 0;">
-                ${amount.toLocaleString("fr-FR")} €
+                ${amount.toLocaleString("fr-FR")} € ${p.commission_ht ? '<span style="font-size:18px;color:#6b7280;">HT</span>' : '<span style="font-size:18px;color:#6b7280;">TTC</span>'}
               </p>
+              ${p.commission_ht ? '<p style="font-size:12px;color:#6b7280;text-align:center;font-style:italic;margin-top:-12px;">Montant exprimé Hors Taxes — appliquez la TVA selon votre régime sur votre facture.</p>' : ''}
               <p>Pour recevoir ce règlement, merci de nous transmettre votre facture en suivant ces étapes :</p>
               <ol style="line-height: 1.8;">
                 <li>Connectez-vous à votre espace partenaire</li>

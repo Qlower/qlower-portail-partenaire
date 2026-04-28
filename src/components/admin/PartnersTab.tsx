@@ -634,7 +634,7 @@ export default function PartnersTab() {
                         className="font-semibold text-[#0A3855]"
                         title="Cumul commission (vue partenaire — règles appliquées année par année)"
                       >
-                        {displayCommission} EUR
+                        {displayCommission} EUR {p.commission_ht ? "HT" : "TTC"}
                       </span>
                       {latestInvoice && (
                         <>
@@ -649,7 +649,7 @@ export default function PartnersTab() {
                                 : `Facture ${latestInvoice.year} en attente${latestInvoice.uploaded_at ? ` — déposée le ${new Date(latestInvoice.uploaded_at).toLocaleDateString("fr-FR")}` : " de dépôt"}`
                             }
                           >
-                            {latestInvoice.is_paid ? "✓" : "⏳"} Facture {latestInvoice.year} : {latestInvoice.amount.toLocaleString("fr-FR")}&nbsp;€
+                            {latestInvoice.is_paid ? "✓" : "⏳"} Facture {latestInvoice.year} : {latestInvoice.amount.toLocaleString("fr-FR")}&nbsp;€&nbsp;{p.commission_ht ? "HT" : "TTC"}
                           </span>
                         </>
                       )}
@@ -830,7 +830,7 @@ export default function PartnersTab() {
                           </svg>
                           <h4 className="text-sm font-semibold text-gray-900">Factures de {p.nom}</h4>
                         </div>
-                        <PartnerInvoicesAdmin partnerId={p.id} partnerName={p.nom} partnerEmail={p.email} />
+                        <PartnerInvoicesAdmin partnerId={p.id} partnerName={p.nom} partnerEmail={p.email} commissionHt={p.commission_ht} />
                       </div>
                     </div>
                   )}
@@ -892,6 +892,43 @@ export default function PartnersTab() {
                           />
                           <p className="text-[10px] text-gray-400">
                             Les factures ne sont proposées que pour les années ≥ cette date.
+                          </p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Régime de commission</Label>
+                          <div className="flex items-center gap-3 mt-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditForm({
+                                  ...editForm,
+                                  commission_ht: !(editForm.commission_ht ?? p.commission_ht ?? false),
+                                })
+                              }
+                              className="inline-flex items-center gap-2 cursor-pointer"
+                            >
+                              <div
+                                className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
+                                  editForm.commission_ht ?? p.commission_ht
+                                    ? "bg-[#0A3855]"
+                                    : "bg-gray-300"
+                                }`}
+                              >
+                                <div
+                                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                                    editForm.commission_ht ?? p.commission_ht
+                                      ? "translate-x-[18px]"
+                                      : "translate-x-0.5"
+                                  }`}
+                                />
+                              </div>
+                              <span className="text-sm font-medium text-gray-700">
+                                {editForm.commission_ht ?? p.commission_ht ? "Montants en HT" : "Montants en TTC"}
+                              </span>
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-gray-400">
+                            Mentionné dans tous les affichages, emails et PDF d&apos;appel à facturation.
                           </p>
                         </div>
                         <Select

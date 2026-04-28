@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
   const supabase = createServiceClient();
   const { data: partners } = await supabase
     .from("partners")
-    .select("id, utm, comm_rules, biens_moyens, ca_par_client")
+    .select("id, utm, comm_rules, biens_moyens, ca_par_client, commission_ht")
     .eq("active", true);
 
   if (!partners) return NextResponse.json([]);
@@ -177,7 +177,7 @@ export async function GET(request: NextRequest) {
       p.biens_moyens ?? 2,
       p.ca_par_client ?? 0
     );
-    return { partnerId: p.id, totalSubscribers, totalCommission };
+    return { partnerId: p.id, totalSubscribers, totalCommission, commissionHt: !!p.commission_ht };
   });
 
   return NextResponse.json(results);

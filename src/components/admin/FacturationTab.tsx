@@ -260,7 +260,7 @@ export default function FacturationTab() {
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <p className="text-lg font-bold text-[#0A3855] tabular-nums leading-tight">
-                          {commission.toLocaleString("fr-FR")} €
+                          {commission.toLocaleString("fr-FR")} €&nbsp;<span className="text-[10px] font-medium text-gray-400">{p.commission_ht ? "HT" : "TTC"}</span>
                         </p>
                         <p className="text-[10px] text-gray-400">
                           {subscribers} abonné{subscribers > 1 ? "s" : ""} cumulés
@@ -275,6 +275,7 @@ export default function FacturationTab() {
                         partnerId={p.id}
                         partnerName={p.nom}
                         partnerEmail={p.email}
+                        commissionHt={p.commission_ht}
                       />
                     </div>
                   )}

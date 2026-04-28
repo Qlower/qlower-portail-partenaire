@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   // Fetch partner details
   const { data: partner } = await supabase
     .from("partners")
-    .select("nom, email, utm, code, siret, adresse, ville, code_postal")
+    .select("nom, email, utm, code, siret, adresse, ville, code_postal, commission_ht")
     .eq("id", partnerId)
     .single();
   if (!partner) {
@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
   const totalAmount = commData.totalCommission ?? 0;
   const totalSubs = commData.totalSubscribers ?? 0;
   const activeRules = (commData.ruleDetails ?? []).filter((r) => r.montant > 0);
+  const taxSuffix = partner.commission_ht ? "HT" : "TTC";
 
   const chunks: Buffer[] = [];
   await new Promise<void>((resolve, reject) => {
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
     doc.rect(50, 230, 495, 28).fillColor("#0A3855").fill();
     doc.fontSize(11).fillColor("#ffffff")
       .text(`Commission due pour l'annee ${year}`, 60, 238)
-      .text(`${totalAmount.toLocaleString("fr-FR")} EUR`, 470, 238, { align: "right", width: 65 });
+      .text(`${totalAmount.toLocaleString("fr-FR")} EUR ${taxSuffix}`, 460, 238, { align: "right", width: 80 });
 
     doc.fontSize(9).fillColor("#6b7280").text(
       `Calcul base sur ${totalSubs} abonne(s) du programme partenaire.`,
@@ -95,13 +96,24 @@ export async function GET(request: NextRequest) {
     y += 20;
     activeRules.forEach((r) => {
       doc.fontSize(9).fillColor("#6b7280")
-        .text(`- ${r.label} : ${r.montant} EUR`, 60, y)
+        .text(`- ${r.label} : ${r.montant} EUR ${taxSuffix}`, 60, y)
         .text(
           r.type === "recurring" ? "par abonne / an" : "par nouvel abonne",
           300, y
         );
       y += 15;
     });
+
+    // Note TVA si HT
+    if (partner.commission_ht) {
+      y += 4;
+      doc.fontSize(8).fillColor("#9ca3af")
+        .text(
+          "Montants exprimes en Hors Taxes. Appliquez la TVA selon votre regime fiscal lors de l'emission de votre facture.",
+          50, y, { width: 495 }
+        );
+      y += 20;
+    }
 
     // Instructions
     y += 20;

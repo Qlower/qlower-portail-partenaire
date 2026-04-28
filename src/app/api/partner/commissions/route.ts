@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
   const { data: partner, error: partnerError } = await supabase
     .from("partners")
-    .select("utm, comm_rules, biens_moyens, ca_par_client")
+    .select("utm, comm_rules, biens_moyens, ca_par_client, commission_ht")
     .eq("id", partnerId)
     .single();
 
@@ -303,6 +303,7 @@ export async function GET(request: NextRequest) {
     partnerId,
     montantParAbonne,
     ruleDetails,
+    commissionHt: !!partner.commission_ht,
     totalSubscribers: isAllYears ? cumulSubscribersCountedInAllYears : totalSubscribersCurrentYear,
     totalCommission: isAllYears ? cumulCommissionAllYears : totalCommissionCurrentYear,
     previousYear: {

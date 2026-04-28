@@ -126,6 +126,7 @@ export interface CommissionData {
     totalCommission: number;
   };
   ruleDetails?: Array<{ label: string; montant: number; type: "one_shot" | "recurring" }>;
+  commissionHt?: boolean;
   months: Array<{
     month: number;
     label: string;

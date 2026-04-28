@@ -23,9 +23,10 @@ interface Props {
   partnerId: string;
   partnerName?: string;
   partnerEmail?: string | null;
+  commissionHt?: boolean;
 }
 
-export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEmail }: Props) {
+export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEmail, commissionHt }: Props) {
   const qc = useQueryClient();
   const [confirmSend, setConfirmSend] = useState<{ year: number; amount: number } | null>(null);
   const [sending, setSending] = useState(false);
@@ -198,7 +199,7 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
           <div className="space-y-0.5">
             {ruleDetails.map((r, i) => (
               <p key={i} className="text-[11px] text-gray-700 leading-relaxed">
-                <span className="font-semibold">{r.label}</span> : {r.montant}&nbsp;€
+                <span className="font-semibold">{r.label}</span> : {r.montant}&nbsp;€&nbsp;{commissionHt ? "HT" : "TTC"}
                 {r.type === "recurring"
                   ? " par abonné actif, chaque année"
                   : " par nouvel abonné (année de souscription)"}
@@ -277,7 +278,7 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
               <td className="px-3 py-2 text-xs tabular-nums">
                 {inv.amount > 0 ? (
                   <div className="flex flex-col leading-tight">
-                    <span>{inv.amount.toLocaleString("fr-FR")}&nbsp;€</span>
+                    <span>{inv.amount.toLocaleString("fr-FR")}&nbsp;€&nbsp;{commissionHt ? "HT" : "TTC"}</span>
                     {inv.id.startsWith("placeholder-") && (
                       <span className="text-[9px] text-gray-400 italic">Commission due</span>
                     )}
@@ -421,7 +422,7 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
                 <div>
                   <span className="text-gray-500 block">Commission calculée</span>
                   <span className="font-bold text-[#0A3855]">
-                    {confirmSend.amount.toLocaleString("fr-FR")}&nbsp;€
+                    {confirmSend.amount.toLocaleString("fr-FR")}&nbsp;€&nbsp;{commissionHt ? "HT" : "TTC"}
                   </span>
                 </div>
               </div>

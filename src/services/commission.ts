@@ -7,6 +7,19 @@ export const COMM_LABELS: Record<string, string> = {
   pct_ca: "% du CA généré",
 };
 
+/**
+ * Formats a commission amount with the right tax suffix.
+ * @param amount montant
+ * @param ht true if amounts are stored as Hors Taxes
+ */
+export function formatCommission(amount: number, ht?: boolean): string {
+  return `${amount.toLocaleString("fr-FR")} € ${ht ? "HT" : "TTC"}`;
+}
+
+export function commissionSuffix(ht?: boolean): string {
+  return ht ? "HT" : "TTC";
+}
+
 export const DEFAULT_TRANCHES = (): Tranche[] => [
   { max: 1, montant: 50 },
   { max: 3, montant: 80 },

@@ -56,6 +56,7 @@ export interface Partner {
   created_at: string;
   updated_at: string;
   contract_signed_at?: string | null;
+  commission_ht?: boolean;
 }
 
 // ── Lead ──────────────────────────────────────────────────────
