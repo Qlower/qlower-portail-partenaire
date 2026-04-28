@@ -98,5 +98,17 @@ export async function POST(request: NextRequest) {
   const sent = results.filter((r) => r.status === "fulfilled").length;
   const failed = results.filter((r) => r.status === "rejected").length;
 
+  // Log the campaign send for the history view
+  const recipientIds = (partners ?? []).filter((p) => p.email).map((p) => p.id);
+  await supabase.from("campaign_sends").insert({
+    template_id: templateKey,
+    subject: template.subject,
+    body: template.body,
+    partner_ids: recipientIds,
+    partner_count: recipientIds.length,
+    sent_count: sent,
+    failed_count: failed,
+  });
+
   return NextResponse.json({ sent, failed });
 }

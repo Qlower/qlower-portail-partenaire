@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Partner, ContratType } from "@/types";
 import { useAdminPartners, useEmailTemplates, useUpdateEmailTemplate } from "@/hooks/useAdminData";
 import type { EmailTemplate } from "@/hooks/useAdminData";
@@ -33,10 +34,24 @@ function replaceVars(text: string, vars: Record<string, string>): string {
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
 }
 
+type CampaignSend = {
+  id: string;
+  template_id: string | null;
+  subject: string;
+  body: string;
+  partner_ids: string[];
+  partner_count: number;
+  sent_count: number;
+  failed_count: number;
+  sent_at: string;
+  recipients: Array<{ id: string; nom: string }>;
+};
+
 export default function CampagnesTab() {
   const { data: partners = [], isLoading: loadingPartners } = useAdminPartners();
   const { data: templates = [], isLoading: loadingTemplates } = useEmailTemplates();
   const updateTemplate = useUpdateEmailTemplate();
+  const queryClient = useQueryClient();
 
   const [audience, setAudience] = useState<Audience>("tous");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -146,6 +161,8 @@ export default function CampagnesTab() {
       const ids = new Set(selected.map((p) => p.id));
       setSentPartners(ids);
       setAllSent(true);
+      // Refresh history list
+      queryClient.invalidateQueries({ queryKey: ["campaign-history"] });
     } catch {
       alert("Erreur lors de l'envoi des emails. Vérifiez la configuration Resend.");
     } finally {
@@ -433,6 +450,135 @@ export default function CampagnesTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* Historique des envois */}
+      <CampaignHistory />
     </div>
+  );
+}
+
+function CampaignHistory() {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { data: history = [], isLoading } = useQuery<CampaignSend[]>({
+    queryKey: ["campaign-history"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/campaign-history");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="size-4 text-[#0A3855]" />
+          Historique des envois
+          {history.length > 0 && (
+            <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855] ml-1">
+              {history.length}
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="size-4 animate-spin text-[#0A3855]" />
+          </div>
+        ) : history.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">
+            Aucune campagne envoyée pour le moment
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {history.map((h) => {
+              const isOpen = expandedId === h.id;
+              const dt = new Date(h.sent_at);
+              return (
+                <div
+                  key={h.id}
+                  className="border border-gray-100 rounded-lg overflow-hidden"
+                >
+                  <button
+                    onClick={() => setExpandedId(isOpen ? null : h.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#E5EDF1]/30 transition-colors text-left"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {h.subject}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {dt.toLocaleDateString("fr-FR", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })}{" "}
+                        à {dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        {" • "}
+                        {h.sent_count} envoyé{h.sent_count > 1 ? "s" : ""}
+                        {h.failed_count > 0 && ` • ${h.failed_count} échec${h.failed_count > 1 ? "s" : ""}`}
+                      </p>
+                    </div>
+                    {h.template_id && (
+                      <Badge variant="secondary" className="bg-gray-50 text-gray-600 border border-gray-200 text-[10px] flex-shrink-0">
+                        {h.template_id}
+                      </Badge>
+                    )}
+                    <svg
+                      className={`size-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {isOpen && (
+                    <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-3 space-y-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                          Destinataires ({h.recipients.length})
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {h.recipients.map((r) => (
+                            <Badge
+                              key={r.id}
+                              variant="secondary"
+                              className="bg-white border border-gray-200 text-gray-700 text-[10px] shadow-none"
+                            >
+                              {r.nom}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                          Sujet
+                        </p>
+                        <p className="text-xs text-gray-800 font-mono bg-white p-2 rounded border border-gray-100">
+                          {h.subject}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">
+                          Corps du mail (template avant personnalisation)
+                        </p>
+                        <div
+                          className="text-xs bg-white p-3 rounded border border-gray-100 max-h-80 overflow-y-auto prose prose-sm max-w-none"
+                          dangerouslySetInnerHTML={{ __html: h.body }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
