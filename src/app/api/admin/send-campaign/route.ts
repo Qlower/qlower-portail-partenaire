@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 import { resend, FROM } from "@/lib/resend";
 import { layout } from "@/services/emailTemplates";
 import { verifyAdmin } from "@/lib/admin-auth";
+import { generateSetupPasswordLink } from "@/lib/setup-token";
 
 function replaceVars(text: string, vars: Record<string, string>): string {
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
@@ -61,9 +62,17 @@ export async function POST(request: NextRequest) {
       .map(async (p) => {
         const link = `https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}`;
 
-        // Magic link 24h pour CTA "Accéder à mon espace"
-        // /auth/magic gère PKCE + implicit flow (vs /auth/callback qui ne gère que PKCE)
-        let magicLink = `${siteUrl}/login`;
+        // Setup-password link 7j (NOT consumed by email scanners) — preferred for new comm
+        let setupLink = `${siteUrl}/login`;
+        try {
+          const generated = await generateSetupPasswordLink(p.email!);
+          if (generated) setupLink = generated;
+        } catch {
+          // fallback déjà sur /login
+        }
+
+        // Magic link 24h (legacy, gardé pour compat)
+        let magicLink = setupLink; // fallback to setup link
         try {
           const { data: linkData } = await supabase.auth.admin.generateLink({
             type: "magiclink",
@@ -74,7 +83,7 @@ export async function POST(request: NextRequest) {
             magicLink = linkData.properties.action_link;
           }
         } catch {
-          // fallback déjà sur /login
+          // fallback déjà sur setupLink
         }
 
         const vars: Record<string, string> = {
@@ -85,6 +94,7 @@ export async function POST(request: NextRequest) {
           leads: String(p.leads ?? 0),
           abonnes: String(p.abonnes ?? 0),
           link,
+          setup_link: setupLink,
           magic_link: magicLink,
         };
 
