@@ -331,8 +331,15 @@ export default function PartnersTab() {
       setSuccess(form.sendEmail ? "Partenaire créé — email de bienvenue envoyé" : "Partenaire créé et synchronisé HubSpot");
       setShowCreate(false);
       setForm(emptyForm());
-    } catch {
-      setError("Erreur lors de la creation");
+    } catch (e: unknown) {
+      const detail =
+        (e && typeof e === "object" && "response" in e
+          ? (e as { response?: { data?: { error?: string } } }).response?.data?.error
+          : undefined) ||
+        (e instanceof Error ? e.message : null) ||
+        "Erreur inconnue";
+      setError(`Erreur lors de la création : ${detail}`);
+      console.error("Create partner failed:", e);
     }
   };
 
