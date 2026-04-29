@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     id, nom, contact_prenom, contact_nom, email, type, contrat, code, utm,
     comm_rules, comm_obj_annuel, user_id, sendEmail,
     statut, metier, siret, tva, adresse, ville, code_postal, telephone, iban, bic, kbis_url,
+    contract_signed_at, commission_ht,
   } = body;
 
   if (!id || !nom || !utm) {
@@ -101,6 +102,8 @@ export async function POST(request: NextRequest) {
     iban: iban || null,
     bic: bic || null,
     kbis_url: kbis_url || null,
+    contract_signed_at: contract_signed_at || null,
+    commission_ht: !!commission_ht,
   }).select().single();
 
   if (error) {

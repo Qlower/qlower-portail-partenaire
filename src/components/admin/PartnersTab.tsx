@@ -83,6 +83,8 @@ interface NewPartnerForm {
   email: string;
   comm_rules: CommissionRule[];
   sendEmail: boolean;
+  contract_signed_at: string;
+  commission_ht: boolean;
 }
 
 const emptyForm = (): NewPartnerForm => ({
@@ -97,6 +99,8 @@ const emptyForm = (): NewPartnerForm => ({
   email: "",
   comm_rules: DEFAULT_COMM_RULES,
   sendEmail: false,
+  contract_signed_at: "",
+  commission_ht: false,
 });
 
 function LeadsPanel({ partnerId, partnerName }: { partnerId: string; partnerName: string }) {
@@ -327,6 +331,8 @@ export default function PartnersTab() {
         comm_obj_annuel: form.objectif,
         comm_rules: form.comm_rules,
         sendEmail: form.sendEmail,
+        contract_signed_at: form.contract_signed_at || null,
+        commission_ht: form.commission_ht,
       });
       setSuccess(form.sendEmail ? "Partenaire créé — email de bienvenue envoyé" : "Partenaire créé et synchronisé HubSpot");
       setShowCreate(false);
@@ -553,6 +559,40 @@ export default function PartnersTab() {
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="contact@partenaire.com"
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Date de signature du contrat</Label>
+                <Input
+                  type="date"
+                  value={form.contract_signed_at}
+                  onChange={(e) => setForm({ ...form, contract_signed_at: e.target.value })}
+                />
+                <p className="text-[10px] text-gray-400">
+                  Aucune commission calculée avant cette date.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Régime de commission</Label>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, commission_ht: !form.commission_ht })}
+                  className="inline-flex items-center gap-2 cursor-pointer mt-2"
+                >
+                  <div
+                    className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
+                      form.commission_ht ? "bg-[#0A3855]" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                        form.commission_ht ? "translate-x-[18px]" : "translate-x-0.5"
+                      }`}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">
+                    {form.commission_ht ? "Montants en HT" : "Montants en TTC"}
+                  </span>
+                </button>
               </div>
               <div className="flex items-center gap-2 self-end pb-1">
                 <input
