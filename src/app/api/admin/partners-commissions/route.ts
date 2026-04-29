@@ -62,7 +62,8 @@ function computeCommissionAllYears(
   partnerContacts: HSContact[],
   rules: Rule[],
   biensMoyens: number,
-  caParClient: number
+  caParClient: number,
+  contractYear: number | null
 ): { totalSubscribers: number; totalCommission: number } {
   const activeRules = rules.filter((r) => r.actif);
   const souscRule = activeRules.find((r) => r.type === "souscription");
@@ -88,6 +89,7 @@ function computeCommissionAllYears(
     targetYear: number
   ): number => {
     if (targetYear < subYear) return 0;
+    if (contractYear !== null && targetYear < contractYear) return 0;
     if (unsubYear && subYear === unsubYear) return 0; // same-year churn
     if (!isCurrentlySubscriber) {
       if (!unsubYear) return 0;
@@ -153,7 +155,7 @@ export async function GET(request: NextRequest) {
   const supabase = createServiceClient();
   const { data: partners } = await supabase
     .from("partners")
-    .select("id, utm, comm_rules, biens_moyens, ca_par_client, commission_ht")
+    .select("id, utm, comm_rules, biens_moyens, ca_par_client, commission_ht, contract_signed_at")
     .eq("active", true);
 
   if (!partners) return NextResponse.json([]);
@@ -171,11 +173,15 @@ export async function GET(request: NextRequest) {
 
   const results = partners.map((p) => {
     const partnerContacts = byUtm.get(p.utm) || [];
+    const contractYear = p.contract_signed_at
+      ? new Date(p.contract_signed_at).getFullYear()
+      : null;
     const { totalSubscribers, totalCommission } = computeCommissionAllYears(
       partnerContacts,
       (p.comm_rules || []) as Rule[],
       p.biens_moyens ?? 2,
-      p.ca_par_client ?? 0
+      p.ca_par_client ?? 0,
+      contractYear
     );
     return { partnerId: p.id, totalSubscribers, totalCommission, commissionHt: !!p.commission_ht };
   });

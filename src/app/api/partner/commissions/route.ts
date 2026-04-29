@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
   const { data: partner, error: partnerError } = await supabase
     .from("partners")
-    .select("utm, comm_rules, biens_moyens, ca_par_client, commission_ht")
+    .select("utm, comm_rules, biens_moyens, ca_par_client, commission_ht, contract_signed_at")
     .eq("id", partnerId)
     .single();
 
@@ -131,6 +131,11 @@ export async function GET(request: NextRequest) {
    *   (no exit date at all). Re-subscriptions don't re-trigger the one-shot bonus.
    * - Annuelle / %CA (recurring rules) apply every active year.
    */
+  // Année minimum pour laquelle une commission peut etre calculee (contrat signe)
+  const contractYear = partner.contract_signed_at
+    ? new Date(partner.contract_signed_at).getFullYear()
+    : null;
+
   function commissionForSubscriber(
     subYear: number,
     unsubYear: number | null,
@@ -139,6 +144,8 @@ export async function GET(request: NextRequest) {
     targetYear: number
   ): number {
     if (targetYear < subYear) return 0;
+    // Aucune commission avant l'annee de signature du contrat
+    if (contractYear !== null && targetYear < contractYear) return 0;
 
     // Same-year churn (subscribed AND first churn same year) → never any commission,
     // even for later resubs (règle Qlower : pas de commission si l'abonné ne "tient" pas
