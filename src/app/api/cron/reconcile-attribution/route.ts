@@ -5,9 +5,10 @@ const CRON_SECRET = process.env.CRON_SECRET || "";
 
 export const maxDuration = 60;
 
-// Vercel Cron — runs reconcile in apply=true mode.
+// Vercel Cron — runs reconcile in apply=true mode every 15 minutes.
 // Acts as a fallback when the HubSpot webhook misses the
 // `hs_analytics_source_data_2` property change event.
+// See vercel.json for the cron schedule definition.
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
