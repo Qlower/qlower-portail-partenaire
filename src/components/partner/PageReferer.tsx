@@ -3,7 +3,7 @@
 import { useState, type ReactElement } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePartner, useReferrals } from "@/hooks/usePartnerData";
-import { buildSignupLink, buildRdvLink } from "@/services/links";
+import { buildRdvLink } from "@/services/links";
 import { STAGE_STYLES } from "@/services/constants";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import ReferralForm from "./ReferralForm";
 import type { Partner } from "@/types";
 
-type Mode = "link" | "page" | "form" | "rdv";
+type Mode = "page" | "form" | "rdv";
 
 interface PageRefererProps {
   partner: Partner;
@@ -21,23 +21,12 @@ interface PageRefererProps {
 
 export default function PageReferer({ partner }: PageRefererProps) {
   const { data: referrals, isLoading: referralsLoading } = useReferrals(partner.id);
-  const [mode, setMode] = useState<Mode>("link");
+  const [mode, setMode] = useState<Mode>("page");
 
-  const signupLink = buildSignupLink(partner.utm, partner.code);
   const rdvLink = buildRdvLink(partner.utm);
   const partnerPageLink = `https://www.qlower.com/qlower-x-partenaire?utm_source=${encodeURIComponent(partner.utm)}&utm_medium=affiliation&utm_campaign=${encodeURIComponent(partner.code || partner.utm)}`;
 
   const modes: { key: Mode; icon: ReactElement; title: string; desc: string }[] = [
-    {
-      key: "link",
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-        </svg>
-      ),
-      title: "Lien direct",
-      desc: "Partagez votre lien d'inscription",
-    },
     {
       key: "page",
       icon: (
@@ -78,7 +67,7 @@ export default function PageReferer({ partner }: PageRefererProps) {
       />
 
       {/* Mode selector cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {modes.map((m) => (
           <button
             key={m.key}
@@ -118,29 +107,6 @@ export default function PageReferer({ partner }: PageRefererProps) {
 
       {/* Active content */}
       <div>
-        {mode === "link" && (
-          <Card className="border-gray-200 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-gray-900">
-                Votre lien d&apos;inscription personnalise
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0">
-                  <code className="block truncate text-sm text-[#0A3855] bg-[#E5EDF1]/50 rounded-lg border border-[#0A3855]/10 px-4 py-3 font-mono">
-                    {signupLink}
-                  </code>
-                </div>
-                <CopyButton text={signupLink} />
-              </div>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Chaque inscription via ce lien sera automatiquement track&eacute;e et attribu&eacute;e &agrave; votre compte partenaire.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
         {mode === "page" && (
           <Card className="border-gray-200 shadow-sm">
             <CardHeader className="pb-3">
