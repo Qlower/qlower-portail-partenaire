@@ -301,6 +301,36 @@ export default function PartnersTab() {
   const [success, setSuccess] = useState("");
   const [linkLoading, setLinkLoading] = useState<string | null>(null);
   const [confirmAccess, setConfirmAccess] = useState<Partner | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditReport, setAuditReport] = useState<{
+    mode: string;
+    scannedOrphans: number;
+    matchedCount: number;
+    ambiguousCount: number;
+    matched: Array<{ id: string; email: string; name: string; source2: string; matchedUtm: string; partenaireLead: string; patched: boolean }>;
+    ambiguous: Array<{ id: string; email: string; source2: string }>;
+  } | null>(null);
+
+  const runAudit = async (apply: boolean) => {
+    setAuditLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/reconcile-attribution", {
+        method: apply ? "POST" : "GET",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erreur");
+      setAuditReport(json);
+      if (apply) {
+        const tagged = json.matched.filter((m: { patched: boolean }) => m.patched).length;
+        setSuccess(`Audit applique : ${tagged} contact(s) tagge(s) dans HubSpot`);
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erreur audit attribution");
+    } finally {
+      setAuditLoading(false);
+    }
+  };
 
   const filteredPartners = partners.filter((p) => {
     if (!partnerSearch.trim()) return true;
@@ -445,6 +475,66 @@ export default function PartnersTab() {
           <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}
+
+      {/* Audit attribution panel */}
+      <Card className="border-amber-200 bg-amber-50/40">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <Info className="size-4 text-amber-600" /> Audit attribution UTM
+              </h4>
+              <p className="text-xs text-gray-600 mt-1 max-w-2xl">
+                Scanne les contacts HubSpot des 90 derniers jours dont l&apos;UTM source est captur&eacute;
+                (<code>hs_analytics_source_data_2</code>) mais qui ne sont pas tagg&eacute;s
+                <code> partenaire__lead_</code>. Permet de rattraper les leads orphelins.
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button variant="outline" onClick={() => runAudit(false)} disabled={auditLoading}>
+                {auditLoading ? <Loader2 className="size-4 animate-spin" /> : "Dry-run"}
+              </Button>
+              <Button onClick={() => runAudit(true)} disabled={auditLoading || !auditReport || auditReport.matchedCount === 0}>
+                Tagger {auditReport?.matchedCount ? `(${auditReport.matchedCount})` : ""}
+              </Button>
+            </div>
+          </div>
+          {auditReport && (
+            <div className="mt-3 text-xs text-gray-700 space-y-2">
+              <div className="flex gap-4 flex-wrap">
+                <span>Scannes : <b>{auditReport.scannedOrphans}</b></span>
+                <span>Matches partenaire : <b className="text-green-700">{auditReport.matchedCount}</b></span>
+                <span>Ambigus : <b className="text-orange-700">{auditReport.ambiguousCount}</b></span>
+                <span className="text-gray-500">({auditReport.mode})</span>
+              </div>
+              {auditReport.matched.length > 0 && (
+                <details className="bg-white rounded p-2 border border-gray-200">
+                  <summary className="cursor-pointer font-medium">Contacts identifies ({auditReport.matched.length})</summary>
+                  <ul className="mt-2 space-y-1 max-h-60 overflow-auto">
+                    {auditReport.matched.map((m) => (
+                      <li key={m.id} className="font-mono text-[11px]">
+                        {m.patched ? "OK " : "-> "}{m.email || m.name} | {m.source2} | {m.partenaireLead}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {auditReport.ambiguous.length > 0 && (
+                <details className="bg-white rounded p-2 border border-gray-200">
+                  <summary className="cursor-pointer font-medium">Ambigus ({auditReport.ambiguous.length})</summary>
+                  <ul className="mt-2 space-y-1 max-h-60 overflow-auto">
+                    {auditReport.ambiguous.map((a) => (
+                      <li key={a.id} className="font-mono text-[11px]">
+                        {a.email} | {a.source2}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">

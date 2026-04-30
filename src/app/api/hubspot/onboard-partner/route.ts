@@ -94,7 +94,9 @@ export async function POST(request: NextRequest) {
     errors.push({ step: "property", message: err instanceof Error ? err.message : "Unknown error" });
   }
 
-  // Step 2: Create a workflow that tags contacts where utm_source = utmValue
+  // Step 2: Create a workflow that tags contacts when HubSpot captures
+  // the UTM in `hs_analytics_source_data_2` (format "{utm_source} / {utm_medium}").
+  // The previous trigger on a non-existent `utm_source` property never fired.
   try {
     const workflowPayload = {
       name: `Auto-tag partenaire: ${partnerName}`,
@@ -106,9 +108,21 @@ export async function POST(request: NextRequest) {
             filterBranchType: "AND",
             filters: [
               {
-                property: "utm_source",
-                operator: "EQ",
-                value: utmValue,
+                property: "hs_analytics_source_data_2",
+                operator: "STARTS_WITH",
+                value: `${utmValue}/`,
+              },
+            ],
+          },
+        },
+        {
+          filterBranch: {
+            filterBranchType: "AND",
+            filters: [
+              {
+                property: "hs_analytics_source_data_2",
+                operator: "STARTS_WITH",
+                value: `${utmValue} /`,
               },
             ],
           },
