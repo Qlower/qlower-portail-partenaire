@@ -1,0 +1,23 @@
+name: Reconcile UTM attribution
+
+on:
+  schedule:
+    # Every 15 minutes — fallback when HubSpot webhook misses property changes
+    - cron: "*/15 * * * *"
+  workflow_dispatch: # Allow manual trigger from the GitHub Actions UI
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call reconcile-attribution endpoint
+        run: |
+          response=$(curl -sS -w "\n%{http_code}" -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://partenaire.qlower.com/api/cron/reconcile-attribution")
+          body=$(echo "$response" | head -n -1)
+          status=$(echo "$response" | tail -n 1)
+          echo "HTTP $status"
+          echo "$body"
+          if [ "$status" != "200" ]; then
+            exit 1
+          fi
