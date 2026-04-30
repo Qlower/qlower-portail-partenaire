@@ -307,6 +307,9 @@ export default function PartnersTab() {
     scannedOrphans: number;
     matchedCount: number;
     ambiguousCount: number;
+    activePartnersCount?: number;
+    inactivePartnersCount?: number;
+    knownUtms?: Array<{ utm: string; nom: string; active: boolean }>;
     matched: Array<{ id: string; email: string; name: string; source2: string; matchedUtm: string; partenaireLead: string; patched: boolean }>;
     ambiguous: Array<{ id: string; email: string; source2: string }>;
   } | null>(null);
@@ -505,8 +508,23 @@ export default function PartnersTab() {
                 <span>Scannes : <b>{auditReport.scannedOrphans}</b></span>
                 <span>Matches partenaire : <b className="text-green-700">{auditReport.matchedCount}</b></span>
                 <span>Ambigus : <b className="text-orange-700">{auditReport.ambiguousCount}</b></span>
+                {typeof auditReport.activePartnersCount === "number" && (
+                  <span>Partenaires : <b>{auditReport.activePartnersCount}</b> actifs / <b>{auditReport.inactivePartnersCount}</b> inactifs</span>
+                )}
                 <span className="text-gray-500">({auditReport.mode})</span>
               </div>
+              {auditReport.knownUtms && auditReport.knownUtms.length > 0 && (
+                <details className="bg-white rounded p-2 border border-gray-200">
+                  <summary className="cursor-pointer font-medium">UTMs connus en base ({auditReport.knownUtms.length})</summary>
+                  <ul className="mt-2 space-y-1 max-h-60 overflow-auto">
+                    {auditReport.knownUtms.map((u) => (
+                      <li key={u.utm} className={`font-mono text-[11px] ${u.active ? "" : "text-gray-400 line-through"}`}>
+                        {u.utm} | {u.nom} {u.active ? "" : "[INACTIF]"}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
               {auditReport.matched.length > 0 && (
                 <details className="bg-white rounded p-2 border border-gray-200">
                   <summary className="cursor-pointer font-medium">Contacts identifies ({auditReport.matched.length})</summary>

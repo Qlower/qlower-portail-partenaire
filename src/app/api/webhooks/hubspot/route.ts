@@ -40,23 +40,42 @@ async function autoTagFromAnalyticsUtm(
   contactId: string,
   props: Record<string, string | null>
 ): Promise<string | null> {
-  if (props.partenaire__lead_) return props.partenaire__lead_;
+  if (props.partenaire__lead_) {
+    console.log(`[autotag] ${contactId} already tagged: ${props.partenaire__lead_}`);
+    return props.partenaire__lead_;
+  }
   const src2 = (props.hs_analytics_source_data_2 || "").trim();
-  if (!src2) return null;
+  if (!src2) {
+    console.log(`[autotag] ${contactId} no hs_analytics_source_data_2`);
+    return null;
+  }
 
   // Format observed: "{utm_source} / {utm_medium}" or "{utm_source}/{utm_medium}"
   const utmCandidate = src2.split(/\s*\/\s*/)[0]?.trim().toLowerCase();
-  if (!utmCandidate) return null;
+  if (!utmCandidate) {
+    console.log(`[autotag] ${contactId} no UTM candidate from "${src2}"`);
+    return null;
+  }
 
   // Look up active partner by UTM (case-insensitive)
-  const { data: partner } = await supabase
+  const { data: partner, error } = await supabase
     .from("partners")
-    .select("utm")
+    .select("utm, active")
     .ilike("utm", utmCandidate)
-    .eq("active", true)
     .maybeSingle();
 
-  if (!partner?.utm) return null;
+  if (error) {
+    console.log(`[autotag] ${contactId} supabase error: ${error.message}`);
+    return null;
+  }
+  if (!partner?.utm) {
+    console.log(`[autotag] ${contactId} no partner found for utm="${utmCandidate}"`);
+    return null;
+  }
+  if (!partner.active) {
+    console.log(`[autotag] ${contactId} partner "${partner.utm}" is INACTIVE — skipping`);
+    return null;
+  }
 
   // Patch the contact in HubSpot so subsequent flows see the tag
   const patchRes = await fetch(`${HS_BASE}/crm/v3/objects/contacts/${contactId}`, {
@@ -67,8 +86,13 @@ async function autoTagFromAnalyticsUtm(
     },
     body: JSON.stringify({ properties: { partenaire__lead_: partner.utm } }),
   });
-  if (!patchRes.ok) return null;
+  if (!patchRes.ok) {
+    const errText = await patchRes.text();
+    console.log(`[autotag] ${contactId} HubSpot PATCH failed: ${patchRes.status} ${errText}`);
+    return null;
+  }
 
+  console.log(`[autotag] ${contactId} ✅ tagged "${partner.utm}" from src2="${src2}"`);
   // Reflect in current props so upsertLead continues without re-fetching
   props.partenaire__lead_ = partner.utm;
   return partner.utm;

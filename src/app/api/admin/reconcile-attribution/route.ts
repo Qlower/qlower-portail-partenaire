@@ -82,20 +82,22 @@ type Match = {
 
 async function reconcile(apply: boolean) {
   const supabase = createServiceClient();
+  // Fetch ALL partners (active + inactive) so the report makes sense even
+  // when an inactive partner has captured leads.
   const { data: partners } = await supabase
     .from("partners")
-    .select("utm, code, nom")
-    .eq("active", true);
+    .select("utm, code, nom, active");
 
   if (!partners || partners.length === 0) {
-    return NextResponse.json({ error: "No active partners" }, { status: 404 });
+    return NextResponse.json({ error: "No partners" }, { status: 404 });
   }
 
-  // Map utm (lowercased) → partenaire__lead_ enum value (= utm itself in our schema)
-  const utmIndex = new Map<string, { utm: string; nom: string }>();
+  // Map utm (lowercased) → partner. We only auto-tag for active partners
+  // but expose inactive ones in the report so the user can see them.
+  const utmIndex = new Map<string, { utm: string; nom: string; active: boolean }>();
   for (const p of partners) {
     if (!p.utm) continue;
-    utmIndex.set(p.utm.toLowerCase(), { utm: p.utm, nom: p.nom });
+    utmIndex.set(p.utm.toLowerCase(), { utm: p.utm, nom: p.nom, active: !!p.active });
   }
 
   // Pull orphan contacts from the last 90 days. Older ones are tagged manually
@@ -126,8 +128,9 @@ async function reconcile(apply: boolean) {
       continue;
     }
 
+    // Skip inactive partners but expose them in matched with patched=false
     let patched = false;
-    if (apply) {
+    if (apply && hit.active) {
       patched = await patchContact(c.id, hit.utm);
     }
 
@@ -137,7 +140,7 @@ async function reconcile(apply: boolean) {
       name: `${c.properties.firstname || ""} ${c.properties.lastname || ""}`.trim(),
       source2: c.properties.hs_analytics_source_data_2 || "",
       matchedUtm: hit.utm,
-      partenaireLead: hit.nom,
+      partenaireLead: hit.active ? hit.nom : `${hit.nom} [INACTIF]`,
       patched,
     });
   }
@@ -147,6 +150,13 @@ async function reconcile(apply: boolean) {
     scannedOrphans: orphans.length,
     matchedCount: matched.length,
     ambiguousCount: ambiguous.length,
+    activePartnersCount: partners.filter((p) => p.active).length,
+    inactivePartnersCount: partners.filter((p) => !p.active).length,
+    knownUtms: Array.from(utmIndex.entries()).map(([k, v]) => ({
+      utm: k,
+      nom: v.nom,
+      active: v.active,
+    })),
     matched,
     ambiguous,
   });
