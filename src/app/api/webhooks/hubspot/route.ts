@@ -23,11 +23,55 @@ function verifyRequest(request: NextRequest): boolean {
 // ── Fetch full contact from HubSpot ─────────────────────────
 async function fetchContact(contactId: string) {
   const res = await fetch(
-    `${HS_BASE}/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,phone,partenaire__lead_,utm_source,hs_lifecyclestage,lifecyclestage,hs_v2_date_entered_999998694,createdate`,
+    `${HS_BASE}/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,phone,partenaire__lead_,utm_source,hs_analytics_source_data_2,hs_lifecyclestage,lifecyclestage,hs_v2_date_entered_999998694,createdate`,
     { headers: { Authorization: `Bearer ${HS_TOKEN}` } }
   );
   if (!res.ok) return null;
   return res.json();
+}
+
+// ── Auto-tag partenaire__lead_ from analytics UTM ───────────
+// HubSpot stores captured UTMs in `hs_analytics_source_data_2` as
+// `{utm_source} / {utm_medium}`. If the contact arrived via a partner
+// link (page de presentation, RDV, etc.) but `partenaire__lead_` was
+// never set (no per-partner workflow needed), we tag here.
+async function autoTagFromAnalyticsUtm(
+  supabase: ReturnType<typeof createServiceClient>,
+  contactId: string,
+  props: Record<string, string | null>
+): Promise<string | null> {
+  if (props.partenaire__lead_) return props.partenaire__lead_;
+  const src2 = (props.hs_analytics_source_data_2 || "").trim();
+  if (!src2) return null;
+
+  // Format observed: "{utm_source} / {utm_medium}" or "{utm_source}/{utm_medium}"
+  const utmCandidate = src2.split(/\s*\/\s*/)[0]?.trim().toLowerCase();
+  if (!utmCandidate) return null;
+
+  // Look up active partner by UTM (case-insensitive)
+  const { data: partner } = await supabase
+    .from("partners")
+    .select("utm")
+    .ilike("utm", utmCandidate)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (!partner?.utm) return null;
+
+  // Patch the contact in HubSpot so subsequent flows see the tag
+  const patchRes = await fetch(`${HS_BASE}/crm/v3/objects/contacts/${contactId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${HS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ properties: { partenaire__lead_: partner.utm } }),
+  });
+  if (!patchRes.ok) return null;
+
+  // Reflect in current props so upsertLead continues without re-fetching
+  props.partenaire__lead_ = partner.utm;
+  return partner.utm;
 }
 
 // ── Map HubSpot lifecycle to our stage ──────────────────────
@@ -192,6 +236,10 @@ export async function POST(request: NextRequest) {
       results.push({ contactId, event: eventType, status: "skip:no_data" });
       continue;
     }
+
+    // Defensive auto-tag: if partenaire__lead_ is empty but the captured
+    // UTM matches an active partner, tag it now (no per-partner workflow needed).
+    await autoTagFromAnalyticsUtm(supabase, contactId, contact.properties);
 
     const result = await upsertLead(supabase, contactId, contact.properties);
     results.push({ contactId, event: eventType, ...result });
