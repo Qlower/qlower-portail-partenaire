@@ -64,6 +64,16 @@ export default function Parametres({ partner, onRestartGuide }: ParametresProps)
     { label: "Type de contrat", value: partner.contrat.replace("_", " "), capitalize: true },
     { label: "Code partenaire", value: partner.code || "En attente", mono: !!partner.code },
     {
+      label: "Date de signature du contrat",
+      value: partner.contract_signed_at
+        ? new Date(partner.contract_signed_at).toLocaleDateString("fr-FR", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          })
+        : "Non renseignée",
+    },
+    {
       label: "Membre depuis",
       value: new Date(partner.created_at).toLocaleDateString("fr-FR", {
         day: "2-digit",
