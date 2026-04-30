@@ -995,6 +995,19 @@ export default function PartnersTab() {
                             }
                           />
                         </div>
+                        <div className="space-y-1.5">
+                          <Label>Code promo</Label>
+                          <Input
+                            value={editForm.code ?? ""}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, code: e.target.value })
+                            }
+                            placeholder="Ex: CLIMB2026"
+                          />
+                          <p className="text-[10px] text-gray-400">
+                            Affiché côté partenaire (dashboard, emails, PDF). Pensez à mettre à jour le code Stripe en parallèle.
+                          </p>
+                        </div>
                         <Select
                           label="Contrat"
                           value={editForm.contrat ?? p.contrat}
