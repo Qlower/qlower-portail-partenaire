@@ -335,6 +335,36 @@ export default function PartnersTab() {
     }
   };
 
+  const [syncEnumLoading, setSyncEnumLoading] = useState(false);
+  const [syncEnumReport, setSyncEnumReport] = useState<{
+    mode: string;
+    missingActiveCount?: number;
+    missingActive?: Array<{ utm: string; nom: string }>;
+    added?: number;
+    addedItems?: Array<{ utm: string; nom: string }>;
+    message?: string;
+  } | null>(null);
+
+  const runSyncEnum = async (apply: boolean) => {
+    setSyncEnumLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/sync-hubspot-enum", {
+        method: apply ? "POST" : "GET",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erreur");
+      setSyncEnumReport(json);
+      if (apply) {
+        setSuccess(`Sync enum HubSpot : ${json.added ?? 0} UTM(s) ajoute(s)`);
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erreur sync enum");
+    } finally {
+      setSyncEnumLoading(false);
+    }
+  };
+
   const filteredPartners = partners.filter((p) => {
     if (!partnerSearch.trim()) return true;
     const q = partnerSearch.toLowerCase();
@@ -478,6 +508,64 @@ export default function PartnersTab() {
           <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}
+
+      {/* Sync enum HubSpot panel */}
+      <Card className="border-blue-200 bg-blue-50/40">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <Info className="size-4 text-blue-600" /> Sync enum HubSpot
+              </h4>
+              <p className="text-xs text-gray-600 mt-1 max-w-2xl">
+                Compare les UTM de tes partenaires actifs avec les options de la propri&eacute;t&eacute;
+                HubSpot <code>partenaire__lead_</code>. Ajoute les UTM manquants (sans quoi le tagging
+                automatique ne peut pas fonctionner pour ces partenaires).
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button variant="outline" onClick={() => runSyncEnum(false)} disabled={syncEnumLoading}>
+                {syncEnumLoading ? <Loader2 className="size-4 animate-spin" /> : "Dry-run"}
+              </Button>
+              <Button onClick={() => runSyncEnum(true)} disabled={syncEnumLoading || !syncEnumReport || (syncEnumReport.missingActiveCount ?? 0) === 0}>
+                Ajouter {syncEnumReport?.missingActiveCount ? `(${syncEnumReport.missingActiveCount})` : ""}
+              </Button>
+            </div>
+          </div>
+          {syncEnumReport && (
+            <div className="mt-3 text-xs text-gray-700 space-y-2">
+              {syncEnumReport.mode === "applied" ? (
+                <>
+                  <div>
+                    UTM ajout&eacute;s : <b className="text-green-700">{syncEnumReport.added ?? 0}</b>
+                    {syncEnumReport.message && <span className="text-gray-500"> — {syncEnumReport.message}</span>}
+                  </div>
+                  {syncEnumReport.addedItems && syncEnumReport.addedItems.length > 0 && (
+                    <ul className="font-mono text-[11px] bg-white rounded p-2 border border-gray-200 max-h-40 overflow-auto space-y-1">
+                      {syncEnumReport.addedItems.map((it) => (
+                        <li key={it.utm}>{it.utm} | {it.nom}</li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div>
+                    Manquants (actifs) : <b className="text-red-700">{syncEnumReport.missingActiveCount ?? 0}</b>
+                  </div>
+                  {syncEnumReport.missingActive && syncEnumReport.missingActive.length > 0 && (
+                    <ul className="font-mono text-[11px] bg-white rounded p-2 border border-gray-200 max-h-40 overflow-auto space-y-1">
+                      {syncEnumReport.missingActive.map((it) => (
+                        <li key={it.utm} className="text-red-700">⚠ {it.utm} | {it.nom}</li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Audit attribution panel */}
       <Card className="border-amber-200 bg-amber-50/40">
