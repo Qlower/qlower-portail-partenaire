@@ -92,10 +92,10 @@ export default function KitPage() {
               <p>Interface Qlower en vidéo — à montrer en RDV ou à transmettre</p>
               <span className="card-link">Voir la vidéo générale →</span>
             </a>
-            <a className="card" href="https://www.notion.so/qlower/Expliquer-Qlower-ses-clients-comment-y-souscrire-6b4eee4ecb4e48dc8cf64b026681a9d5" target="_blank" rel="noreferrer">
+            <a className="card" href="/dashboard/expliquer">
               <div className="card-icon blue">⬡</div>
               <h3>Expliquer Qlower</h3>
-              <p>Guide pas à pas pour présenter l&apos;offre à un client</p>
+              <p>Guide pas à pas + votre lien d&apos;inscription tracké à transmettre</p>
               <span className="card-link">Accéder au guide →</span>
             </a>
             <a className="card" href="https://drive.google.com/file/d/17xTVPzA8_WzgSaHMlPf5Y37imgtHBJCW/view" target="_blank" rel="noreferrer">
@@ -108,10 +108,10 @@ export default function KitPage() {
 
           <div className="section-title">Templates de communication</div>
           <div className="kit-grid">
-            <a className="card" href="https://www.notion.so/qlower/Kit-fiscal-partenaire-Qlower" target="_blank" rel="noreferrer">
+            <a className="card" href="/dashboard/emails">
               <div className="card-icon teal">✉</div>
               <h3>Emails clients</h3>
-              <p>Séquence complète prête à envoyer tout au long de l&apos;année</p>
+              <p>Templates pré-remplis avec votre lien d&apos;inscription tracké</p>
               <span className="card-link">Voir les templates →</span>
             </a>
             <a className="card" href="https://drive.google.com/file/d/1jQNSS9ftqD_td99F7IxacmiCOISUqaWf/view" target="_blank" rel="noreferrer">
