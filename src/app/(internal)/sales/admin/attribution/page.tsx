@@ -5,6 +5,7 @@ import AttributionTable, {
   type HistoryEntry,
   type NoteEntry,
 } from "@/components/internal/AttributionTable";
+import LockMonthButton from "@/components/internal/LockMonthButton";
 
 interface DbRow {
   charge_id: string;
@@ -152,7 +153,8 @@ export default async function AttributionAdminPage() {
             {run?.locked ? "(verrouillé)" : "(active)"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <LockMonthButton yearMonth={yearMonth} isLocked={!!run?.locked} />
           <a
             href={`/sales`}
             className="text-xs text-gray-500 hover:text-[#0A3855] px-3 py-1.5 border border-gray-200 rounded"
