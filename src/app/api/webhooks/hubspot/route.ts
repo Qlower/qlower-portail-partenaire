@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { syncHubspotEnum } from "@/services/sync-enum";
 
+// Allow up to 60s — needed because we may sleep 25s waiting for HubSpot
+// analytics to populate after a fresh contact creation (race-guard).
+export const maxDuration = 60;
+
 const HS_TOKEN = process.env.HUBSPOT_TOKEN!;
 const HS_BASE = "https://api.hubapi.com";
 
@@ -53,6 +57,40 @@ async function fetchContact(contactId: string) {
   );
   if (!res.ok) return null;
   return res.json();
+}
+
+// ── Race-condition guard ────────────────────────────────────
+// HubSpot fires the webhook ~5s after a contact is created, but the
+// `hs_analytics_source_data_2` analytics field can take 30s–2min to populate.
+// If we see a freshly-created contact with no analytics data and no partner
+// tag, wait once and re-fetch — covers the common case for MEETING + FORM
+// contacts where HubSpot doesn't re-emit the event for the analytics fill.
+const RACE_RETRY_DELAY_MS = 25_000; // total budget kept under Vercel's 60s maxDuration
+// Returns true iff a retry was actually performed. Caller uses this to disable
+// further retries in the same batch (we have one ~25s budget per POST).
+async function fetchContactWithRaceGuard(
+  contactId: string,
+  retryAllowed: boolean,
+): Promise<{ contact: Awaited<ReturnType<typeof fetchContact>>; retried: boolean }> {
+  let contact = await fetchContact(contactId);
+  if (!contact?.properties) return { contact, retried: false };
+  const props = contact.properties as Record<string, string | null>;
+  const hasUtmSrc = !!(props.partenaire__lead_ || props.utm_source || props.hs_analytics_source_data_2);
+  if (hasUtmSrc) return { contact, retried: false };
+  if (!retryAllowed) return { contact, retried: false };
+  // Only retry for very-recent contacts. Older ones probably never had analytics.
+  const createdAt = props.createdate ? new Date(props.createdate).getTime() : 0;
+  const ageMs = Date.now() - createdAt;
+  if (createdAt === 0 || ageMs < 0 || ageMs > 5 * 60 * 1000) return { contact, retried: false };
+  console.log(`[race-guard] ${contactId} created ${Math.round(ageMs / 1000)}s ago, no analytics yet — retrying in ${RACE_RETRY_DELAY_MS}ms`);
+  await new Promise((r) => setTimeout(r, RACE_RETRY_DELAY_MS));
+  contact = await fetchContact(contactId);
+  if (contact?.properties?.hs_analytics_source_data_2) {
+    console.log(`[race-guard] ${contactId} ✅ analytics arrived: "${contact.properties.hs_analytics_source_data_2}"`);
+  } else {
+    console.log(`[race-guard] ${contactId} ⏰ still no analytics after ${RACE_RETRY_DELAY_MS}ms — leaving for cron`);
+  }
+  return { contact, retried: true };
 }
 
 // ── Auto-tag partenaire__lead_ from analytics UTM ───────────
@@ -331,6 +369,9 @@ export async function POST(request: NextRequest) {
   }
 
   const results: Array<{ contactId: string; event: string; status: string }> = [];
+  // We have a single ~25s race-guard budget per POST. Once consumed, we don't
+  // retry again for subsequent events in the same batch (they'd time out).
+  let raceGuardBudget = true;
 
   for (const event of events) {
     const contactId = String(event.objectId || event.vid || "");
@@ -338,8 +379,12 @@ export async function POST(request: NextRequest) {
 
     if (!contactId) continue;
 
-    // Fetch full contact from HubSpot (works for both creation and property change)
-    const contact = await fetchContact(contactId);
+    // Fetch full contact from HubSpot (works for both creation and property change).
+    // The race-guard variant retries once after 25s if the contact is fresh and
+    // has no analytics yet — HubSpot sometimes fires the webhook before populating
+    // `hs_analytics_source_data_2`.
+    const { contact, retried } = await fetchContactWithRaceGuard(contactId, raceGuardBudget);
+    if (retried) raceGuardBudget = false;
     if (!contact?.properties) {
       results.push({ contactId, event: eventType, status: "skip:no_data" });
       continue;
