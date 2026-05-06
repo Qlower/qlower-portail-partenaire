@@ -17,7 +17,17 @@ export type SyncEnumReport = {
   missingActive: Array<{ utm: string; nom: string }>;
   added: number;
   addedItems: Array<{ utm: string; nom: string }>;
+  // Variants detected: an existing enum option uses a different separator
+  // (e.g. partner has UTM "foo-bar" in Supabase but enum has "foo_bar").
+  // We add the partner UTM as a NEW option so HubSpot accepts the PATCH from
+  // the webhook (which writes the kebab UTM, not the snake variant).
+  variantConflicts: Array<{ utm: string; existingValue: string }>;
 };
+
+// Normalize a UTM/value for variant comparison (kebab ↔ snake).
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/[-_]/g, "-");
+}
 
 async function fetchEnumOptions(): Promise<HSOption[]> {
   const res = await fetch(`${HS_BASE}/crm/v3/properties/contacts/partenaire__lead_`, {
@@ -56,11 +66,28 @@ export async function syncHubspotEnum(apply: boolean): Promise<SyncEnumReport> {
   const activePartners = allPartners.filter((p) => p.active);
 
   const enumOptions = await fetchEnumOptions();
-  const enumValues = new Set(enumOptions.map((o) => o.value.toLowerCase()));
+  // Index by exact-lowercase value AND by normalized (kebab) value.
+  // Webhook auto-tag PATCHes with the EXACT UTM string, so HubSpot must
+  // have an option whose value === utm (case sensitive in some HubSpot
+  // accounts). We also track variants for ops visibility.
+  const enumValuesExact = new Set(enumOptions.map((o) => o.value.toLowerCase()));
+  const enumValuesNormalized = new Map<string, string>(); // normalized -> existing exact value
+  for (const o of enumOptions) enumValuesNormalized.set(normalize(o.value), o.value);
 
-  const missingActive = activePartners
-    .filter((p) => !enumValues.has(p.utm.toLowerCase()))
-    .map((p) => ({ utm: p.utm, nom: p.nom }));
+  const missingActive: Array<{ utm: string; nom: string }> = [];
+  const variantConflicts: Array<{ utm: string; existingValue: string }> = [];
+
+  for (const p of activePartners) {
+    if (enumValuesExact.has(p.utm.toLowerCase())) continue; // exact match exists — fine
+    const existingVariant = enumValuesNormalized.get(normalize(p.utm));
+    if (existingVariant) {
+      // Variant detected (e.g. partner UTM "foo-bar" but enum has "foo_bar").
+      // We still need to ADD the partner UTM as a NEW option so the webhook
+      // PATCH succeeds. HubSpot allows multiple options with similar values.
+      variantConflicts.push({ utm: p.utm, existingValue: existingVariant });
+    }
+    missingActive.push({ utm: p.utm, nom: p.nom });
+  }
 
   let added = 0;
   let addedItems: Array<{ utm: string; nom: string }> = [];
@@ -89,5 +116,6 @@ export async function syncHubspotEnum(apply: boolean): Promise<SyncEnumReport> {
     missingActive,
     added,
     addedItems,
+    variantConflicts,
   };
 }

@@ -1,8 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { syncHubspotEnum } from "@/services/sync-enum";
 
 const HS_TOKEN = process.env.HUBSPOT_TOKEN!;
 const HS_BASE = "https://api.hubapi.com";
+
+// Log a webhook tagging error visibly in partner_actions so the admin can
+// see in real time which leads failed to be tagged.
+async function logTagError(
+  supabase: ReturnType<typeof createServiceClient>,
+  partnerId: string | null,
+  contactId: string,
+  reason: string
+) {
+  try {
+    if (partnerId) {
+      await supabase.from("partner_actions").insert({
+        partner_id: partnerId,
+        type: "contact" as const,
+        label: `⚠️ Erreur tag HubSpot — contact ${contactId} : ${reason.slice(0, 200)}`,
+        date: new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }),
+      });
+    }
+    // Always log to server logs so we can grep production logs.
+    console.error(`[webhook-tag-error] contact=${contactId} partner=${partnerId || "?"} reason=${reason}`);
+  } catch (e) {
+    console.error("[webhook-tag-error] failed to persist:", e);
+  }
+}
 
 // ── Verify webhook authenticity ──────────────────────────────
 // Uses a shared secret token in the URL: ?token=WEBHOOK_SECRET
@@ -60,7 +85,7 @@ async function autoTagFromAnalyticsUtm(
   // Look up active partner by UTM (case-insensitive)
   const { data: partner, error } = await supabase
     .from("partners")
-    .select("utm, active")
+    .select("id, utm, active")
     .ilike("utm", utmCandidate)
     .maybeSingle();
 
@@ -77,18 +102,42 @@ async function autoTagFromAnalyticsUtm(
     return null;
   }
 
-  // Patch the contact in HubSpot so subsequent flows see the tag
-  const patchRes = await fetch(`${HS_BASE}/crm/v3/objects/contacts/${contactId}`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${HS_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ properties: { partenaire__lead_: partner.utm } }),
-  });
-  if (!patchRes.ok) {
-    const errText = await patchRes.text();
-    console.log(`[autotag] ${contactId} HubSpot PATCH failed: ${patchRes.status} ${errText}`);
+  // Patch helper — encapsulated for retry after a sync-enum.
+  const tryPatch = async (): Promise<{ ok: boolean; status: number; body: string }> => {
+    const r = await fetch(`${HS_BASE}/crm/v3/objects/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${HS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ properties: { partenaire__lead_: partner.utm } }),
+    });
+    return { ok: r.ok, status: r.status, body: r.ok ? "" : await r.text() };
+  };
+
+  let res = await tryPatch();
+
+  // Self-heal on INVALID_OPTION: the enum HubSpot doesn't yet have the
+  // partner UTM (e.g. brand-new partner, cron sync-enum hasn't run yet).
+  // Trigger sync-enum on demand and retry once.
+  if (!res.ok && /INVALID_OPTION/i.test(res.body)) {
+    console.log(`[autotag] ${contactId} INVALID_OPTION for "${partner.utm}" — running sync-enum then retrying`);
+    try {
+      const report = await syncHubspotEnum(true);
+      console.log(`[autotag] sync-enum: added=${report.added}, variants=${report.variantConflicts.length}`);
+    } catch (e) {
+      console.log(`[autotag] sync-enum failed: ${e}`);
+    }
+    res = await tryPatch();
+  }
+
+  if (!res.ok) {
+    await logTagError(
+      supabase,
+      partner.id,
+      contactId,
+      `HubSpot PATCH ${res.status}: ${res.body.slice(0, 150)}`
+    );
     return null;
   }
 
