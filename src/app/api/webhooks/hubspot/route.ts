@@ -280,9 +280,42 @@ async function upsertLead(
 // HubSpot sends: contact.creation, contact.propertyChange, etc.
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
+  const url = new URL(request.url);
+  const supabase = createServiceClient();
+
+  // ── PROOF OF RECEIPT — log this incoming call BEFORE anything else ──
+  // Even if auth fails or parsing crashes later, we want to know HubSpot
+  // (or whoever) attempted to call us. The /api/admin/webhook-calls endpoint
+  // reads this table. Don't await — non-blocking, errors swallowed.
+  const sourceIp = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "";
+  const userAgent = request.headers.get("user-agent") || "";
+  const hasToken = !!url.searchParams.get("token");
+  let parsedEarly: Array<Record<string, unknown>> = [];
+  try {
+    const j = JSON.parse(rawBody);
+    parsedEarly = Array.isArray(j) ? j : [j];
+  } catch { /* ignore — we still log the receipt */ }
+  const earlyContactIds = parsedEarly.map((e) => String(e.objectId || e.vid || "")).filter(Boolean);
+  const logRowPromise = supabase
+    .from("webhook_call_log")
+    .insert({
+      source_ip: sourceIp.slice(0, 100),
+      user_agent: userAgent.slice(0, 200),
+      has_token: hasToken,
+      events_count: parsedEarly.length,
+      contact_ids: earlyContactIds,
+      body_size: rawBody.length,
+      body_excerpt: rawBody.slice(0, 500),
+    })
+    .select("id")
+    .single()
+    .then((r) => r.data?.id || null);
 
   // Verify request authenticity
   if (!verifyRequest(request)) {
+    logRowPromise.then(async (logId) => {
+      if (logId) await supabase.from("webhook_call_log").update({ http_status: 401, result_summary: "auth failed" }).eq("id", logId);
+    });
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -291,10 +324,12 @@ export async function POST(request: NextRequest) {
     const parsed = JSON.parse(rawBody);
     events = Array.isArray(parsed) ? parsed : [parsed];
   } catch {
+    logRowPromise.then(async (logId) => {
+      if (logId) await supabase.from("webhook_call_log").update({ http_status: 400, result_summary: "invalid json" }).eq("id", logId);
+    });
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
   const results: Array<{ contactId: string; event: string; status: string }> = [];
 
   for (const event of events) {
@@ -317,6 +352,22 @@ export async function POST(request: NextRequest) {
     const result = await upsertLead(supabase, contactId, contact.properties);
     results.push({ contactId, event: eventType, ...result });
   }
+
+  // Update the receipt row with the final outcome
+  const counts = results.reduce<Record<string, number>>((acc, r) => {
+    const key = (r.status || "").split(":")[0] || "unknown";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const summary = Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(", ") || "no events";
+  logRowPromise.then(async (logId) => {
+    if (logId) {
+      await supabase
+        .from("webhook_call_log")
+        .update({ http_status: 200, result_summary: summary })
+        .eq("id", logId);
+    }
+  });
 
   return NextResponse.json({ processed: results.length, results });
 }
