@@ -144,11 +144,11 @@ export default function KitPage() {
               <span className="card-link">Télécharger le guide →</span>
               <span className="card-link">Voir la vidéo →</span>
             </a>
-            <a className="card" href="https://drive.google.com/file/d/185wn2HvpXxOENNtccFAcCbwkxDz0WEc_/view" target="_blank" rel="noreferrer">
+            <a className="card" href="/dashboard/calendrier">
               <div className="card-icon amber">◉</div>
-              <h3>Calendrier fiscal</h3>
-              <p>Échéances clés à transmettre à vos clients chaque année</p>
-              <span className="card-link">Télécharger →</span>
+              <h3>Calendrier fiscal 2026 — 2027</h3>
+              <p>Échéances clés mois par mois — LF 2026, Jeanbrun, TVLH</p>
+              <span className="card-link">Consulter le calendrier →</span>
             </a>
           </div>
 
