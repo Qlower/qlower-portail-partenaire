@@ -50,11 +50,25 @@ export interface RowData {
   notes: NoteEntry[];
 }
 
+/**
+ * Display mode of the attribution table.
+ *
+ * - admin: full edit (dropdown to change attribution + add notes + flag)
+ * - sales-own: this is a sales-only view of their own rows (no dropdown,
+ *   but they can write notes and flag rows for arbitration)
+ * - readonly: pure display (no dropdowns, no edit, no flag, no note add)
+ */
+export type AttributionTableMode = "admin" | "sales-own" | "readonly";
+
 interface Props {
   rows: RowData[];
   commercials: CommercialOption[];
-  editable: boolean;
+  // Legacy boolean for backward compat: editable=true → "admin", false → "readonly"
+  editable?: boolean;
+  mode?: AttributionTableMode;
   yearMonth: string;
+  /** When mode === "sales-own", show a flag button on each row */
+  showFlagButton?: boolean;
 }
 
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
@@ -75,7 +89,20 @@ function ScoreBadge({ score, isOverride }: { score: number | null; isOverride: b
   return <span className={`inline-block min-w-[24px] px-1.5 py-0.5 rounded text-[10px] font-bold text-white ${bg} text-center`}>{s}</span>;
 }
 
-export default function AttributionTable({ rows: initialRows, commercials, editable, yearMonth }: Props) {
+export default function AttributionTable({
+  rows: initialRows,
+  commercials,
+  editable,
+  mode: modeProp,
+  yearMonth,
+  showFlagButton,
+}: Props) {
+  // Resolve effective mode (mode prop wins; else fall back to legacy editable bool)
+  const mode: AttributionTableMode =
+    modeProp ?? (editable ? "admin" : "readonly");
+  const canEditAttribution = mode === "admin";
+  const canAddNote = mode === "admin" || mode === "sales-own";
+  const canFlag = (mode === "admin" || mode === "sales-own") && (showFlagButton ?? mode === "sales-own");
   const [rows, setRows] = useState(initialRows);
   const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
   const [openNotesId, setOpenNotesId] = useState<string | null>(null);
@@ -235,7 +262,9 @@ export default function AttributionTable({ rows: initialRows, commercials, edita
                 key={r.charge_id}
                 row={r}
                 commercials={commercials}
-                editable={editable}
+                editable={canEditAttribution}
+                canAddNote={canAddNote}
+                canFlag={canFlag}
                 openHistory={openHistoryId === r.charge_id}
                 openNotes={openNotesId === r.charge_id}
                 noteForm={noteFormChargeId === r.charge_id}
@@ -247,6 +276,24 @@ export default function AttributionTable({ rows: initialRows, commercials, edita
                 onChangeNoteText={setNoteText}
                 onSubmitNote={() => addNote(r.charge_id)}
                 onChangeAttribution={(cid) => changeAttribution(r.charge_id, cid)}
+                onToggleFlag={async () => {
+                  try {
+                    const newFlag = !r.flagged_for_review;
+                    const resp = await fetch(`/api/sales/flag/${encodeURIComponent(r.charge_id)}`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ flag: newFlag }),
+                    });
+                    if (!resp.ok) {
+                      const err = await resp.json().catch(() => ({}));
+                      throw new Error(err.error || `HTTP ${resp.status}`);
+                    }
+                    setRows((prev) => prev.map((rr) => rr.charge_id === r.charge_id ? { ...rr, flagged_for_review: newFlag } : rr));
+                    showToast(newFlag ? "🚩 Attribution contestée" : "Contestation retirée");
+                  } catch (e) {
+                    showToast(`Erreur : ${e instanceof Error ? e.message : "inconnue"}`, true);
+                  }
+                }}
               />
             ))}
             {filteredRows.length === 0 && (
@@ -275,6 +322,8 @@ interface RowProps {
   row: RowData;
   commercials: CommercialOption[];
   editable: boolean;
+  canAddNote: boolean;
+  canFlag: boolean;
   openHistory: boolean;
   openNotes: boolean;
   noteForm: boolean;
@@ -286,13 +335,14 @@ interface RowProps {
   onChangeNoteText: (t: string) => void;
   onSubmitNote: () => void;
   onChangeAttribution: (commercialId: string | null) => void;
+  onToggleFlag: () => void;
 }
 
 function RowComponent({
-  row, commercials, editable,
+  row, commercials, editable, canAddNote, canFlag,
   openHistory, openNotes, noteForm, noteText,
   onToggleHistory, onToggleNotes, onOpenNoteForm, onCancelNoteForm,
-  onChangeNoteText, onSubmitNote, onChangeAttribution,
+  onChangeNoteText, onSubmitNote, onChangeAttribution, onToggleFlag,
 }: RowProps) {
   return (
     <>
@@ -352,13 +402,22 @@ function RowComponent({
               <MessageSquare className="w-3 h-3" /> {row.notes.length}
             </button>
           )}
-          {!noteForm && (
+          {canAddNote && !noteForm && (
             <button
               onClick={onOpenNoteForm}
               className="inline-flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-[#0A3855]"
               title="Ajouter une note"
             >
               <Plus className="w-3 h-3" />
+            </button>
+          )}
+          {canFlag && (
+            <button
+              onClick={onToggleFlag}
+              className={`inline-flex items-center gap-0.5 text-[10px] ml-1 hover:text-orange-700 ${row.flagged_for_review ? "text-orange-600" : "text-gray-400"}`}
+              title={row.flagged_for_review ? "Retirer la contestation" : "Contester cette attribution"}
+            >
+              <Flag className="w-3 h-3" />
             </button>
           )}
         </td>

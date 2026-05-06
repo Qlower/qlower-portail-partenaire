@@ -1,0 +1,181 @@
+import { createServiceClient } from "@/lib/supabase-server";
+import { Trophy } from "lucide-react";
+
+const MONTHS_FR: Record<string, string> = {
+  "01": "Janvier", "02": "Février", "03": "Mars", "04": "Avril",
+  "05": "Mai", "06": "Juin", "07": "Juillet", "08": "Août",
+  "09": "Septembre", "10": "Octobre", "11": "Novembre", "12": "Décembre",
+};
+
+async function loadTeamData(yearMonth: string) {
+  const sb = createServiceClient();
+
+  const { data: run } = await sb
+    .from("monthly_runs")
+    .select("id, locked")
+    .eq("year_month", yearMonth)
+    .maybeSingle();
+
+  const { data: rows } = await sb
+    .from("attribution_rows")
+    .select("amount_net_eur, auto_commercial_id, override_commercial_id, flagged_for_review")
+    .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
+
+  const { data: commercials } = await sb
+    .from("commercials")
+    .select("id, name, role")
+    .order("name");
+
+  const { data: targets } = await sb
+    .from("commercial_monthly_targets")
+    .select("commercial_id, target_eur")
+    .eq("year_month", yearMonth);
+  const targetById = new Map<string, number>();
+  for (const t of targets || []) targetById.set(t.commercial_id, t.target_eur);
+
+  const { data: teamTarget } = await sb
+    .from("team_monthly_targets")
+    .select("target_eur")
+    .eq("year_month", yearMonth)
+    .maybeSingle();
+
+  // Aggregate by effective commercial
+  type Agg = {
+    id: string;
+    name: string;
+    role: string;
+    rows: number;
+    net: number;
+    flagged: number;
+    target: number;
+  };
+  const byId = new Map<string, Agg>();
+  for (const r of rows || []) {
+    const cid = (r.override_commercial_id || r.auto_commercial_id) as string | null;
+    if (!cid) continue;
+    const c = commercials?.find((x) => x.id === cid);
+    if (!c) continue;
+    const cur = byId.get(cid) || {
+      id: cid,
+      name: c.name,
+      role: c.role,
+      rows: 0,
+      net: 0,
+      flagged: 0,
+      target: targetById.get(cid) || 0,
+    };
+    cur.rows++;
+    cur.net += r.amount_net_eur;
+    if (r.flagged_for_review) cur.flagged++;
+    byId.set(cid, cur);
+  }
+
+  // Include zero-CA commercials so the team list is complete
+  for (const c of commercials || []) {
+    if ((c.role === "sales" || c.role === "sales_admin") && !byId.has(c.id)) {
+      byId.set(c.id, {
+        id: c.id,
+        name: c.name,
+        role: c.role,
+        rows: 0,
+        net: 0,
+        flagged: 0,
+        target: targetById.get(c.id) || 0,
+      });
+    }
+  }
+
+  const all = [...byId.values()].sort((a, b) => b.net - a.net);
+  return { all, teamTarget: teamTarget?.target_eur || 0 };
+}
+
+const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
+const fmtPct = (n: number) => `${n.toFixed(1)}%`;
+
+export default async function EquipePage() {
+  const yearMonth = "2026-04";
+  const { all, teamTarget } = await loadTeamData(yearMonth);
+  const monthLabel = `${MONTHS_FR[yearMonth.slice(-2)]} ${yearMonth.slice(0, 4)}`;
+
+  const totalNet = all.reduce((s, c) => s + c.net, 0);
+  const teamPct = teamTarget > 0 ? (totalNet / teamTarget) * 100 : 0;
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-[#0A3855]">Équipe — {monthLabel}</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Classement temps réel · {fmtEur(totalNet)} sur {fmtEur(teamTarget)} d&apos;objectif équipe ({fmtPct(teamPct)})
+        </p>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr className="text-left text-[11px] uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3">#</th>
+              <th className="px-4 py-3">Commercial</th>
+              <th className="px-4 py-3 text-right">CA Net</th>
+              <th className="px-4 py-3 text-right">Objectif</th>
+              <th className="px-4 py-3 text-right">% atteint</th>
+              <th className="px-4 py-3 text-right">Lignes</th>
+              <th className="px-4 py-3">Progression</th>
+            </tr>
+          </thead>
+          <tbody>
+            {all.map((c, i) => {
+              const pct = c.target > 0 ? (c.net / c.target) * 100 : 0;
+              const ahead = pct >= 100;
+              const colorBar = ahead
+                ? "bg-emerald-500"
+                : pct >= 70
+                  ? "bg-[#0A3855]"
+                  : pct >= 30
+                    ? "bg-amber-400"
+                    : "bg-red-300";
+              return (
+                <tr key={c.id} className="border-t border-gray-100">
+                  <td className="px-4 py-3">
+                    {i === 0 && c.target > 0 ? (
+                      <Trophy className="w-4 h-4 text-amber-500" />
+                    ) : (
+                      <span className="text-xs text-gray-400">{i + 1}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <strong className="text-gray-900">{c.name}</strong>
+                    <span className="ml-2 text-[11px] text-gray-400">({c.role})</span>
+                    {c.flagged > 0 && (
+                      <span className="ml-2 text-[11px] text-orange-600">🚩 {c.flagged}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums">{fmtEur(c.net)}</td>
+                  <td className="px-4 py-3 text-right text-xs text-gray-500 font-mono tabular-nums">
+                    {c.target > 0 ? fmtEur(c.target) : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                    {c.target > 0 ? (
+                      <span className={ahead ? "text-emerald-600" : pct >= 70 ? "text-[#0A3855]" : "text-orange-600"}>
+                        {fmtPct(pct)}
+                      </span>
+                    ) : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right text-xs text-gray-500 font-mono tabular-nums">{c.rows}</td>
+                  <td className="px-4 py-3">
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden w-full max-w-[180px]">
+                      <div className={`h-full ${colorBar} transition-all`} style={{ width: `${Math.min(100, pct)}%` }} />
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[11px] text-gray-400 text-center">
+        Vue accessible à toute l&apos;équipe (lecture seule pour les négos).
+      </p>
+    </div>
+  );
+}
