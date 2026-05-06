@@ -1,0 +1,430 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronDown, History, MessageSquare, Flag, Plus } from "lucide-react";
+
+export interface CommercialOption {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface HistoryEntry {
+  id: string;
+  when_at: string;
+  who_email: string | null;
+  from_commercial: string | null;
+  to_commercial: string | null;
+  comment: string | null;
+}
+
+export interface NoteEntry {
+  id: string;
+  author_email: string | null;
+  when_at: string;
+  text: string;
+}
+
+export interface RowData {
+  charge_id: string;
+  email: string;
+  created_at: string;
+  amount_net_eur: number;
+  family: string | null;
+  newbiz_1m: string | null;
+  newbiz_3m: string | null;
+  auto_commercial_id: string | null;
+  auto_score: number | null;
+  auto_source: string | null;
+  auto_reason: string | null;
+  override_commercial_id: string | null;
+  override_set_by_email: string | null;
+  override_set_at: string | null;
+  effective_commercial_id: string | null;
+  effective_commercial_name: string | null;
+  is_override: boolean;
+  flagged_for_review: boolean;
+  flagged_reason: string | null;
+  history: HistoryEntry[];
+  notes: NoteEntry[];
+}
+
+interface Props {
+  rows: RowData[];
+  commercials: CommercialOption[];
+  editable: boolean;
+  yearMonth: string;
+}
+
+const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
+const fmtDate = (iso: string) => iso.slice(0, 10);
+const fmtDt = (iso: string) => {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+};
+
+function ScoreBadge({ score, isOverride }: { score: number | null; isOverride: boolean }) {
+  if (isOverride) return <span className="inline-block min-w-[24px] px-1.5 py-0.5 rounded text-[10px] font-bold text-white bg-violet-600 text-center" title="Manuel">M</span>;
+  const s = score ?? 0;
+  let bg = "bg-gray-400";
+  if (s >= 8) bg = "bg-emerald-600";
+  else if (s >= 6) bg = "bg-amber-500";
+  else if (s > 0) bg = "bg-red-500";
+  return <span className={`inline-block min-w-[24px] px-1.5 py-0.5 rounded text-[10px] font-bold text-white ${bg} text-center`}>{s}</span>;
+}
+
+export default function AttributionTable({ rows: initialRows, commercials, editable, yearMonth }: Props) {
+  const [rows, setRows] = useState(initialRows);
+  const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
+  const [openNotesId, setOpenNotesId] = useState<string | null>(null);
+  const [noteFormChargeId, setNoteFormChargeId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState("");
+  const [filter, setFilter] = useState("");
+  const [filterMode, setFilterMode] = useState<"all" | "flagged" | "manual" | "low_score" | "search">("all");
+  const [, startTransition] = useTransition();
+  const router = useRouter();
+  const [toast, setToast] = useState<{ msg: string; isError?: boolean } | null>(null);
+  const showToast = (msg: string, isError = false) => {
+    setToast({ msg, isError });
+    setTimeout(() => setToast(null), 2400);
+  };
+
+  // Filtering
+  const filteredRows = rows.filter((r) => {
+    if (filterMode === "flagged" && !r.flagged_for_review) return false;
+    if (filterMode === "manual" && !r.is_override) return false;
+    if (filterMode === "low_score" && (r.is_override || (r.auto_score ?? 0) >= 6)) return false;
+    if (filterMode === "search" && filter && !r.email.toLowerCase().includes(filter.toLowerCase())) return false;
+    return true;
+  });
+
+  // Sort by net DESC
+  filteredRows.sort((a, b) => b.amount_net_eur - a.amount_net_eur);
+
+  async function changeAttribution(chargeId: string, newCommercialId: string | null) {
+    const row = rows.find((r) => r.charge_id === chargeId);
+    if (!row) return;
+    try {
+      const r = await fetch(`/api/sales/overrides/${encodeURIComponent(chargeId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commercial_id: newCommercialId }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${r.status}`);
+      }
+      const data = await r.json();
+      const newCommercial = newCommercialId ? commercials.find((c) => c.id === newCommercialId) : null;
+      const newCommercialName = newCommercialId
+        ? newCommercial?.name || "—"
+        : commercials.find((c) => c.id === row.auto_commercial_id)?.name || "Non attribué";
+
+      setRows((prev) =>
+        prev.map((r) =>
+          r.charge_id === chargeId
+            ? {
+                ...r,
+                override_commercial_id: newCommercialId,
+                effective_commercial_id: newCommercialId || r.auto_commercial_id,
+                effective_commercial_name: newCommercialName,
+                is_override: !!newCommercialId,
+                flagged_for_review: false,
+                history: [
+                  {
+                    id: data.history_entry?.when || String(Date.now()),
+                    when_at: data.history_entry?.when || new Date().toISOString(),
+                    who_email: data.history_entry?.who || null,
+                    from_commercial: data.history_entry?.from || null,
+                    to_commercial: data.history_entry?.to || null,
+                    comment: null,
+                  },
+                  ...r.history,
+                ],
+              }
+            : r,
+        ),
+      );
+      showToast(`Attribution → ${newCommercialName}`);
+      // Refresh server data so totals stay accurate
+      startTransition(() => router.refresh());
+    } catch (e) {
+      showToast(`Erreur : ${e instanceof Error ? e.message : "inconnue"}`, true);
+    }
+  }
+
+  async function addNote(chargeId: string) {
+    if (!noteText.trim()) return;
+    try {
+      const r = await fetch(`/api/sales/notes/${encodeURIComponent(chargeId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: noteText }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${r.status}`);
+      }
+      const data = await r.json();
+      setRows((prev) =>
+        prev.map((r) =>
+          r.charge_id === chargeId
+            ? { ...r, notes: [data.note, ...r.notes] }
+            : r,
+        ),
+      );
+      setNoteText("");
+      setNoteFormChargeId(null);
+      setOpenNotesId(chargeId);
+      showToast("Note ajoutée");
+    } catch (e) {
+      showToast(`Erreur : ${e instanceof Error ? e.message : "inconnue"}`, true);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <span className="text-xs text-gray-500">Filtre :</span>
+        {([
+          { v: "all", l: `Toutes (${rows.length})` },
+          { v: "flagged", l: `🚩 Contestées (${rows.filter((r) => r.flagged_for_review).length})` },
+          { v: "manual", l: `✎ Manuelles (${rows.filter((r) => r.is_override).length})` },
+          { v: "low_score", l: `À vérifier (${rows.filter((r) => !r.is_override && (r.auto_score ?? 0) > 0 && (r.auto_score ?? 0) < 6).length})` },
+        ] as const).map((opt) => (
+          <button
+            key={opt.v}
+            onClick={() => { setFilterMode(opt.v); setFilter(""); }}
+            className={`text-xs px-2.5 py-1 rounded border transition-colors ${
+              filterMode === opt.v ? "bg-[#0A3855] text-white border-[#0A3855]" : "bg-white text-gray-700 border-gray-200 hover:border-gray-300"
+            }`}
+          >
+            {opt.l}
+          </button>
+        ))}
+        <input
+          type="search"
+          placeholder="🔍 Rechercher par email…"
+          value={filter}
+          onChange={(e) => { setFilter(e.target.value); setFilterMode("search"); }}
+          className="text-xs px-2 py-1 border border-gray-200 rounded ml-auto w-64"
+        />
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg">
+        <table className="w-full text-xs">
+          <thead className="bg-gray-50">
+            <tr className="text-left text-[11px] uppercase tracking-wider text-gray-500">
+              <th className="px-3 py-2 sticky left-0 bg-gray-50">Email</th>
+              <th className="px-2 py-2">Date</th>
+              <th className="px-2 py-2 text-right">Net</th>
+              <th className="px-2 py-2">Famille</th>
+              <th className="px-2 py-2">1m / 3m</th>
+              <th className="px-2 py-2">Attribution</th>
+              <th className="px-2 py-2">Raison</th>
+              <th className="px-2 py-2 w-24"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRows.map((r) => (
+              <RowComponent
+                key={r.charge_id}
+                row={r}
+                commercials={commercials}
+                editable={editable}
+                openHistory={openHistoryId === r.charge_id}
+                openNotes={openNotesId === r.charge_id}
+                noteForm={noteFormChargeId === r.charge_id}
+                noteText={noteFormChargeId === r.charge_id ? noteText : ""}
+                onToggleHistory={() => setOpenHistoryId(openHistoryId === r.charge_id ? null : r.charge_id)}
+                onToggleNotes={() => setOpenNotesId(openNotesId === r.charge_id ? null : r.charge_id)}
+                onOpenNoteForm={() => { setNoteFormChargeId(r.charge_id); setNoteText(""); }}
+                onCancelNoteForm={() => { setNoteFormChargeId(null); setNoteText(""); }}
+                onChangeNoteText={setNoteText}
+                onSubmitNote={() => addNote(r.charge_id)}
+                onChangeAttribution={(cid) => changeAttribution(r.charge_id, cid)}
+              />
+            ))}
+            {filteredRows.length === 0 && (
+              <tr><td colSpan={8} className="px-3 py-6 text-center text-gray-400">Aucune ligne</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[11px] text-gray-400 text-center">
+        {filteredRows.length} / {rows.length} lignes — {yearMonth} —{" "}
+        {editable ? "Édition activée (sales_admin)" : "Lecture seule"}
+      </p>
+
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 px-4 py-2.5 rounded-lg text-white text-sm shadow-lg z-50 ${toast.isError ? "bg-red-600" : "bg-[#0A3855]"}`}>
+          {toast.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface RowProps {
+  row: RowData;
+  commercials: CommercialOption[];
+  editable: boolean;
+  openHistory: boolean;
+  openNotes: boolean;
+  noteForm: boolean;
+  noteText: string;
+  onToggleHistory: () => void;
+  onToggleNotes: () => void;
+  onOpenNoteForm: () => void;
+  onCancelNoteForm: () => void;
+  onChangeNoteText: (t: string) => void;
+  onSubmitNote: () => void;
+  onChangeAttribution: (commercialId: string | null) => void;
+}
+
+function RowComponent({
+  row, commercials, editable,
+  openHistory, openNotes, noteForm, noteText,
+  onToggleHistory, onToggleNotes, onOpenNoteForm, onCancelNoteForm,
+  onChangeNoteText, onSubmitNote, onChangeAttribution,
+}: RowProps) {
+  return (
+    <>
+      <tr className="border-t border-gray-100 hover:bg-gray-50/40">
+        <td className="px-3 py-2 font-mono text-[11px] sticky left-0 bg-white">{row.email}</td>
+        <td className="px-2 py-2 whitespace-nowrap">{fmtDate(row.created_at)}</td>
+        <td className="px-2 py-2 text-right font-mono tabular-nums">{fmtEur(row.amount_net_eur)}</td>
+        <td className="px-2 py-2">{row.family || "—"}</td>
+        <td className="px-2 py-2 text-[11px] text-gray-500">
+          {row.newbiz_1m || "—"} / {row.newbiz_3m || "—"}
+        </td>
+        <td className="px-2 py-2">
+          {editable ? (
+            <div className="flex items-center gap-1.5">
+              <select
+                value={row.override_commercial_id || ""}
+                onChange={(e) => onChangeAttribution(e.target.value || null)}
+                className="text-[11px] px-1.5 py-1 border border-gray-200 rounded max-w-[140px]"
+              >
+                <option value="">— auto ({commercials.find((c) => c.id === row.auto_commercial_id)?.name || "—"})</option>
+                {commercials.filter((c) => c.role === "sales" || c.role === "upsell" || c.role === "sales_admin").map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <ScoreBadge score={row.auto_score} isOverride={row.is_override} />
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <ScoreBadge score={row.auto_score} isOverride={row.is_override} />
+              <strong className="text-gray-900">{row.effective_commercial_name || "—"}</strong>
+            </div>
+          )}
+          {row.flagged_for_review && (
+            <span className="ml-1 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700">🚩</span>
+          )}
+        </td>
+        <td className="px-2 py-2 text-[11px]">
+          <div className="font-medium text-gray-800">{row.is_override ? "Manuel" : (row.auto_source || "—")}</div>
+          <div className="text-gray-500 leading-snug">{row.auto_reason || "—"}</div>
+        </td>
+        <td className="px-2 py-2 whitespace-nowrap text-right">
+          {row.history.length > 0 && (
+            <button
+              onClick={onToggleHistory}
+              className="inline-flex items-center gap-0.5 text-[10px] text-gray-600 hover:text-[#0A3855] mr-1"
+              title={`${row.history.length} modification(s)`}
+            >
+              <History className="w-3 h-3" /> {row.history.length}
+            </button>
+          )}
+          {row.notes.length > 0 && (
+            <button
+              onClick={onToggleNotes}
+              className="inline-flex items-center gap-0.5 text-[10px] text-gray-600 hover:text-[#0A3855] mr-1"
+              title={`${row.notes.length} note(s)`}
+            >
+              <MessageSquare className="w-3 h-3" /> {row.notes.length}
+            </button>
+          )}
+          {!noteForm && (
+            <button
+              onClick={onOpenNoteForm}
+              className="inline-flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-[#0A3855]"
+              title="Ajouter une note"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          )}
+        </td>
+      </tr>
+      {openHistory && row.history.length > 0 && (
+        <tr className="bg-blue-50/30">
+          <td colSpan={8} className="px-3 py-2">
+            <div className="text-[11px]">
+              <strong className="text-[#0A3855]">Historique :</strong>
+              <ul className="mt-1 space-y-0.5">
+                {row.history.map((h) => (
+                  <li key={h.id} className="text-gray-700">
+                    <span className="text-gray-400 font-mono">{fmtDt(h.when_at)}</span>{" "}
+                    <strong>{h.who_email}</strong> : {h.from_commercial} → {h.to_commercial}
+                    {h.comment ? <em className="text-gray-500"> — {h.comment}</em> : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </td>
+        </tr>
+      )}
+      {openNotes && row.notes.length > 0 && (
+        <tr className="bg-amber-50/30">
+          <td colSpan={8} className="px-3 py-2">
+            <div className="text-[11px]">
+              <strong className="text-[#0A3855]">Notes :</strong>
+              <ul className="mt-1 space-y-0.5">
+                {row.notes.map((n) => (
+                  <li key={n.id} className="text-gray-700">
+                    <span className="text-gray-400 font-mono">{fmtDt(n.when_at)}</span>{" "}
+                    <strong>{n.author_email}</strong> : {n.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </td>
+        </tr>
+      )}
+      {noteForm && (
+        <tr className="bg-amber-50/50">
+          <td colSpan={8} className="px-3 py-2">
+            <div className="flex gap-2 items-start">
+              <textarea
+                value={noteText}
+                onChange={(e) => onChangeNoteText(e.target.value)}
+                placeholder="Ex : Hasan a closé alors que Driss avait pris le RDV initial"
+                rows={2}
+                className="flex-1 text-[11px] px-2 py-1.5 border border-gray-300 rounded resize-y"
+                autoFocus
+              />
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={onSubmitNote}
+                  disabled={!noteText.trim()}
+                  className="text-[11px] px-3 py-1 bg-[#0A3855] text-white rounded disabled:opacity-40"
+                >Enregistrer</button>
+                <button
+                  onClick={onCancelNoteForm}
+                  className="text-[11px] px-3 py-1 border border-gray-200 rounded"
+                >Annuler</button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}

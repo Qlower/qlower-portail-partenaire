@@ -60,8 +60,18 @@ export default function LoginForm() {
     setLoading(true);
     try {
       const data = await signIn(email, password);
-      const role = data?.user?.user_metadata?.role || data?.session?.user?.user_metadata?.role;
-      router.push(role === "admin" ? "/admin" : "/dashboard");
+      const meta = (data?.user?.user_metadata || data?.session?.user?.user_metadata) as Record<string, unknown> | undefined;
+      const role = meta?.role;
+      const internalRole = meta?.internal_role;
+      const params = new URLSearchParams(window.location.search);
+      const returnTo = params.get("returnTo");
+      const target =
+        role === "admin"
+          ? "/admin"
+          : internalRole === "sales" || internalRole === "sales_admin"
+            ? returnTo && returnTo.startsWith("/sales") ? returnTo : "/sales"
+            : "/dashboard";
+      router.push(target);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Erreur de connexion.";
       setError(message === "Invalid login credentials" ? "Email ou mot de passe incorrect." : message);

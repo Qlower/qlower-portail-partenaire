@@ -1,0 +1,173 @@
+import { createServiceClient } from "@/lib/supabase-server";
+import AttributionTable, {
+  type RowData,
+  type CommercialOption,
+  type HistoryEntry,
+  type NoteEntry,
+} from "@/components/internal/AttributionTable";
+
+interface DbRow {
+  charge_id: string;
+  email: string;
+  created_at: string;
+  amount_net_eur: number;
+  family: string | null;
+  newbiz_1m: string | null;
+  newbiz_3m: string | null;
+  auto_commercial_id: string | null;
+  auto_score: number | null;
+  auto_source: string | null;
+  auto_reason: string | null;
+  override_commercial_id: string | null;
+  override_set_by: string | null;
+  override_set_at: string | null;
+  flagged_for_review: boolean | null;
+  flagged_reason: string | null;
+}
+
+const MONTHS_FR: Record<string, string> = {
+  "01": "Janvier", "02": "Février", "03": "Mars", "04": "Avril",
+  "05": "Mai", "06": "Juin", "07": "Juillet", "08": "Août",
+  "09": "Septembre", "10": "Octobre", "11": "Novembre", "12": "Décembre",
+};
+
+async function loadAttributionData(yearMonth: string) {
+  const sb = createServiceClient();
+
+  const { data: run } = await sb
+    .from("monthly_runs")
+    .select("id, locked, locked_at, year_month")
+    .eq("year_month", yearMonth)
+    .maybeSingle();
+
+  const { data: rawRows } = await sb
+    .from("attribution_rows")
+    .select(
+      "charge_id, email, created_at, amount_net_eur, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason",
+    )
+    .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
+
+  const dbRows = (rawRows || []) as DbRow[];
+
+  const { data: commercials } = await sb
+    .from("commercials")
+    .select("id, name, role")
+    .order("name");
+
+  // Fetch history + notes in single queries (avoid N+1)
+  const chargeIds = dbRows.map((r) => r.charge_id);
+  const { data: history } = chargeIds.length
+    ? await sb
+        .from("attribution_history")
+        .select("id, charge_id, who_email, from_commercial, to_commercial, comment, when_at")
+        .in("charge_id", chargeIds)
+        .order("when_at", { ascending: false })
+    : { data: [] as Array<HistoryEntry & { charge_id: string }> };
+
+  const { data: notes } = chargeIds.length
+    ? await sb
+        .from("attribution_notes")
+        .select("id, charge_id, author_email, text, when_at")
+        .in("charge_id", chargeIds)
+        .order("when_at", { ascending: false })
+    : { data: [] as Array<NoteEntry & { charge_id: string }> };
+
+  const historyByCharge = new Map<string, HistoryEntry[]>();
+  for (const h of history || []) {
+    const list = historyByCharge.get(h.charge_id) || [];
+    list.push({
+      id: h.id,
+      when_at: h.when_at,
+      who_email: h.who_email,
+      from_commercial: h.from_commercial,
+      to_commercial: h.to_commercial,
+      comment: h.comment,
+    });
+    historyByCharge.set(h.charge_id, list);
+  }
+  const notesByCharge = new Map<string, NoteEntry[]>();
+  for (const n of notes || []) {
+    const list = notesByCharge.get(n.charge_id) || [];
+    list.push({
+      id: n.id,
+      author_email: n.author_email,
+      when_at: n.when_at,
+      text: n.text,
+    });
+    notesByCharge.set(n.charge_id, list);
+  }
+
+  const commById = new Map((commercials || []).map((c) => [c.id, c]));
+
+  const rows: RowData[] = dbRows.map((r) => {
+    const effectiveId = r.override_commercial_id || r.auto_commercial_id;
+    const effectiveCommercial = effectiveId ? commById.get(effectiveId) : null;
+    return {
+      charge_id: r.charge_id,
+      email: r.email,
+      created_at: r.created_at,
+      amount_net_eur: r.amount_net_eur,
+      family: r.family,
+      newbiz_1m: r.newbiz_1m,
+      newbiz_3m: r.newbiz_3m,
+      auto_commercial_id: r.auto_commercial_id,
+      auto_score: r.auto_score,
+      auto_source: r.auto_source,
+      auto_reason: r.auto_reason,
+      override_commercial_id: r.override_commercial_id,
+      override_set_by_email: null,
+      override_set_at: r.override_set_at,
+      effective_commercial_id: effectiveId,
+      effective_commercial_name: effectiveCommercial?.name || null,
+      is_override: !!r.override_commercial_id,
+      flagged_for_review: !!r.flagged_for_review,
+      flagged_reason: r.flagged_reason,
+      history: historyByCharge.get(r.charge_id) || [],
+      notes: notesByCharge.get(r.charge_id) || [],
+    };
+  });
+
+  const commercialOptions: CommercialOption[] = (commercials || []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    role: c.role,
+  }));
+
+  return { rows, commercials: commercialOptions, run };
+}
+
+export default async function AttributionAdminPage() {
+  const yearMonth = "2026-04";
+  const { rows, commercials, run } = await loadAttributionData(yearMonth);
+  const monthLabel = `${MONTHS_FR[yearMonth.slice(-2)]} ${yearMonth.slice(0, 4)}`;
+  const editable = !run?.locked;
+
+  return (
+    <div className="max-w-[1400px] mx-auto space-y-4">
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#0A3855]">Attribution — {monthLabel}</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {rows.length} ligne{rows.length > 1 ? "s" : ""} en scope · Édition admin{" "}
+            {run?.locked ? "(verrouillé)" : "(active)"}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <a
+            href={`/sales`}
+            className="text-xs text-gray-500 hover:text-[#0A3855] px-3 py-1.5 border border-gray-200 rounded"
+          >
+            ← Vue d&apos;ensemble
+          </a>
+        </div>
+      </div>
+
+      <AttributionTable
+        rows={rows}
+        commercials={commercials}
+        editable={editable}
+        yearMonth={yearMonth}
+      />
+    </div>
+  );
+}

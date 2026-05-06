@@ -10,10 +10,13 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (user) {
-      const role = user.user_metadata?.role;
-      router.replace(role === "admin" ? "/admin" : "/dashboard");
-    }
+    if (!user) return;
+    const meta = user.user_metadata as Record<string, unknown> | undefined;
+    const role = meta?.role;
+    const internalRole = meta?.internal_role;
+    if (role === "admin") router.replace("/admin");
+    else if (internalRole === "sales" || internalRole === "sales_admin") router.replace("/sales");
+    else router.replace("/dashboard");
   }, [user, router]);
 
   if (loading) {
