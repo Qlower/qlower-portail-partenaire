@@ -9,9 +9,9 @@ export const runtime = "nodejs"; // need raw body for signature verification
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 
-const stripe = STRIPE_SECRET_KEY
-  ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2026-04-22.dahlia" })
-  : null;
+// Use the SDK's default API version (avoids hard-coded version mismatch
+// between TS types and runtime if the published SDK lags behind).
+const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
 interface ChargeUpsertInput {
   charge_id: string;
