@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/reconcile-attribution",
       "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/sales-rescore",
-      "schedule": "0 * * * *"
     }
   ]
 }
