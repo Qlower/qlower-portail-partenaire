@@ -50,11 +50,19 @@ async function loadTeamData(yearMonth: string) {
     target: number;
   };
   const byId = new Map<string, Agg>();
+  let autonomeNet = 0;
+  let autonomeRows = 0;
   for (const r of rows || []) {
     const cid = (r.override_commercial_id || r.auto_commercial_id) as string | null;
     if (!cid) continue;
     const c = commercials?.find((x) => x.id === cid);
     if (!c) continue;
+    // Achats autonomes : compté dans le total mais pas dans le classement.
+    if (c.role === "system_none") {
+      autonomeNet += r.amount_net_eur;
+      autonomeRows++;
+      continue;
+    }
     const cur = byId.get(cid) || {
       id: cid,
       name: c.name,
@@ -86,7 +94,7 @@ async function loadTeamData(yearMonth: string) {
   }
 
   const all = [...byId.values()].sort((a, b) => b.net - a.net);
-  return { all, teamTarget: teamTarget?.target_eur || 0 };
+  return { all, teamTarget: teamTarget?.target_eur || 0, autonomeNet, autonomeRows };
 }
 
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
@@ -94,10 +102,12 @@ const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 
 export default async function EquipePage() {
   const yearMonth = "2026-04";
-  const { all, teamTarget } = await loadTeamData(yearMonth);
+  const { all, teamTarget, autonomeNet, autonomeRows } = await loadTeamData(yearMonth);
   const monthLabel = `${MONTHS_FR[yearMonth.slice(-2)]} ${yearMonth.slice(0, 4)}`;
 
-  const totalNet = all.reduce((s, c) => s + c.net, 0);
+  // Le total d'équipe inclut les achats autonomes (pour la jauge globale)
+  // mais le classement individuel ne les liste pas.
+  const totalNet = all.reduce((s, c) => s + c.net, 0) + autonomeNet;
   const teamPct = teamTarget > 0 ? (totalNet / teamTarget) * 100 : 0;
 
   return (
@@ -172,6 +182,15 @@ export default async function EquipePage() {
           </tbody>
         </table>
       </div>
+
+      {autonomeRows > 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between text-xs">
+          <span className="text-gray-600">
+            🚫 <strong>Achats autonomes</strong> — {autonomeRows} vente{autonomeRows > 1 ? "s" : ""} sans intervention sales (hors classement)
+          </span>
+          <span className="font-mono tabular-nums text-gray-700">{fmtEur(autonomeNet)}</span>
+        </div>
+      )}
 
       <p className="text-[11px] text-gray-400 text-center">
         Vue accessible à toute l&apos;équipe (lecture seule pour les négos).

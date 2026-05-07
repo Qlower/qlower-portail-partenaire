@@ -360,12 +360,43 @@ function RowComponent({
               <select
                 value={row.override_commercial_id || ""}
                 onChange={(e) => onChangeAttribution(e.target.value || null)}
-                className="text-[11px] px-1.5 py-1 border border-gray-200 rounded max-w-[140px]"
+                className="text-[11px] px-1.5 py-1 border border-gray-200 rounded max-w-[160px]"
               >
                 <option value="">— auto ({commercials.find((c) => c.id === row.auto_commercial_id)?.name || "—"})</option>
-                {commercials.filter((c) => c.role === "sales" || c.role === "upsell" || c.role === "sales_admin").map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
+                {/* Cas spéciaux : achat autonome (pas de sales) ou support */}
+                {commercials
+                  .filter((c) => c.role === "system_none")
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>🚫 {c.name}</option>
+                  ))}
+                <optgroup label="Sales">
+                  {commercials
+                    .filter((c) => c.role === "sales" || c.role === "sales_admin")
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                </optgroup>
+                <optgroup label="Upsell">
+                  {commercials
+                    .filter((c) => c.role === "upsell")
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                </optgroup>
+                <optgroup label="Support">
+                  {commercials
+                    .filter((c) => c.role === "support")
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                </optgroup>
+                <optgroup label="Anciens">
+                  {commercials
+                    .filter((c) => c.role === "former")
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                </optgroup>
               </select>
               <ScoreBadge score={row.auto_score} isOverride={row.is_override} />
             </div>

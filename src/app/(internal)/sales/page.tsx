@@ -47,9 +47,20 @@ async function getDashboardData(yearMonth: string) {
   const byId = new Map<string, Agg>();
   let totalNet = 0;
   let flaggedCount = 0;
+  // Hors-classement (achat autonome) : compté dans le total mais pas dans
+  // le ranking individuel (puisqu'aucun commercial n'est responsable).
+  let autonomeNet = 0;
+  let autonomeRows = 0;
   for (const r of rows || []) {
     const cid = (r.override_commercial_id || r.auto_commercial_id) as string | null;
     const c = commercials?.find((x) => x.id === cid);
+    if (c?.role === "system_none") {
+      autonomeNet += r.amount_net_eur;
+      autonomeRows++;
+      totalNet += r.amount_net_eur;
+      if (r.flagged_for_review) flaggedCount++;
+      continue;
+    }
     const key = cid || "unmapped";
     const cur = byId.get(key) || {
       name: c?.name || "(Non attribué)",
@@ -79,6 +90,8 @@ async function getDashboardData(yearMonth: string) {
     totalRows: rows?.length || 0,
     locked: runRow?.locked || false,
     flaggedCount,
+    autonomeNet,
+    autonomeRows,
     perCommercial: [...byId.entries()]
       .map(([id, v]) => ({
         id,
@@ -139,6 +152,22 @@ export default async function SalesHomePage() {
           </div>
         </div>
       </div>
+
+      {/* Hors-classement : achats autonomes */}
+      {data.autonomeRows > 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-wider text-gray-500">🚫 Hors classement — Achats autonomes</div>
+            <div className="text-xs text-gray-600 mt-1">
+              {data.autonomeRows} vente{data.autonomeRows > 1 ? "s" : ""} sans intervention sales
+              (compté dans le CA équipe, pas dans le ranking individuel).
+            </div>
+          </div>
+          <div className="text-xl font-bold text-gray-700 font-mono tabular-nums">
+            {fmtEur(data.autonomeNet)}
+          </div>
+        </div>
+      )}
 
       {/* Per-commercial */}
       <div className="bg-white border border-gray-200 rounded-lg">
