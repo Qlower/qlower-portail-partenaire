@@ -17,6 +17,7 @@ interface ChargeUpsertInput {
   charge_id: string;
   email: string;
   phone: string | null;
+  client_name: string | null;
   customer_id: string;
   created_at: string; // ISO
   amount_gross_eur: number;
@@ -92,6 +93,7 @@ async function upsertCharge(input: ChargeUpsertInput): Promise<{ created: boolea
     customer_id: input.customer_id,
     email: input.email,
     phone: input.phone,
+    client_name: input.client_name,
     created_at: input.created_at,
     amount_gross_eur: input.amount_gross_eur,
     amount_refunded_eur: input.amount_refunded_eur,
@@ -166,14 +168,17 @@ export async function POST(request: NextRequest) {
         // object). Used to dedupe HubSpot contacts when a person has multiple
         // fiches HubSpot (cas Baptiste Perlin).
         let phone: string | null = charge.billing_details?.phone || null;
-        if (!phone && customerId) {
+        let clientName: string | null = charge.billing_details?.name || null;
+        if ((!phone || !clientName) && customerId) {
           try {
             const customer = await stripe.customers.retrieve(customerId);
             if (!("deleted" in customer) || customer.deleted !== true) {
-              phone = (customer as Stripe.Customer).phone || null;
+              const c = customer as Stripe.Customer;
+              if (!phone) phone = c.phone || null;
+              if (!clientName) clientName = c.name || null;
             }
           } catch {
-            // Customer fetch failed — non-blocking, on continue sans tél
+            // Customer fetch failed — non-blocking, on continue sans tél / nom
           }
         }
 
@@ -181,6 +186,7 @@ export async function POST(request: NextRequest) {
           charge_id: charge.id,
           email,
           phone,
+          client_name: clientName,
           customer_id: customerId,
           created_at: new Date(charge.created * 1000).toISOString(),
           amount_gross_eur: Math.round(charge.amount / 100),

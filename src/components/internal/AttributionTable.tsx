@@ -29,6 +29,7 @@ export interface NoteEntry {
 export interface RowData {
   charge_id: string;
   email: string;
+  client_name: string | null;
   created_at: string;
   amount_net_eur: number;
   family: string | null;
@@ -131,13 +132,22 @@ export default function AttributionTable({
     setTimeout(() => setToast(null), 2400);
   };
 
-  // Filtering
+  // Filtering — la recherche match email OU client_name OU partie locale de l'email
+  // (ex: "baptiste" matche aussi baptiste.perlin@gmail.com même sans client_name).
   const filteredRows = rows.filter((r) => {
     if (filterMode === "mine" && r.effective_commercial_id !== myCommercialId) return false;
     if (filterMode === "flagged" && !r.flagged_for_review) return false;
     if (filterMode === "manual" && !r.is_override) return false;
     if (filterMode === "low_score" && (r.is_override || (r.auto_score ?? 0) >= 6)) return false;
-    if (filterMode === "search" && filter && !r.email.toLowerCase().includes(filter.toLowerCase())) return false;
+    if (filterMode === "search" && filter) {
+      const q = filter.toLowerCase();
+      const haystack = [
+        r.email.toLowerCase(),
+        (r.client_name || "").toLowerCase(),
+        r.email.split("@")[0].toLowerCase().replace(/[._-]/g, " "),
+      ].join(" ");
+      if (!haystack.includes(q)) return false;
+    }
     return true;
   });
 
@@ -259,7 +269,7 @@ export default function AttributionTable({
         ))}
         <input
           type="search"
-          placeholder="🔍 Rechercher par email…"
+          placeholder="🔍 Rechercher par nom ou email…"
           value={filter}
           onChange={(e) => { setFilter(e.target.value); setFilterMode("search"); }}
           className="text-xs px-2 py-1 border border-gray-200 rounded ml-auto w-64"
@@ -387,9 +397,12 @@ function RowComponent({
   return (
     <>
       <tr className={rowClass}>
-        <td className={`px-3 py-2 font-mono text-[11px] sticky left-0 ${cellBg}`}>
-          {isMine && <span className="mr-1" title="Attribuée à moi">●</span>}
-          {row.email}
+        <td className={`px-3 py-2 sticky left-0 ${cellBg}`}>
+          {isMine && <span className="mr-1 text-[#0A3855]" title="Attribuée à moi">●</span>}
+          {row.client_name && (
+            <div className="text-[12px] font-semibold text-gray-900">{row.client_name}</div>
+          )}
+          <div className="font-mono text-[11px] text-gray-500">{row.email}</div>
         </td>
         <td className="px-2 py-2 whitespace-nowrap">{fmtDate(row.created_at)}</td>
         <td className="px-2 py-2 text-right font-mono tabular-nums">{fmtEur(row.amount_net_eur)}</td>

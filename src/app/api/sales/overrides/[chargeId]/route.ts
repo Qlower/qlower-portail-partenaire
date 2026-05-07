@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { verifySales } from "@/lib/sales-auth";
+import { notifyOverrideOnFlaggedRow } from "@/lib/sales-notifications";
 
 interface OverrideBody {
   commercial_id?: string | null;     // commercials.id; null/empty = clear override
@@ -31,12 +32,16 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ charge
   // Fetch current state of the row + commercial names for the audit log
   const { data: row, error: rowErr } = await sb
     .from("attribution_rows")
-    .select("charge_id, run_id, auto_commercial_id, override_commercial_id")
+    .select("charge_id, run_id, auto_commercial_id, override_commercial_id, flagged_for_review")
     .eq("charge_id", chargeId)
     .maybeSingle();
   if (rowErr || !row) {
     return NextResponse.json({ error: "Row not found" }, { status: 404 });
   }
+  // Capture si la ligne ÉTAIT flaggée AVANT le update — sinon le clear de
+  // flagged_for_review qu'on fait plus bas masquerait l'info au moment d'envoyer
+  // la notif au flagger.
+  const wasFlagged = !!row.flagged_for_review;
 
   // Check the run isn't locked
   const { data: run } = await sb
@@ -88,6 +93,18 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ charge
     to_commercial: toName,
     comment: body.comment || null,
   });
+
+  // Si la ligne ÉTAIT flaggée, on notifie le flagger que le manager a tranché.
+  if (wasFlagged) {
+    await notifyOverrideOnFlaggedRow({
+      chargeId,
+      fromCommercialName: fromName,
+      toCommercialName: toName,
+      byEmail: auth.email,
+      byName: auth.name || auth.email,
+      comment: body.comment || null,
+    });
+  }
 
   return NextResponse.json({
     ok: true,

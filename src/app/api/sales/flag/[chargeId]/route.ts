@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { verifySales } from "@/lib/sales-auth";
+import { notifyFlagChange } from "@/lib/sales-notifications";
 
 // POST /api/sales/flag/[chargeId]
 // body: { reason?: string, flag: boolean }
@@ -57,6 +58,15 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ charge
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Notification email — non-blocking (waitUntil-style swallow inside helper).
+  await notifyFlagChange({
+    chargeId,
+    flagged: flag,
+    byEmail: auth.email,
+    byName: auth.name || auth.email,
+    reason: body.reason || null,
+  });
 
   return NextResponse.json({ ok: true, flagged: flag });
 }

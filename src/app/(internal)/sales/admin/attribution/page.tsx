@@ -13,6 +13,7 @@ import { formatYearMonthFull, resolveYearMonth } from "@/lib/year-month";
 interface DbRow {
   charge_id: string;
   email: string;
+  client_name: string | null;
   created_at: string;
   amount_net_eur: number;
   family: string | null;
@@ -41,7 +42,7 @@ async function loadAttributionData(yearMonth: string) {
   const { data: rawRows } = await sb
     .from("attribution_rows")
     .select(
-      "charge_id, email, created_at, amount_net_eur, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason",
+      "charge_id, email, client_name, created_at, amount_net_eur, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
@@ -103,6 +104,7 @@ async function loadAttributionData(yearMonth: string) {
     return {
       charge_id: r.charge_id,
       email: r.email,
+      client_name: r.client_name,
       created_at: r.created_at,
       amount_net_eur: r.amount_net_eur,
       family: r.family,

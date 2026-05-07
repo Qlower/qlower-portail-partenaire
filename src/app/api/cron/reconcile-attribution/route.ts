@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { reconcileAttribution } from "@/services/reconcile";
 import { syncHubspotEnum } from "@/services/sync-enum";
+import { autoLockPreviousMonth } from "@/services/auto-lock-month";
 
 const CRON_SECRET = process.env.CRON_SECRET || "";
 
@@ -50,6 +51,13 @@ export async function GET(request: NextRequest) {
       `tagged=${result.matched.filter((m) => m.patched).length} ambiguous=${result.ambiguousCount}`
   );
 
+  // Step 3 : verrouillage automatique du mois M-1 le 5 du mois courant.
+  // No-op les autres jours. Si déjà verrouillé, no-op aussi.
+  const lockResult = await autoLockPreviousMonth();
+  if (lockResult.locked) {
+    console.log(`[cron:auto-lock] mois ${lockResult.yearMonth} verrouillé automatiquement`);
+  }
+
   return NextResponse.json({
     enumSync: syncReport
       ? { added: syncReport.added, missingBefore: syncReport.missingActiveCount }
@@ -60,5 +68,6 @@ export async function GET(request: NextRequest) {
       tagged: result.matched.filter((m) => m.patched).length,
       ambiguous: result.ambiguousCount,
     },
+    autoLock: lockResult,
   });
 }
