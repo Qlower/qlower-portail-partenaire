@@ -132,7 +132,11 @@ export default function AttributionTable({
 
   async function changeAttribution(chargeId: string, newCommercialId: string | null) {
     const row = rows.find((r) => r.charge_id === chargeId);
-    if (!row) return;
+    if (!row) {
+      console.warn("[attribution] row not found", chargeId);
+      return;
+    }
+    console.log("[attribution] changing", chargeId, "→", newCommercialId);
     try {
       const r = await fetch(`/api/sales/overrides/${encodeURIComponent(chargeId)}`, {
         method: "POST",
@@ -141,6 +145,7 @@ export default function AttributionTable({
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
+        console.error("[attribution] API error", r.status, err);
         throw new Error(err.error || `HTTP ${r.status}`);
       }
       const data = await r.json();
@@ -178,6 +183,7 @@ export default function AttributionTable({
       // Refresh server data so totals stay accurate
       startTransition(() => router.refresh());
     } catch (e) {
+      console.error("[attribution] changeAttribution failed", e);
       showToast(`Erreur : ${e instanceof Error ? e.message : "inconnue"}`, true);
     }
   }

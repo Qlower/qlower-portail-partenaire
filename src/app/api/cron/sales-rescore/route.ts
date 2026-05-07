@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   const { data: rows } = await sb
     .from("attribution_rows")
     .select(
-      "charge_id, email, created_at, override_commercial_id, auto_commercial_id, auto_score, run_id",
+      "charge_id, email, phone, created_at, override_commercial_id, auto_commercial_id, auto_score, run_id",
     )
     .gte("created_at", sevenDaysAgo)
     .is("override_commercial_id", null)
@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
     try {
       const result = await scoreCharge({
         email: row.email,
+        phone: row.phone,
         paymentDate: row.created_at,
       });
       rescored++;

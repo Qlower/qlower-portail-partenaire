@@ -16,6 +16,7 @@ const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 interface ChargeUpsertInput {
   charge_id: string;
   email: string;
+  phone: string | null;
   customer_id: string;
   created_at: string; // ISO
   amount_gross_eur: number;
@@ -72,8 +73,13 @@ async function upsertCharge(input: ChargeUpsertInput): Promise<{ created: boolea
     .maybeSingle();
   if (run?.locked) return { created: false, updated: false, skipped: "month_locked" };
 
-  // Score the charge against HubSpot data
-  const scoring = await scoreCharge({ email: input.email, paymentDate: input.created_at });
+  // Score the charge against HubSpot data — incl. lookup par téléphone pour
+  // gérer les clients ayant plusieurs fiches HubSpot (cas Baptiste Perlin).
+  const scoring = await scoreCharge({
+    email: input.email,
+    phone: input.phone,
+    paymentDate: input.created_at,
+  });
 
   // Upsert the row (don't overwrite override if it exists)
   const { data: existing } = await sb
@@ -85,6 +91,7 @@ async function upsertCharge(input: ChargeUpsertInput): Promise<{ created: boolea
   const baseFields = {
     customer_id: input.customer_id,
     email: input.email,
+    phone: input.phone,
     created_at: input.created_at,
     amount_gross_eur: input.amount_gross_eur,
     amount_refunded_eur: input.amount_refunded_eur,
@@ -154,9 +161,26 @@ export async function POST(request: NextRequest) {
           break;
         }
         const customerId = typeof charge.customer === "string" ? charge.customer : (charge.customer?.id || "");
+
+        // Extract phone (billing_details first, fallback to Stripe customer
+        // object). Used to dedupe HubSpot contacts when a person has multiple
+        // fiches HubSpot (cas Baptiste Perlin).
+        let phone: string | null = charge.billing_details?.phone || null;
+        if (!phone && customerId) {
+          try {
+            const customer = await stripe.customers.retrieve(customerId);
+            if (!("deleted" in customer) || customer.deleted !== true) {
+              phone = (customer as Stripe.Customer).phone || null;
+            }
+          } catch {
+            // Customer fetch failed — non-blocking, on continue sans tél
+          }
+        }
+
         result = await upsertCharge({
           charge_id: charge.id,
           email,
+          phone,
           customer_id: customerId,
           created_at: new Date(charge.created * 1000).toISOString(),
           amount_gross_eur: Math.round(charge.amount / 100),
