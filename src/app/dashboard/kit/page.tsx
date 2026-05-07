@@ -98,7 +98,7 @@ export default function KitPage() {
               <p>Guide pas à pas + votre lien d&apos;inscription tracké à transmettre</p>
               <span className="card-link">Accéder au guide →</span>
             </a>
-            <a className="card" href="https://drive.google.com/file/d/17xTVPzA8_WzgSaHMlPf5Y37imgtHBJCW/view" target="_blank" rel="noreferrer">
+            <a className="card" href="/plaquette-b2c.pdf" target="_blank" rel="noreferrer">
               <div className="card-icon amber">◈</div>
               <h3>Plaquette B2C</h3>
               <p>Document à envoyer directement à vos clients</p>
