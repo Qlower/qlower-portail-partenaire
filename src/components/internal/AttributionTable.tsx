@@ -54,11 +54,13 @@ export interface RowData {
  * Display mode of the attribution table.
  *
  * - admin: full edit (dropdown to change attribution + add notes + flag)
- * - sales-own: this is a sales-only view of their own rows (no dropdown,
- *   but they can write notes and flag rows for arbitration)
+ * - sales-own: legacy single-user view (kept for backward compat)
+ * - sales-team: tour de contrôle — tout le négo voit toutes les ventes,
+ *              peut commenter n'importe laquelle, peut flag les siennes
+ *              pour contester
  * - readonly: pure display (no dropdowns, no edit, no flag, no note add)
  */
-export type AttributionTableMode = "admin" | "sales-own" | "readonly";
+export type AttributionTableMode = "admin" | "sales-own" | "sales-team" | "readonly";
 
 interface Props {
   rows: RowData[];
@@ -69,6 +71,10 @@ interface Props {
   yearMonth: string;
   /** When mode === "sales-own", show a flag button on each row */
   showFlagButton?: boolean;
+  /** Commercial id of the current user — used to highlight own rows + restrict flag */
+  myCommercialId?: string | null;
+  /** If true, the "Mes ventes" filter is preselected on mount */
+  defaultFilterMine?: boolean;
 }
 
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
@@ -96,20 +102,27 @@ export default function AttributionTable({
   mode: modeProp,
   yearMonth,
   showFlagButton,
+  myCommercialId,
+  defaultFilterMine,
 }: Props) {
   // Resolve effective mode (mode prop wins; else fall back to legacy editable bool)
   const mode: AttributionTableMode =
     modeProp ?? (editable ? "admin" : "readonly");
   const canEditAttribution = mode === "admin";
-  const canAddNote = mode === "admin" || mode === "sales-own";
-  const canFlag = (mode === "admin" || mode === "sales-own") && (showFlagButton ?? mode === "sales-own");
+  // Tout négo / admin peut commenter (vue d'équipe partagée).
+  const canAddNote = mode === "admin" || mode === "sales-own" || mode === "sales-team";
+  // Flag de contestation : admin sur tout, sales-own/sales-team uniquement
+  // sur les lignes qui me concernent (= attribution actuelle = moi).
+  const canFlag = mode === "admin" || mode === "sales-own" || mode === "sales-team";
   const [rows, setRows] = useState(initialRows);
   const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
   const [openNotesId, setOpenNotesId] = useState<string | null>(null);
   const [noteFormChargeId, setNoteFormChargeId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
   const [filter, setFilter] = useState("");
-  const [filterMode, setFilterMode] = useState<"all" | "flagged" | "manual" | "low_score" | "search">("all");
+  const [filterMode, setFilterMode] = useState<"all" | "mine" | "flagged" | "manual" | "low_score" | "search">(
+    defaultFilterMine ? "mine" : "all",
+  );
   const [, startTransition] = useTransition();
   const router = useRouter();
   const [toast, setToast] = useState<{ msg: string; isError?: boolean } | null>(null);
@@ -120,12 +133,17 @@ export default function AttributionTable({
 
   // Filtering
   const filteredRows = rows.filter((r) => {
+    if (filterMode === "mine" && r.effective_commercial_id !== myCommercialId) return false;
     if (filterMode === "flagged" && !r.flagged_for_review) return false;
     if (filterMode === "manual" && !r.is_override) return false;
     if (filterMode === "low_score" && (r.is_override || (r.auto_score ?? 0) >= 6)) return false;
     if (filterMode === "search" && filter && !r.email.toLowerCase().includes(filter.toLowerCase())) return false;
     return true;
   });
+
+  const myRowsCount = myCommercialId
+    ? rows.filter((r) => r.effective_commercial_id === myCommercialId).length
+    : 0;
 
   // Sort by net DESC
   filteredRows.sort((a, b) => b.amount_net_eur - a.amount_net_eur);
@@ -223,11 +241,12 @@ export default function AttributionTable({
       <div className="flex flex-wrap gap-2 items-center">
         <span className="text-xs text-gray-500">Filtre :</span>
         {([
-          { v: "all", l: `Toutes (${rows.length})` },
-          { v: "flagged", l: `🚩 Contestées (${rows.filter((r) => r.flagged_for_review).length})` },
-          { v: "manual", l: `✎ Manuelles (${rows.filter((r) => r.is_override).length})` },
-          { v: "low_score", l: `À vérifier (${rows.filter((r) => !r.is_override && (r.auto_score ?? 0) > 0 && (r.auto_score ?? 0) < 6).length})` },
-        ] as const).map((opt) => (
+          { v: "all", l: `Toutes (${rows.length})`, hidden: false },
+          { v: "mine", l: `👤 Mes ventes (${myRowsCount})`, hidden: !myCommercialId },
+          { v: "flagged", l: `🚩 Contestées (${rows.filter((r) => r.flagged_for_review).length})`, hidden: false },
+          { v: "manual", l: `✎ Manuelles (${rows.filter((r) => r.is_override).length})`, hidden: false },
+          { v: "low_score", l: `À vérifier (${rows.filter((r) => !r.is_override && (r.auto_score ?? 0) > 0 && (r.auto_score ?? 0) < 6).length})`, hidden: false },
+        ] as const).filter((opt) => !opt.hidden).map((opt) => (
           <button
             key={opt.v}
             onClick={() => { setFilterMode(opt.v); setFilter(""); }}
@@ -263,14 +282,22 @@ export default function AttributionTable({
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((r) => (
+            {filteredRows.map((r) => {
+              // Pour la vue équipe : chaque négo ne peut flag que ses propres
+              // attributions (pour contester). Le manager admin peut flag tout.
+              const canFlagThisRow =
+                canFlag &&
+                (mode === "admin" || r.effective_commercial_id === myCommercialId);
+              const isMine = !!myCommercialId && r.effective_commercial_id === myCommercialId;
+              return (
               <RowComponent
                 key={r.charge_id}
                 row={r}
                 commercials={commercials}
                 editable={canEditAttribution}
                 canAddNote={canAddNote}
-                canFlag={canFlag}
+                canFlag={canFlagThisRow}
+                isMine={isMine}
                 openHistory={openHistoryId === r.charge_id}
                 openNotes={openNotesId === r.charge_id}
                 noteForm={noteFormChargeId === r.charge_id}
@@ -301,7 +328,8 @@ export default function AttributionTable({
                   }
                 }}
               />
-            ))}
+              );
+            })}
             {filteredRows.length === 0 && (
               <tr><td colSpan={8} className="px-3 py-6 text-center text-gray-400">Aucune ligne</td></tr>
             )}
@@ -330,6 +358,7 @@ interface RowProps {
   editable: boolean;
   canAddNote: boolean;
   canFlag: boolean;
+  isMine?: boolean;
   openHistory: boolean;
   openNotes: boolean;
   noteForm: boolean;
@@ -345,15 +374,23 @@ interface RowProps {
 }
 
 function RowComponent({
-  row, commercials, editable, canAddNote, canFlag,
+  row, commercials, editable, canAddNote, canFlag, isMine,
   openHistory, openNotes, noteForm, noteText,
   onToggleHistory, onToggleNotes, onOpenNoteForm, onCancelNoteForm,
   onChangeNoteText, onSubmitNote, onChangeAttribution, onToggleFlag,
 }: RowProps) {
+  // Highlight subtilement les lignes qui me concernent dans la vue équipe.
+  const rowClass = isMine
+    ? "border-t border-gray-100 hover:bg-gray-50/40 bg-blue-50/30"
+    : "border-t border-gray-100 hover:bg-gray-50/40";
+  const cellBg = isMine ? "bg-blue-50/30" : "bg-white";
   return (
     <>
-      <tr className="border-t border-gray-100 hover:bg-gray-50/40">
-        <td className="px-3 py-2 font-mono text-[11px] sticky left-0 bg-white">{row.email}</td>
+      <tr className={rowClass}>
+        <td className={`px-3 py-2 font-mono text-[11px] sticky left-0 ${cellBg}`}>
+          {isMine && <span className="mr-1" title="Attribuée à moi">●</span>}
+          {row.email}
+        </td>
         <td className="px-2 py-2 whitespace-nowrap">{fmtDate(row.created_at)}</td>
         <td className="px-2 py-2 text-right font-mono tabular-nums">{fmtEur(row.amount_net_eur)}</td>
         <td className="px-2 py-2">{row.family || "—"}</td>

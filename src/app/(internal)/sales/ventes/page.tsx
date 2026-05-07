@@ -30,7 +30,7 @@ async function getCurrentUser() {
   return user;
 }
 
-async function loadVentesData(yearMonth: string, filterByCommercialId: string | null) {
+async function loadVentesData(yearMonth: string) {
   const sb = createServiceClient();
   const { data: run } = await sb
     .from("monthly_runs")
@@ -38,21 +38,15 @@ async function loadVentesData(yearMonth: string, filterByCommercialId: string | 
     .eq("year_month", yearMonth)
     .maybeSingle();
 
-  let q = sb
+  // Tour de contrôle : tout le monde charge TOUTES les ventes du mois.
+  // Le filtrage "Mes ventes" se fait côté client via les filter chips
+  // (l'utilisateur peut basculer entre Toutes / Mes / Contestées / etc.).
+  const { data: rawRows } = await sb
     .from("attribution_rows")
     .select(
       "charge_id, email, created_at, amount_net_eur, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_at, flagged_for_review, flagged_reason",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
-
-  if (filterByCommercialId) {
-    // Sales view: only rows where auto OR override = my commercial_id
-    q = q.or(
-      `auto_commercial_id.eq.${filterByCommercialId},override_commercial_id.eq.${filterByCommercialId}`,
-    );
-  }
-
-  const { data: rawRows } = await q;
   const dbRows = rawRows || [];
 
   const { data: commercials } = await sb
@@ -136,41 +130,39 @@ export default async function VentesPage() {
   const myCommercialId = (meta.commercial_id as string | undefined) || null;
   const myName = (meta.name as string | undefined) || "Moi";
 
-  // Sales: filter to my own rows. Sales_admin: see everything.
-  const filterCid = internalRole === "sales" ? myCommercialId : null;
-
-  const { rows, commercials } = await loadVentesData(yearMonth, filterCid);
+  const { rows, commercials } = await loadVentesData(yearMonth);
 
   const monthLabel = `${MONTHS_FR[yearMonth.slice(-2)]} ${yearMonth.slice(0, 4)}`;
   const total = rows.reduce((sum, r) => sum + r.amount_net_eur, 0);
+  const myRowsCount = myCommercialId
+    ? rows.filter((r) => r.effective_commercial_id === myCommercialId).length
+    : 0;
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-[#0A3855]">
-          {filterCid ? `Mes ventes — ${monthLabel}` : `Toutes les ventes — ${monthLabel}`}
-        </h1>
+        <h1 className="text-2xl font-bold text-[#0A3855]">Tour de contrôle — {monthLabel}</h1>
         <p className="text-sm text-gray-500 mt-1">
-          {filterCid
-            ? `${rows.length} ligne${rows.length > 1 ? "s" : ""} attribuée${rows.length > 1 ? "s" : ""} à ${myName} · ${Math.round(total).toLocaleString("fr-FR")} €`
-            : `${rows.length} ligne${rows.length > 1 ? "s" : ""} équipe · ${Math.round(total).toLocaleString("fr-FR")} €`}
+          {rows.length} ligne{rows.length > 1 ? "s" : ""} équipe · {Math.round(total).toLocaleString("fr-FR")} €
+          {myCommercialId && (
+            <> · <span className="text-[#0A3855] font-medium">{myRowsCount} pour {myName}</span></>
+          )}
         </p>
       </div>
 
       <AttributionTable
         rows={rows}
         commercials={commercials}
-        mode={filterCid ? "sales-own" : "readonly"}
-        showFlagButton={!!filterCid}
+        mode="sales-team"
+        myCommercialId={myCommercialId}
+        defaultFilterMine={internalRole === "sales"}
         yearMonth={yearMonth}
       />
 
-      {filterCid && rows.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-gray-700">
-          💡 <strong>Tu peux contester une attribution</strong> en cliquant sur 🚩 — le manager sera notifié et arbitrera.
-          Tu peux aussi <strong>ajouter une note</strong> sur n&apos;importe laquelle de tes ventes pour donner un contexte.
-        </div>
-      )}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-gray-700">
+        💡 <strong>Tu peux contester une attribution qui te concerne</strong> en cliquant sur 🚩 — le manager sera notifié et arbitrera.{" "}
+        <strong>Tu peux aussi ajouter une note sur n&apos;importe quelle vente</strong> (visible par toute l&apos;équipe et le manager).
+      </div>
     </div>
   );
 }
