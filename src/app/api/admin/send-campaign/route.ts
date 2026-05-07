@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     (partners ?? [])
       .filter((p) => p.email)
       .map(async (p) => {
-        const link = `https://secure.qlower.com/signup?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}`;
+        const link = `https://www.qlower.com/qlower-x-partenaire?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}`;
 
         // Setup-password link 7j (NOT consumed by email scanners) — preferred for new comm
         let setupLink = `${siteUrl}/login`;

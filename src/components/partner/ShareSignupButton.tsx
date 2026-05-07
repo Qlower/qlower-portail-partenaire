@@ -15,7 +15,7 @@ interface Props {
 /**
  * Button that copies the partner's tracked signup link to the clipboard.
  *
- *   https://secure.qlower.com/signup?utm_source=<UTM>&utm_medium=affiliation&utm_campaign=<CODE>
+ *   https://www.qlower.com/qlower-x-partenaire?utm_source=<UTM>&utm_medium=affiliation&utm_campaign=<CODE>
  *
  * Used on the public-facing client-share pages (/dashboard/expliquer,
  * /dashboard/emails) to discourage partners from copy-pasting the raw
@@ -76,7 +76,7 @@ export default function ShareSignupButton({ label, compact }: Props) {
       </button>
       <p className="text-[11px] text-gray-600 leading-relaxed">
         ⚠️ <strong>Important</strong> : c&apos;est ce lien que vous devez transmettre à
-        vos clients (et pas un lien Notion ou directement secure.qlower.com).
+        vos clients (et pas un lien Notion ou directement qlower.com sans UTM).
         Sans ce lien tracké, votre commission n&apos;est pas attribuée
         automatiquement.
       </p>

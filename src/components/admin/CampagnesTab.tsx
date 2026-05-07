@@ -99,7 +99,7 @@ export default function CampagnesTab() {
         code: previewPartner.code,
         leads: String(previewPartner.leads ?? 0),
         abonnes: String(previewPartner.abonnes ?? 0),
-        link: `https://secure.qlower.com/signup?utm_source=${previewPartner.utm}&utm_medium=affiliation&utm_campaign=${previewPartner.code}`,
+        link: `https://www.qlower.com/qlower-x-partenaire?utm_source=${previewPartner.utm}&utm_medium=affiliation&utm_campaign=${previewPartner.code}`,
         magic_link: "https://partenaire.qlower.com/login (lien magique généré à l'envoi, valable 24h)",
       }
     : {};

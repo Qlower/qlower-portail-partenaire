@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 const BASE_URLS = [
-  { value: "https://secure.qlower.com/signup", label: "Inscription Qlower" },
+  { value: "https://www.qlower.com/qlower-x-partenaire", label: "Page partenaire Qlower" },
   { value: "https://www.qlower.com", label: "Site vitrine" },
   { value: "https://meetings-eu1.hubspot.com/qlower/accompagnement-declaration-fiscale-decouverte-qlower", label: "RDV HubSpot" },
   { value: "custom", label: "URL personnalisee" },
