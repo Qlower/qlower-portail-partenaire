@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   ChevronDown,
+  FileBarChart,
 } from "lucide-react";
 
 type InternalRole = "sales" | "sales_admin";
@@ -25,6 +26,7 @@ const NAV_BASE = [
   { href: "/sales", label: "Mon mois", icon: LayoutDashboard, exact: true },
   { href: "/sales/ventes", label: "Mes ventes", icon: TrendingUp, exact: false },
   { href: "/sales/equipe", label: "Équipe", icon: Users, exact: false },
+  { href: "/sales/rapport", label: "Rapport", icon: FileBarChart, exact: false },
   { href: "/sales/historique", label: "Historique", icon: History, exact: false },
 ];
 
