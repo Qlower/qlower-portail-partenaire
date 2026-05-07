@@ -14,14 +14,27 @@ export async function POST(request: NextRequest) {
   if (auth.error) return auth.error;
 
   const body = await request.json();
-  const { templateKey, audience, partnerIds } = body as {
+  const { templateKey, audience, partnerIds, confirm, expectedRecipientCount } = body as {
     templateKey: string;
     audience?: string;
     partnerIds?: string[];
+    confirm?: boolean;
+    expectedRecipientCount?: number;
   };
 
   if (!templateKey) {
     return NextResponse.json({ error: "templateKey is required" }, { status: 400 });
+  }
+
+  // Defense in depth : un envoi de campagne réelle est irréversible.
+  // On exige un flag explicite { confirm: true } + un nombre attendu de
+  // destinataires. Si le frontend (modal) ne l'envoie pas, on refuse —
+  // y compris si quelqu'un appelle l'API en curl par accident.
+  if (confirm !== true) {
+    return NextResponse.json(
+      { error: "Confirmation requise. Envoi refusé sans { confirm: true }." },
+      { status: 400 },
+    );
   }
 
   const supabase = createServiceClient();
@@ -53,6 +66,23 @@ export async function POST(request: NextRequest) {
   const { data: partners, error } = await query;
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Cross-check entre ce que le user voit dans la modal et ce que le serveur
+  // s'apprête à envoyer. Si la liste a changé (partenaire ajouté/désactivé
+  // entre l'ouverture de la modal et la confirmation), on refuse pour ne pas
+  // envoyer à un autre périmètre que celui validé.
+  const eligiblePartners = (partners ?? []).filter((p) => p.email);
+  if (
+    typeof expectedRecipientCount === "number" &&
+    expectedRecipientCount !== eligiblePartners.length
+  ) {
+    return NextResponse.json(
+      {
+        error: `Liste des destinataires modifiée depuis la confirmation : attendu ${expectedRecipientCount}, trouvé ${eligiblePartners.length}. Recharge la page et reconfirme.`,
+      },
+      { status: 409 },
+    );
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://partenaire.qlower.com";

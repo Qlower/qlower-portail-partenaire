@@ -26,6 +26,7 @@ import {
   Save,
   Check,
   X,
+  AlertTriangle,
 } from "lucide-react";
 
 type Audience = "tous" | "affiliation" | "marque_blanche";
@@ -60,6 +61,11 @@ export default function CampagnesTab() {
   const [sentPartners, setSentPartners] = useState<Set<string>>(new Set());
   const [allSent, setAllSent] = useState(false);
   const [sending, setSending] = useState(false);
+  // Confirmation modal — pour éviter tout envoi accidentel.
+  // L'utilisateur doit cliquer "Préparer l'envoi" → modal s'ouvre →
+  // taper le nombre exact de destinataires → "Envoyer maintenant".
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTyped, setConfirmTyped] = useState("");
 
   // Editable fields
   const [editSubject, setEditSubject] = useState("");
@@ -136,8 +142,18 @@ export default function CampagnesTab() {
     }
   };
 
+  // Étape 1 : ouvre la modal (ne lance PAS l'envoi).
+  const openConfirm = () => {
+    if (!selectedTemplateId || selected.length === 0) return;
+    setConfirmTyped("");
+    setConfirmOpen(true);
+  };
+
+  // Étape 2 : la modal a fait taper le bon nombre + cliquer "Envoyer maintenant".
+  // C'est SEULEMENT à ce moment-là que les emails partent.
   const handleSendAll = async () => {
     if (!selectedTemplateId || selected.length === 0) return;
+    setConfirmOpen(false);
     setSending(true);
     try {
       // Save template first if modified
@@ -155,9 +171,14 @@ export default function CampagnesTab() {
         body: JSON.stringify({
           templateKey: selectedTemplateId,
           partnerIds: selected.map((p) => p.id),
+          confirm: true,
+          expectedRecipientCount: selected.filter((p) => p.email).length,
         }),
       });
-      if (!res.ok) throw new Error("Erreur serveur");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur serveur");
+      }
       const ids = new Set(selected.map((p) => p.id));
       setSentPartners(ids);
       setAllSent(true);
@@ -385,7 +406,7 @@ export default function CampagnesTab() {
                 </Button>
                 <Button
                   className="bg-[#F6CCA4] text-[#6B4D2D] hover:bg-[#F0BF8E] border border-[#E8B88A]"
-                  onClick={handleSendAll}
+                  onClick={openConfirm}
                   disabled={selected.length === 0 || allSent || sending}
                 >
                   {sending ? (
@@ -393,7 +414,7 @@ export default function CampagnesTab() {
                   ) : allSent ? (
                     <><CheckCircle2 className="size-4 mr-1.5" /> Envoyé à {selected.length} partenaire(s)</>
                   ) : (
-                    <><Send className="size-4 mr-1.5" /> Envoyer à {selected.length} partenaire(s)</>
+                    <><Send className="size-4 mr-1.5" /> Préparer l&apos;envoi à {selected.length} partenaire(s)</>
                   )}
                 </Button>
               </div>
@@ -453,6 +474,139 @@ export default function CampagnesTab() {
 
       {/* Historique des envois */}
       <CampaignHistory />
+
+      {/* Modal de double validation avant envoi */}
+      {confirmOpen && template && (
+        <ConfirmSendModal
+          recipientCount={selected.length}
+          subject={replaceVars(editSubject, previewVars)}
+          previewBody={previewPartner ? replaceVars(editBody, previewVars) : editBody}
+          previewPartnerName={previewPartner?.nom || "—"}
+          recipients={selected.map((p) => ({ id: p.id, nom: p.nom, email: p.email || "—" }))}
+          confirmTyped={confirmTyped}
+          onConfirmTypedChange={setConfirmTyped}
+          onCancel={() => { setConfirmOpen(false); setConfirmTyped(""); }}
+          onConfirm={handleSendAll}
+        />
+      )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Modal de confirmation d'envoi : type-to-confirm pour éviter tout envoi
+// accidentel. Le bouton "Envoyer maintenant" reste désactivé tant que
+// l'utilisateur n'a pas tapé le nombre exact de destinataires.
+// ----------------------------------------------------------------------------
+function ConfirmSendModal({
+  recipientCount,
+  subject,
+  previewBody,
+  previewPartnerName,
+  recipients,
+  confirmTyped,
+  onConfirmTypedChange,
+  onCancel,
+  onConfirm,
+}: {
+  recipientCount: number;
+  subject: string;
+  previewBody: string;
+  previewPartnerName: string;
+  recipients: Array<{ id: string; nom: string; email: string }>;
+  confirmTyped: string;
+  onConfirmTypedChange: (v: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const canConfirm = confirmTyped.trim() === String(recipientCount);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="border-b border-amber-200 bg-amber-50 px-6 py-4 flex items-start gap-3">
+          <AlertTriangle className="size-5 text-amber-600 mt-0.5 shrink-0" />
+          <div>
+            <h2 className="text-base font-semibold text-amber-900">Confirmer l&apos;envoi de la campagne</h2>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Cette action enverra un email réel à <strong>{recipientCount} partenaire{recipientCount > 1 ? "s" : ""}</strong>. Elle est irréversible.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Récap */}
+          <div className="space-y-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold w-24 shrink-0">Sujet</span>
+              <span className="text-sm text-gray-900">{subject}</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold w-24 shrink-0">Destinataires</span>
+              <span className="text-sm text-gray-900">{recipientCount} partenaire{recipientCount > 1 ? "s" : ""}</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold w-24 shrink-0">Aperçu</span>
+              <span className="text-xs text-gray-500">Personnalisé pour : <strong>{previewPartnerName}</strong></span>
+            </div>
+          </div>
+
+          {/* Liste des destinataires */}
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-2">
+              Liste des destinataires
+            </p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-32 overflow-y-auto">
+              <div className="flex flex-wrap gap-1">
+                {recipients.map((r) => (
+                  <span key={r.id} className="inline-block text-[11px] bg-white border border-gray-200 rounded-full px-2 py-0.5 text-gray-700">
+                    {r.nom}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Aperçu du contenu */}
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-2">
+              Aperçu du contenu (1er destinataire)
+            </p>
+            <div
+              className="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-700 max-h-60 overflow-y-auto"
+              dangerouslySetInnerHTML={{ __html: previewBody }}
+            />
+          </div>
+
+          {/* Type-to-confirm */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <Label className="text-amber-900 font-semibold">
+              Pour confirmer, tape le nombre de destinataires : <span className="font-mono text-base">{recipientCount}</span>
+            </Label>
+            <Input
+              autoFocus
+              value={confirmTyped}
+              onChange={(e) => onConfirmTypedChange(e.target.value)}
+              placeholder={String(recipientCount)}
+              className="mt-2 max-w-[200px]"
+            />
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100 px-6 py-4 flex items-center justify-end gap-3 bg-gray-50/50">
+          <Button variant="outline" onClick={onCancel}>
+            Annuler
+          </Button>
+          <Button
+            onClick={onConfirm}
+            disabled={!canConfirm}
+            className="bg-[#0A3855] text-white hover:bg-[#0d4f78] disabled:opacity-50"
+          >
+            <Send className="size-4 mr-1.5" />
+            Envoyer maintenant à {recipientCount} partenaire{recipientCount > 1 ? "s" : ""}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
