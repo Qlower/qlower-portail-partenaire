@@ -1,11 +1,8 @@
 import { createServiceClient } from "@/lib/supabase-server";
 import { Trophy } from "lucide-react";
-
-const MONTHS_FR: Record<string, string> = {
-  "01": "Janvier", "02": "Février", "03": "Mars", "04": "Avril",
-  "05": "Mai", "06": "Juin", "07": "Juillet", "08": "Août",
-  "09": "Septembre", "10": "Octobre", "11": "Novembre", "12": "Décembre",
-};
+import MonthSelector from "@/components/internal/MonthSelector";
+import { loadAvailableMonths } from "@/lib/available-months";
+import { formatYearMonthFull, resolveYearMonth } from "@/lib/year-month";
 
 async function loadTeamData(yearMonth: string) {
   const sb = createServiceClient();
@@ -100,10 +97,18 @@ async function loadTeamData(yearMonth: string) {
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 
-export default async function EquipePage() {
-  const yearMonth = "2026-04";
-  const { all, teamTarget, autonomeNet, autonomeRows } = await loadTeamData(yearMonth);
-  const monthLabel = `${MONTHS_FR[yearMonth.slice(-2)]} ${yearMonth.slice(0, 4)}`;
+export default async function EquipePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ym?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const yearMonth = resolveYearMonth(params.ym);
+  const [{ all, teamTarget, autonomeNet, autonomeRows }, availableMonths] = await Promise.all([
+    loadTeamData(yearMonth),
+    loadAvailableMonths(),
+  ]);
+  const monthLabel = formatYearMonthFull(yearMonth);
 
   // Le total d'équipe inclut les achats autonomes (pour la jauge globale)
   // mais le classement individuel ne les liste pas.
@@ -112,11 +117,14 @@ export default async function EquipePage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[#0A3855]">Équipe — {monthLabel}</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Classement temps réel · {fmtEur(totalNet)} sur {fmtEur(teamTarget)} d&apos;objectif équipe ({fmtPct(teamPct)})
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-[#0A3855]">Équipe — {monthLabel}</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Classement temps réel · {fmtEur(totalNet)} sur {fmtEur(teamTarget)} d&apos;objectif équipe ({fmtPct(teamPct)})
+          </p>
+        </div>
+        <MonthSelector current={yearMonth} available={availableMonths} />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">

@@ -7,12 +7,9 @@ import AttributionTable, {
   type HistoryEntry,
   type NoteEntry,
 } from "@/components/internal/AttributionTable";
-
-const MONTHS_FR: Record<string, string> = {
-  "01": "Janvier", "02": "Février", "03": "Mars", "04": "Avril",
-  "05": "Mai", "06": "Juin", "07": "Juillet", "08": "Août",
-  "09": "Septembre", "10": "Octobre", "11": "Novembre", "12": "Décembre",
-};
+import MonthSelector from "@/components/internal/MonthSelector";
+import { loadAvailableMonths } from "@/lib/available-months";
+import { formatYearMonthFull, resolveYearMonth } from "@/lib/year-month";
 
 async function getCurrentUser() {
   const cookieStore = await cookies();
@@ -122,17 +119,25 @@ async function loadVentesData(yearMonth: string) {
   return { rows, commercials: commercialOptions };
 }
 
-export default async function VentesPage() {
-  const yearMonth = "2026-04";
+export default async function VentesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ym?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const yearMonth = resolveYearMonth(params.ym);
   const user = await getCurrentUser();
   const meta = (user?.user_metadata || {}) as Record<string, unknown>;
   const internalRole = meta.internal_role as "sales" | "sales_admin" | undefined;
   const myCommercialId = (meta.commercial_id as string | undefined) || null;
   const myName = (meta.name as string | undefined) || "Moi";
 
-  const { rows, commercials } = await loadVentesData(yearMonth);
+  const [{ rows, commercials }, availableMonths] = await Promise.all([
+    loadVentesData(yearMonth),
+    loadAvailableMonths(),
+  ]);
 
-  const monthLabel = `${MONTHS_FR[yearMonth.slice(-2)]} ${yearMonth.slice(0, 4)}`;
+  const monthLabel = formatYearMonthFull(yearMonth);
   const total = rows.reduce((sum, r) => sum + r.amount_net_eur, 0);
   const myRowsCount = myCommercialId
     ? rows.filter((r) => r.effective_commercial_id === myCommercialId).length
@@ -140,14 +145,17 @@ export default async function VentesPage() {
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-[#0A3855]">Tour de contrôle — {monthLabel}</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {rows.length} ligne{rows.length > 1 ? "s" : ""} équipe · {Math.round(total).toLocaleString("fr-FR")} €
-          {myCommercialId && (
-            <> · <span className="text-[#0A3855] font-medium">{myRowsCount} pour {myName}</span></>
-          )}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-[#0A3855]">Tour de contrôle — {monthLabel}</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {rows.length} ligne{rows.length > 1 ? "s" : ""} équipe · {Math.round(total).toLocaleString("fr-FR")} €
+            {myCommercialId && (
+              <> · <span className="text-[#0A3855] font-medium">{myRowsCount} pour {myName}</span></>
+            )}
+          </p>
+        </div>
+        <MonthSelector current={yearMonth} available={availableMonths} />
       </div>
 
       <AttributionTable
