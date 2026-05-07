@@ -1,4 +1,4 @@
-const PARTNER_PAGE_BASE = "https://qlower.com/partenaire";
+const SIGNUP_BASE = "https://secure.qlower.com/signup";
 const RDV_BASE = "https://meetings-eu1.hubspot.com/qlower/accompagnement-declaration-fiscale-decouverte-qlower";
 
 export const slug = (s: string): string =>
@@ -10,18 +10,20 @@ export const slug = (s: string): string =>
     .replace(/[^a-z0-9-]/g, "");
 
 /**
- * Returns the public partner-branded landing page URL.
+ * Lien d'inscription Qlower tracké pour un partenaire donné.
  *
- *   https://qlower.com/partenaire/<utm>?utm_source=<utm>&utm_medium=affiliation&utm_campaign=<code>
+ *   https://secure.qlower.com/signup?utm_source=<utm>&utm_medium=affiliation&utm_campaign=<code>
  *
- * The path-part `<utm>` lets qlower.com render the partner-branded landing.
- * The query-string UTMs are kept so HubSpot's analytics tracking captures
- * them in `hs_analytics_source_data_2` → enables the auto-tag in the
- * webhook (lead-to-partner attribution).
+ * Note : on a tenté brièvement de pointer sur https://qlower.com/partenaire/<utm>
+ * (page partenaire-brandée), mais ces routes ne sont pas implémentées sur
+ * le site marketing → 404. On reste donc sur secure.qlower.com/signup, qui
+ * est le formulaire d'inscription B2C effectif. Les UTMs sont conservés
+ * en query-string pour que HubSpot capture l'attribution dans
+ * hs_analytics_source_data_2 → trigger l'auto-tag du webhook.
  */
 export const buildSignupLink = (utm: string, code?: string | null): string => {
   const safeUtm = encodeURIComponent(utm || "");
-  const base = `${PARTNER_PAGE_BASE}/${safeUtm}?utm_source=${safeUtm}&utm_medium=affiliation`;
+  const base = `${SIGNUP_BASE}?utm_source=${safeUtm}&utm_medium=affiliation`;
   return code ? `${base}&utm_campaign=${encodeURIComponent(code)}` : base;
 };
 
