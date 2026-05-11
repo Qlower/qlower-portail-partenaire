@@ -125,6 +125,9 @@ export default function AttributionTable({
   const [filterMode, setFilterMode] = useState<"all" | "mine" | "flagged" | "manual" | "low_score" | "search">(
     defaultFilterMine ? "mine" : "all",
   );
+  // Filtre additionnel par commercial (compatible avec filterMode).
+  // null = pas de filtre, "__unassigned__" = lignes Non attribué, sinon = id du commercial.
+  const [filterCommercialId, setFilterCommercialId] = useState<string | null>(null);
   // Charge dont on affiche le panel HubSpot timeline (null = panel fermé)
   const [panelChargeId, setPanelChargeId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -151,8 +154,27 @@ export default function AttributionTable({
       ].join(" ");
       if (!haystack.includes(q)) return false;
     }
+    // Filtre commercial — appliqué en plus des filtres ci-dessus
+    if (filterCommercialId) {
+      if (filterCommercialId === "__unassigned__") {
+        if (r.effective_commercial_id) return false;
+      } else if (r.effective_commercial_id !== filterCommercialId) {
+        return false;
+      }
+    }
     return true;
   });
+
+  // Compte par commercial — utile pour le badge dans le dropdown
+  const countByCommercial = new Map<string, number>();
+  let unassignedCount = 0;
+  for (const r of rows) {
+    if (!r.effective_commercial_id) {
+      unassignedCount++;
+    } else {
+      countByCommercial.set(r.effective_commercial_id, (countByCommercial.get(r.effective_commercial_id) || 0) + 1);
+    }
+  }
 
   const myRowsCount = myCommercialId
     ? rows.filter((r) => r.effective_commercial_id === myCommercialId).length
@@ -270,12 +292,45 @@ export default function AttributionTable({
             {opt.l}
           </button>
         ))}
+        <select
+          value={filterCommercialId || ""}
+          onChange={(e) => setFilterCommercialId(e.target.value || null)}
+          className="text-xs px-2 py-1 border border-gray-200 rounded bg-white hover:border-gray-300 ml-auto"
+        >
+          <option value="">Tous les commerciaux ({rows.length})</option>
+          <option value="__unassigned__">— Non attribué ({unassignedCount})</option>
+          {commercials.filter((c) => c.role === "system_none").map((c) => (
+            <option key={c.id} value={c.id}>
+              🚫 {c.name} ({countByCommercial.get(c.id) || 0})
+            </option>
+          ))}
+          {commercials.filter((c) => c.role === "sales_admin" || c.role === "sales").map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} ({countByCommercial.get(c.id) || 0})
+            </option>
+          ))}
+          {commercials.filter((c) => c.role === "upsell").map((c) => (
+            <option key={c.id} value={c.id}>
+              ⬆ {c.name} ({countByCommercial.get(c.id) || 0})
+            </option>
+          ))}
+          {commercials.filter((c) => c.role === "support").map((c) => (
+            <option key={c.id} value={c.id}>
+              🛟 {c.name} ({countByCommercial.get(c.id) || 0})
+            </option>
+          ))}
+          {commercials.filter((c) => c.role === "former").map((c) => (
+            <option key={c.id} value={c.id}>
+              💤 {c.name} ({countByCommercial.get(c.id) || 0})
+            </option>
+          ))}
+        </select>
         <input
           type="search"
           placeholder="🔍 Rechercher par nom ou email…"
           value={filter}
           onChange={(e) => { setFilter(e.target.value); setFilterMode("search"); }}
-          className="text-xs px-2 py-1 border border-gray-200 rounded ml-auto w-64"
+          className="text-xs px-2 py-1 border border-gray-200 rounded w-64"
         />
       </div>
 
