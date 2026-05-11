@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, History, MessageSquare, Flag, Plus } from "lucide-react";
+import { ChevronDown, History, MessageSquare, Flag, Plus, Search } from "lucide-react";
+import EngagementPanel from "./EngagementPanel";
 
 export interface CommercialOption {
   id: string;
@@ -124,6 +125,8 @@ export default function AttributionTable({
   const [filterMode, setFilterMode] = useState<"all" | "mine" | "flagged" | "manual" | "low_score" | "search">(
     defaultFilterMine ? "mine" : "all",
   );
+  // Charge dont on affiche le panel HubSpot timeline (null = panel fermé)
+  const [panelChargeId, setPanelChargeId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const router = useRouter();
   const [toast, setToast] = useState<{ msg: string; isError?: boolean } | null>(null);
@@ -308,6 +311,7 @@ export default function AttributionTable({
                 canAddNote={canAddNote}
                 canFlag={canFlagThisRow}
                 isMine={isMine}
+                onOpenPanel={() => setPanelChargeId(r.charge_id)}
                 openHistory={openHistoryId === r.charge_id}
                 openNotes={openNotesId === r.charge_id}
                 noteForm={noteFormChargeId === r.charge_id}
@@ -358,6 +362,9 @@ export default function AttributionTable({
           {toast.msg}
         </div>
       )}
+
+      {/* Panel chronologie HubSpot */}
+      <EngagementPanel chargeId={panelChargeId} onClose={() => setPanelChargeId(null)} />
     </div>
   );
 }
@@ -381,6 +388,7 @@ interface RowProps {
   onSubmitNote: () => void;
   onChangeAttribution: (commercialId: string | null) => void;
   onToggleFlag: () => void;
+  onOpenPanel: () => void;
 }
 
 function RowComponent({
@@ -388,6 +396,7 @@ function RowComponent({
   openHistory, openNotes, noteForm, noteText,
   onToggleHistory, onToggleNotes, onOpenNoteForm, onCancelNoteForm,
   onChangeNoteText, onSubmitNote, onChangeAttribution, onToggleFlag,
+  onOpenPanel,
 }: RowProps) {
   // Highlight subtilement les lignes qui me concernent dans la vue équipe.
   const rowClass = isMine
@@ -471,6 +480,13 @@ function RowComponent({
           <div className="text-gray-500 leading-snug">{row.auto_reason || "—"}</div>
         </td>
         <td className="px-2 py-2 whitespace-nowrap text-right">
+          <button
+            onClick={onOpenPanel}
+            className="inline-flex items-center gap-0.5 text-[10px] text-gray-500 hover:text-[#0A3855] mr-1"
+            title="Voir la chronologie HubSpot (Modjo / RDV / Aircall / notes)"
+          >
+            <Search className="w-3 h-3" />
+          </button>
           {row.history.length > 0 && (
             <button
               onClick={onToggleHistory}

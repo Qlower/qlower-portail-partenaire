@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import PartnersTab from "./PartnersTab";
 import CampagnesTab from "./CampagnesTab";
 import BatchTab from "./BatchTab";
@@ -18,6 +19,7 @@ import {
   Receipt,
   Settings,
   RefreshCw,
+  Copy,
 } from "lucide-react";
 
 const TABS = [
@@ -54,6 +56,13 @@ export default function AdminPanel() {
               {syncMessage}
             </span>
           )}
+          <Link
+            href="/admin/doublons"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-all"
+          >
+            <Copy className="size-4" />
+            Doublons HubSpot
+          </Link>
           <button
             onClick={async () => {
               setSyncMessage(null);
