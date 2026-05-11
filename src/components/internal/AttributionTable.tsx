@@ -351,11 +351,10 @@ export default function AttributionTable({
           </thead>
           <tbody>
             {filteredRows.map((r) => {
-              // Pour la vue équipe : chaque négo ne peut flag que ses propres
-              // attributions (pour contester). Le manager admin peut flag tout.
-              const canFlagThisRow =
-                canFlag &&
-                (mode === "admin" || r.effective_commercial_id === myCommercialId);
+              // Tout négo authentifié peut flag N'IMPORTE QUELLE ligne (= "cette
+              // vente devrait être à moi" ou "cette vente n'est pas la mienne").
+              // Le manager arbitre via le dropdown d'attribution.
+              const canFlagThisRow = canFlag;
               const isMine = !!myCommercialId && r.effective_commercial_id === myCommercialId;
               return (
               <RowComponent
@@ -573,7 +572,13 @@ function RowComponent({
             <button
               onClick={onToggleFlag}
               className={`inline-flex items-center gap-0.5 text-[10px] ml-1 hover:text-orange-700 ${row.flagged_for_review ? "text-orange-600" : "text-gray-400"}`}
-              title={row.flagged_for_review ? "Retirer la contestation" : "Contester cette attribution"}
+              title={
+                row.flagged_for_review
+                  ? "Retirer la contestation"
+                  : isMine
+                    ? "Cette vente ne devrait pas m'être attribuée (contester)"
+                    : "Cette vente devrait m'être attribuée (revendiquer)"
+              }
             >
               <Flag className="w-3 h-3" />
             </button>

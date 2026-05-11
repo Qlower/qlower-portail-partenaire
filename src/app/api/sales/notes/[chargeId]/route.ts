@@ -4,9 +4,13 @@ import { verifySales } from "@/lib/sales-auth";
 
 // POST /api/sales/notes/[chargeId]
 // body: { text: string }
-// Appends a note to the charge. Sales can write on rows attributed to them
-// (auto OR override matches their commercial_id). Sales_admin can write on
-// any row.
+// Appends a note to the charge. ANY authenticated internal sales (sales or
+// sales_admin) can write a note on ANY row — y compris les lignes attribuées
+// à un autre négo. Logique métier : utile pour contester / argumenter
+// ("c'est moi qui l'ai eu en RDV le X").
+//
+// Le auteur (author_id, author_email) est stocké, donc l'audit trail est
+// complet. La note est visible par tout le monde (append-only).
 export async function POST(request: NextRequest, ctx: { params: Promise<{ chargeId: string }> }) {
   const r = await verifySales(request);
   if ("error" in r) return r.error;
@@ -29,21 +33,14 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ charge
 
   const sb = createServiceClient();
 
-  // Authorisation: sales can only write on their own rows; admin on any
-  if (auth.internal_role === "sales") {
-    if (!auth.commercial_id) {
-      return NextResponse.json({ error: "No commercial_id linked to your account" }, { status: 403 });
-    }
-    const { data: row } = await sb
-      .from("attribution_rows")
-      .select("auto_commercial_id, override_commercial_id")
-      .eq("charge_id", chargeId)
-      .maybeSingle();
-    if (!row) return NextResponse.json({ error: "Row not found" }, { status: 404 });
-    const effective = row.override_commercial_id || row.auto_commercial_id;
-    if (effective !== auth.commercial_id) {
-      return NextResponse.json({ error: "Not your row" }, { status: 403 });
-    }
+  // Verify the row exists, mais on n'impose plus que ça soit la ligne du négo.
+  const { data: existingRow } = await sb
+    .from("attribution_rows")
+    .select("charge_id")
+    .eq("charge_id", chargeId)
+    .maybeSingle();
+  if (!existingRow) {
+    return NextResponse.json({ error: "Row not found" }, { status: 404 });
   }
 
   const { data: inserted, error } = await sb
