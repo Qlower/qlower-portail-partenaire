@@ -423,6 +423,27 @@ export async function scoreCharge({
       };
     }
   }
+  // Si on a trouvé des fiches mais aucun owner sales/upsell/sales_admin/support
+  // → owner est probablement un ancien collaborateur ou inactif. On NE bind
+  // PAS la vente à cet owner (cas Elias parti). Retourne Non attribué avec
+  // une raison claire pour que le manager puisse arbitrer (typiquement vers
+  // "Achat autonome").
+  if (ownerCandidates.length > 0) {
+    const inactiveOwner = ownerCandidates
+      .map((id) => commercialOf(cmap, id))
+      .find((c) => c.role === "former" || c.role === "unknown");
+    if (inactiveOwner) {
+      return {
+        owner_id: null,
+        commercial_id: null,
+        commercial_name: "Non attribué",
+        score: 0,
+        source: "Owner inactif",
+        reason: `Owner HubSpot = ${inactiveOwner.name} (${inactiveOwner.role === "former" ? "ancien collaborateur" : "inconnu"}) — aucun effort récent. Probablement achat autonome.`,
+        last_efforts: [],
+      };
+    }
+  }
 
   return {
     owner_id: null,
