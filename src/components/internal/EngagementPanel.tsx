@@ -13,6 +13,7 @@ import {
   AlertCircle,
   ExternalLink,
 } from "lucide-react";
+import { hubspotContactUrl } from "@/lib/hubspot-urls";
 
 interface EngagementEntry {
   id: string;
@@ -190,7 +191,7 @@ export default function EngagementPanel({ chargeId, onClose }: Props) {
                     {data.contacts.map((c) => (
                       <a
                         key={c.id}
-                        href={`https://app-eu1.hubspot.com/contacts/qlower/contact/${c.id}`}
+                        href={hubspotContactUrl(c.id)}
                         target="_blank"
                         rel="noreferrer"
                         className="flex items-center justify-between gap-2 p-2 bg-white border border-gray-200 rounded text-xs hover:bg-gray-50"

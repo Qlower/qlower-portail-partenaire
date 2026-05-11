@@ -12,6 +12,7 @@ import {
   RefreshCw,
   CheckCircle2,
 } from "lucide-react";
+import { hubspotContactUrl, hubspotContactsListUrl } from "@/lib/hubspot-urls";
 
 interface DuplicateGroup {
   id: string;
@@ -224,7 +225,7 @@ function DuplicateCard({
         {group.contact_ids.map((cid, i) => (
           <a
             key={cid}
-            href={`https://app-eu1.hubspot.com/contacts/qlower/contact/${cid}`}
+            href={hubspotContactUrl(cid)}
             target="_blank"
             rel="noreferrer"
             className="flex items-center justify-between gap-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs hover:bg-gray-100"
@@ -256,7 +257,7 @@ function DuplicateCard({
           {!noteOpen ? (
             <>
               <a
-                href="https://app-eu1.hubspot.com/contacts/qlower/objects/0-1/views/all"
+                href={hubspotContactsListUrl()}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-[11px] px-3 py-1.5 bg-[#0A3855] text-white rounded hover:bg-[#0d4f78]"
