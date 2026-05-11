@@ -7,8 +7,8 @@ import AttributionTable, {
 } from "@/components/internal/AttributionTable";
 import LockMonthButton from "@/components/internal/LockMonthButton";
 import MonthSelector from "@/components/internal/MonthSelector";
-import { loadAvailableMonths } from "@/lib/available-months";
-import { formatYearMonthFull, resolveYearMonth } from "@/lib/year-month";
+import { resolveYearMonthWithFallback } from "@/lib/available-months";
+import { formatYearMonthFull } from "@/lib/year-month";
 
 interface DbRow {
   charge_id: string;
@@ -142,11 +142,8 @@ export default async function AttributionAdminPage({
   searchParams: Promise<{ ym?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const yearMonth = resolveYearMonth(params.ym);
-  const [{ rows, commercials, run }, availableMonths] = await Promise.all([
-    loadAttributionData(yearMonth),
-    loadAvailableMonths(),
-  ]);
+  const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
+  const { rows, commercials, run } = await loadAttributionData(yearMonth);
   const monthLabel = formatYearMonthFull(yearMonth);
   const editable = !run?.locked;
 

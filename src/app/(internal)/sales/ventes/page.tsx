@@ -8,8 +8,8 @@ import AttributionTable, {
   type NoteEntry,
 } from "@/components/internal/AttributionTable";
 import MonthSelector from "@/components/internal/MonthSelector";
-import { loadAvailableMonths } from "@/lib/available-months";
-import { formatYearMonthFull, resolveYearMonth } from "@/lib/year-month";
+import { resolveYearMonthWithFallback } from "@/lib/available-months";
+import { formatYearMonthFull } from "@/lib/year-month";
 
 async function getCurrentUser() {
   const cookieStore = await cookies();
@@ -126,17 +126,14 @@ export default async function VentesPage({
   searchParams: Promise<{ ym?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const yearMonth = resolveYearMonth(params.ym);
+  const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
   const user = await getCurrentUser();
   const meta = (user?.user_metadata || {}) as Record<string, unknown>;
   const internalRole = meta.internal_role as "sales" | "sales_admin" | undefined;
   const myCommercialId = (meta.commercial_id as string | undefined) || null;
   const myName = (meta.name as string | undefined) || "Moi";
 
-  const [{ rows, commercials }, availableMonths] = await Promise.all([
-    loadVentesData(yearMonth),
-    loadAvailableMonths(),
-  ]);
+  const { rows, commercials } = await loadVentesData(yearMonth);
 
   const monthLabel = formatYearMonthFull(yearMonth);
   const total = rows.reduce((sum, r) => sum + r.amount_net_eur, 0);

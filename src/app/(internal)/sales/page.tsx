@@ -1,8 +1,8 @@
 import { createServiceClient } from "@/lib/supabase-server";
 import Link from "next/link";
 import MonthSelector from "@/components/internal/MonthSelector";
-import { loadAvailableMonths } from "@/lib/available-months";
-import { formatYearMonthFull, resolveYearMonth } from "@/lib/year-month";
+import { resolveYearMonthWithFallback } from "@/lib/available-months";
+import { formatYearMonthFull } from "@/lib/year-month";
 
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -105,11 +105,8 @@ export default async function SalesHomePage({
   searchParams: Promise<{ ym?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const yearMonth = resolveYearMonth(params.ym);
-  const [data, availableMonths] = await Promise.all([
-    getDashboardData(yearMonth),
-    loadAvailableMonths(),
-  ]);
+  const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
+  const data = await getDashboardData(yearMonth);
 
   const monthLabel = formatYearMonthFull(yearMonth);
   const objectivePct = data.teamTarget > 0 ? (data.totalNet / data.teamTarget) * 100 : 0;

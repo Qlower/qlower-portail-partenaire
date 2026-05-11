@@ -6,8 +6,8 @@
 
 import { Trophy, AlertTriangle } from "lucide-react";
 import MonthSelector from "@/components/internal/MonthSelector";
-import { loadAvailableMonths } from "@/lib/available-months";
-import { formatYearMonthFull, resolveYearMonth } from "@/lib/year-month";
+import { resolveYearMonthWithFallback } from "@/lib/available-months";
+import { formatYearMonthFull } from "@/lib/year-month";
 import { loadReportData, type DailyPoint, type NegoLine } from "@/lib/sales-report";
 
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
@@ -19,11 +19,8 @@ export default async function RapportPage({
   searchParams: Promise<{ ym?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const yearMonth = resolveYearMonth(params.ym);
-  const [data, availableMonths] = await Promise.all([
-    loadReportData(yearMonth),
-    loadAvailableMonths(),
-  ]);
+  const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
+  const data = await loadReportData(yearMonth);
   const monthLabel = formatYearMonthFull(yearMonth);
   const teamPct = data.teamObj_eur > 0 ? (data.totalCA_TTC / data.teamObj_eur) * 100 : 0;
   const teamObjReached = teamPct >= 100;

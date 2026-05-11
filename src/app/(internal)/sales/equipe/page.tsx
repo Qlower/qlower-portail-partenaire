@@ -1,8 +1,8 @@
 import { createServiceClient } from "@/lib/supabase-server";
 import { Trophy } from "lucide-react";
 import MonthSelector from "@/components/internal/MonthSelector";
-import { loadAvailableMonths } from "@/lib/available-months";
-import { formatYearMonthFull, resolveYearMonth } from "@/lib/year-month";
+import { resolveYearMonthWithFallback } from "@/lib/available-months";
+import { formatYearMonthFull } from "@/lib/year-month";
 
 async function loadTeamData(yearMonth: string) {
   const sb = createServiceClient();
@@ -103,11 +103,8 @@ export default async function EquipePage({
   searchParams: Promise<{ ym?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const yearMonth = resolveYearMonth(params.ym);
-  const [{ all, teamTarget, autonomeNet, autonomeRows }, availableMonths] = await Promise.all([
-    loadTeamData(yearMonth),
-    loadAvailableMonths(),
-  ]);
+  const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
+  const { all, teamTarget, autonomeNet, autonomeRows } = await loadTeamData(yearMonth);
   const monthLabel = formatYearMonthFull(yearMonth);
 
   // Le total d'équipe inclut les achats autonomes (pour la jauge globale)
