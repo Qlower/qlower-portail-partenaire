@@ -17,3 +17,12 @@ export function hubspotContactUrl(contactId: string): string {
 export function hubspotContactsListUrl(): string {
   return `${HUBSPOT_BASE}/contacts/${HUBSPOT_PORTAL_ID}/objects/0-1/views/all`;
 }
+
+/**
+ * URL de recherche dans HubSpot filtrée par email.
+ * Ouvre la liste des contacts avec `query=email` → le 1er résultat est
+ * la fiche du client. Cliquable depuis le tableau d'attribution.
+ */
+export function hubspotSearchByEmailUrl(email: string): string {
+  return `${HUBSPOT_BASE}/contacts/${HUBSPOT_PORTAL_ID}/objects/0-1/views/all/list?query=${encodeURIComponent(email)}`;
+}

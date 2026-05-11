@@ -17,6 +17,7 @@ import {
   type ReportData,
 } from "@/lib/sales-report";
 import { fmtEurCents } from "@/lib/commissions";
+import { hubspotSearchByEmailUrl } from "@/lib/hubspot-urls";
 
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -254,8 +255,26 @@ export default async function RapportPage({
                     {i === 0 ? <Trophy className="w-4 h-4 text-amber-500" /> : <span className="text-gray-400">{i + 1}</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="font-semibold text-gray-900">{c.client_name || c.email}</div>
-                    {c.client_name && <div className="text-[11px] font-mono text-gray-400">{c.email}</div>}
+                    <a
+                      href={hubspotSearchByEmailUrl(c.email)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold text-gray-900 hover:text-[#0A3855] hover:underline block"
+                      title="Ouvrir dans HubSpot"
+                    >
+                      {c.client_name || c.email}
+                    </a>
+                    {c.client_name && (
+                      <a
+                        href={hubspotSearchByEmailUrl(c.email)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] font-mono text-gray-400 hover:text-[#0A3855] hover:underline"
+                        title="Ouvrir dans HubSpot"
+                      >
+                        {c.email}
+                      </a>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-600">{c.family || "—"}</td>
                   <td className="px-4 py-3 text-right text-sm tabular-nums">{c.nb_charges}</td>

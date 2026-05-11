@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, History, MessageSquare, Flag, Plus, Search } from "lucide-react";
 import EngagementPanel from "./EngagementPanel";
+import { hubspotSearchByEmailUrl } from "@/lib/hubspot-urls";
 
 export interface CommercialOption {
   id: string;
@@ -463,9 +464,25 @@ function RowComponent({
         <td className={`px-3 py-2 sticky left-0 ${cellBg}`}>
           {isMine && <span className="mr-1 text-[#0A3855]" title="Attribuée à moi">●</span>}
           {row.client_name && (
-            <div className="text-[12px] font-semibold text-gray-900">{row.client_name}</div>
+            <a
+              href={hubspotSearchByEmailUrl(row.email)}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[12px] font-semibold text-gray-900 hover:text-[#0A3855] hover:underline block"
+              title="Ouvrir dans HubSpot"
+            >
+              {row.client_name}
+            </a>
           )}
-          <div className="font-mono text-[11px] text-gray-500">{row.email}</div>
+          <a
+            href={hubspotSearchByEmailUrl(row.email)}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-[11px] text-gray-500 hover:text-[#0A3855] hover:underline"
+            title="Ouvrir dans HubSpot"
+          >
+            {row.email}
+          </a>
         </td>
         <td className="px-2 py-2 whitespace-nowrap">{fmtDate(row.created_at)}</td>
         <td className="px-2 py-2 text-right font-mono tabular-nums">{fmtEur(row.amount_net_eur)}</td>
