@@ -4,11 +4,18 @@
 //
 // /sales/rapport?ym=YYYY-MM (sélecteur de mois en haut)
 
-import { Trophy, AlertTriangle } from "lucide-react";
+import { Trophy, AlertTriangle, TrendingUp, Users, Package, Clock, Crown } from "lucide-react";
 import MonthSelector from "@/components/internal/MonthSelector";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
-import { loadReportData, type DailyPoint, type NegoLine } from "@/lib/sales-report";
+import {
+  loadReportData,
+  type DailyPoint,
+  type NegoLine,
+  type CompositionStat,
+  type TopClient,
+  type ReportData,
+} from "@/lib/sales-report";
 import { fmtEurCents } from "@/lib/commissions";
 
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
@@ -37,6 +44,19 @@ export default async function RapportPage({
         </div>
         <MonthSelector current={yearMonth} available={availableMonths} />
       </div>
+
+      {/* Sommaire — clique pour scroller à la section */}
+      <nav className="bg-white border border-gray-200 rounded-xl px-5 py-3 text-xs flex flex-wrap items-center gap-x-4 gap-y-2 text-gray-600">
+        <span className="font-semibold text-gray-400">Sections :</span>
+        <a href="#kpis" className="hover:text-[#0A3855] hover:underline">1. KPIs</a>
+        <a href="#composition" className="hover:text-[#0A3855] hover:underline">2. Composition du CA</a>
+        <a href="#funnel" className="hover:text-[#0A3855] hover:underline">3. Funnel & délais</a>
+        <a href="#negos" className="hover:text-[#0A3855] hover:underline">4. Performance négos</a>
+        <a href="#top-clients" className="hover:text-[#0A3855] hover:underline">5. Top clients</a>
+        <a href="#distribution" className="hover:text-[#0A3855] hover:underline">6. Panier</a>
+      </nav>
+
+      <div id="kpis"></div>
 
       {/* Hero KPIs (BIG) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -105,7 +125,56 @@ export default async function RapportPage({
         </div>
       </div>
 
+      {/* ====== Section Composition ====== */}
+      <div id="composition" />
+      <h2 className="text-lg font-semibold text-[#0A3855] flex items-center gap-2 pt-2">
+        <Package className="w-5 h-5" /> Composition du CA
+      </h2>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <CompositionCard title="NewBiz vs OldBiz" subtitle="Sur tous les paiements du mois" stats={data.newbizStats} totalCA={data.totalCA_TTC} palette={["bg-emerald-500", "bg-gray-400", "bg-amber-400"]} />
+        <CompositionCard title="Sales-touched vs Self-service" subtitle="Effort commercial avant le paiement" stats={data.sourceStats} totalCA={data.totalCA_TTC} palette={["bg-[#0A3855]", "bg-amber-400", "bg-gray-300"]} helpHover="Sales-touched = score ≥ 5 (Modjo, RDV, Aircall, SMS). Mid = owner identifié sans effort récent. Self-service = aucun effort traçable." />
+        <CompositionCard title="Mix produits (family)" subtitle="Par catégorie de prestation" stats={data.productStats} totalCA={data.totalCA_TTC} palette={["bg-[#0A3855]", "bg-[#F6CCA4]", "bg-emerald-500", "bg-violet-400", "bg-sky-400", "bg-orange-400", "bg-pink-400"]} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KpiCard label="Clients uniques" value={data.totalClients.toLocaleString("fr-FR")} sub={`${data.totalRows} ligne${data.totalRows > 1 ? "s" : ""} Stripe`} />
+        <KpiCard label="Panier moyen / charge" value={fmtEur(data.panierMoyen_charge)} sub="TTC par ligne Stripe" />
+        <KpiCard label="Panier moyen / client" value={fmtEur(data.panierMoyen_client)} sub="TTC tous achats cumulés" highlight="primary" />
+      </div>
+
+      {/* ====== Section Funnel & délais ====== */}
+      <div id="funnel" />
+      <h2 className="text-lg font-semibold text-[#0A3855] flex items-center gap-2 pt-2">
+        <Clock className="w-5 h-5" /> Funnel & délais de conversion
+      </h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          label="Délai Lead → 1er paiement"
+          value={data.funnel.avg_lead_to_payment_days != null ? `${Math.round(data.funnel.avg_lead_to_payment_days)} j` : "—"}
+          sub={data.funnel.matched_lead_count > 0 ? `Calculé sur ${data.funnel.matched_lead_count} client(s) UTM matchés` : "Aucun lead UTM matché"}
+        />
+        <KpiCard
+          label="Délai 1ère interaction → paiement"
+          value={data.funnel.avg_first_touch_to_payment_days != null ? `${Math.round(data.funnel.avg_first_touch_to_payment_days)} j` : "—"}
+          sub="Moyenne sales-touched"
+        />
+        <KpiCard
+          label="Interactions avant closing"
+          value={data.funnel.avg_interactions_before_close != null ? data.funnel.avg_interactions_before_close.toFixed(1) : "—"}
+          sub="Effort commercial moyen (Modjo + RDV + Aircall)"
+        />
+        <KpiCard
+          label="% Self-service"
+          value={data.totalRows > 0 ? `${Math.round((data.funnel.self_service_clients / data.totalRows) * 100)}%` : "—"}
+          sub={`${data.funnel.self_service_clients} ligne${data.funnel.self_service_clients > 1 ? "s" : ""} sans effort traçable`}
+          highlight="amber"
+        />
+      </div>
+
       {/* Per-négo table */}
+      <div id="negos" />
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[#0A3855]">Performance & commissions par négo</h2>
@@ -158,6 +227,78 @@ export default async function RapportPage({
         </table>
       </div>
 
+      {/* ====== Section Top clients ====== */}
+      <div id="top-clients" />
+      <h2 className="text-lg font-semibold text-[#0A3855] flex items-center gap-2 pt-2">
+        <Crown className="w-5 h-5" /> Top 10 clients du mois
+      </h2>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
+            <tr>
+              <th className="px-4 py-3 text-left w-12">#</th>
+              <th className="px-4 py-3 text-left">Client</th>
+              <th className="px-4 py-3 text-left">Family</th>
+              <th className="px-4 py-3 text-right">Charges</th>
+              <th className="px-4 py-3 text-right">CA TTC</th>
+              <th className="px-4 py-3 text-right">% CA total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.topClients.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400 text-sm">Aucun client.</td></tr>
+            ) : (
+              data.topClients.map((c, i) => (
+                <tr key={c.email} className="border-t border-gray-100 hover:bg-gray-50/40">
+                  <td className="px-4 py-3 text-sm">
+                    {i === 0 ? <Trophy className="w-4 h-4 text-amber-500" /> : <span className="text-gray-400">{i + 1}</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-semibold text-gray-900">{c.client_name || c.email}</div>
+                    {c.client_name && <div className="text-[11px] font-mono text-gray-400">{c.email}</div>}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-600">{c.family || "—"}</td>
+                  <td className="px-4 py-3 text-right text-sm tabular-nums">{c.nb_charges}</td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums text-[#0A3855] font-semibold">{fmtEur(c.ca)}</td>
+                  <td className="px-4 py-3 text-right text-xs text-gray-500 tabular-nums">
+                    {data.totalCA_TTC > 0 ? `${((c.ca / data.totalCA_TTC) * 100).toFixed(1)}%` : "—"}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500">
+          <strong>Concentration :</strong> le top 10% des clients ({Math.max(1, Math.ceil(data.totalClients * 0.1))} clients sur {data.totalClients})
+          fait <strong className="text-[#0A3855]">{data.concentrationTop10Pct.toFixed(1)}%</strong> du CA du mois.
+        </div>
+      </div>
+
+      {/* ====== Section Distribution panier ====== */}
+      <div id="distribution" />
+      <h2 className="text-lg font-semibold text-[#0A3855] flex items-center gap-2 pt-2">
+        <Users className="w-5 h-5" /> Comportement d&apos;achat
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {data.basketDistribution.map((b) => {
+          const pctClients = data.totalClients > 0 ? (b.nb_clients / data.totalClients) * 100 : 0;
+          const pctCA = data.totalCA_TTC > 0 ? (b.ca / data.totalCA_TTC) * 100 : 0;
+          return (
+            <div key={b.label} className="bg-white border border-gray-200 rounded-xl p-5">
+              <div className="text-xs uppercase tracking-wider text-gray-500 font-semibold">{b.label}</div>
+              <div className="text-3xl font-bold mt-1 text-[#0A3855]">
+                {b.nb_clients}
+                <span className="text-base font-normal text-gray-400 ml-2">client{b.nb_clients > 1 ? "s" : ""}</span>
+              </div>
+              <div className="text-xs text-gray-500 mt-2 space-y-0.5">
+                <div>{pctClients.toFixed(1)}% des clients</div>
+                <div className="font-mono text-gray-700">{fmtEur(b.ca)} <span className="text-gray-400">({pctCA.toFixed(1)}% CA)</span></div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Légende des règles de commission */}
       <details className="bg-blue-50/50 border border-blue-100 rounded-lg p-4 text-xs text-gray-700">
         <summary className="cursor-pointer font-semibold text-[#0A3855]">Barème commissions appliqué</summary>
@@ -169,6 +310,63 @@ export default async function RapportPage({
           <div className="text-gray-500 mt-2">CA HT = CA TTC ÷ 1.20 (TVA 20%). Centimes affichés pour le calcul de paie. Si tu réattribues une vente manuellement, la commission suit la nouvelle attribution.</div>
         </div>
       </details>
+    </div>
+  );
+}
+
+function CompositionCard({
+  title,
+  subtitle,
+  stats,
+  totalCA,
+  palette,
+  helpHover,
+}: {
+  title: string;
+  subtitle: string;
+  stats: CompositionStat[];
+  totalCA: number;
+  palette: string[];
+  helpHover?: string;
+}) {
+  // Stacked bar
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5">
+      <div className="flex items-baseline justify-between mb-1">
+        <h3 className="text-sm font-semibold text-[#0A3855]">{title}</h3>
+        {helpHover && <span className="text-[10px] text-gray-400" title={helpHover}>ⓘ</span>}
+      </div>
+      <p className="text-[11px] text-gray-500 mb-3">{subtitle}</p>
+
+      {/* Stacked progress bar */}
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden flex mb-3">
+        {stats.map((s, i) => (
+          <div
+            key={s.label}
+            className={`h-full ${palette[i % palette.length]}`}
+            style={{ width: `${s.pct_ca}%` }}
+            title={`${s.label} : ${s.pct_ca.toFixed(1)}%`}
+          />
+        ))}
+      </div>
+
+      {/* Liste détaillée */}
+      <ul className="space-y-1.5 text-xs">
+        {stats.map((s, i) => (
+          <li key={s.label} className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className={`w-2 h-2 rounded-full ${palette[i % palette.length]} shrink-0`} />
+              <span className="text-gray-700 truncate">{s.label}</span>
+            </span>
+            <span className="text-gray-600 tabular-nums whitespace-nowrap">
+              {Math.round(s.ca).toLocaleString("fr-FR")} € · <span className="text-gray-400">{s.pct_ca.toFixed(1)}%</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="text-[10px] text-gray-400 mt-3 pt-2 border-t border-gray-100">
+        Total : {Math.round(totalCA).toLocaleString("fr-FR")} € TTC
+      </div>
     </div>
   );
 }
