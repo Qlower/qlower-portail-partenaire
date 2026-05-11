@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronDown,
   FileBarChart,
+  Copy,
 } from "lucide-react";
 
 type InternalRole = "sales" | "sales_admin";
@@ -33,6 +34,7 @@ const NAV_BASE = [
 const NAV_ADMIN_EXTRA = [
   { href: "/sales/admin/attribution", label: "Attribution (admin)", icon: Settings, exact: false },
   { href: "/sales/admin/equipe", label: "Gestion équipe", icon: Users, exact: false },
+  { href: "/admin/doublons", label: "Doublons HubSpot", icon: Copy, exact: false },
 ];
 
 export function InternalShell({ children }: InternalShellProps) {
