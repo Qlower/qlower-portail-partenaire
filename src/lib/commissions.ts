@@ -10,13 +10,15 @@
 //
 // ALEX (sales_admin) :
 //   - 5% du CA HT toujours, sur tout son CA généré
-//   - + 10% sur le SURPLUS au-delà de l'objectif perso, si l'objectif perso
-//     est atteint
-//   - Ses 5% restent acquis dans tous les cas
+//   - + 10% sur le DÉPASSEMENT de l'objectif ÉQUIPE (pas perso)
+//   - Exemple : équipe fait 125k€, obj équipe 110k€ → bonus = 10% × 15k€
+//     du dépassement = 1 500 €, plus ses 5% sur ses propres ventes
 //
-// RUDO, JENNYFER, COLINE, ANATOLE, ELIAS, system_none : 0 €
-// (Rudo : pas de commission pour le moment, Jennyfer = upsell hors barème,
-//  Coline = support, anciens / sentinelle = pas concernés)
+// JENNYFER (upsell) :
+//   - 2% du CA HT généré (toujours)
+//
+// RUDO, COLINE, ANATOLE, ELIAS, support, former, system_none : 0 €
+// (Rudo : pas de commission pour le moment, Coline = support, etc.)
 //
 // Périmètre : amount_net_eur en TTC → conversion HT en divisant par 1.20.
 
@@ -61,16 +63,14 @@ export function computeCommission(input: CommissionInput): CommissionResult {
 
   const name = input.commercialName.toLowerCase();
 
-  // Aucune commission pour : Rudo, Jennyfer, Coline, anciens, sentinelle
+  // Aucune commission pour : Rudo, Coline, anciens, sentinelle
   if (
     name === "rudolph" ||
     name === "rudo" ||
-    name === "jennyfer" ||
     name === "support" ||
     input.commercialRole === "former" ||
     input.commercialRole === "support" ||
-    input.commercialRole === "system_none" ||
-    input.commercialRole === "upsell"
+    input.commercialRole === "system_none"
   ) {
     return {
       amount_eur: 0,
@@ -83,23 +83,39 @@ export function computeCommission(input: CommissionInput): CommissionResult {
     };
   }
 
-  // Règle Alex : 5% du CA HT toujours + 10% du surplus si obj perso atteint
-  if (name === "alexandre" || input.commercialRole === "sales_admin") {
-    const base = myCA_HT * 0.05;
-    let bonus = 0;
-    let breakdown = `5% × ${fmtEur(myCA_HT)} = ${fmtEur(base)}`;
-    if (objReached && myCA_HT > myObj_HT) {
-      const surplus = myCA_HT - myObj_HT;
-      bonus = surplus * 0.10;
-      breakdown += ` + 10% × surplus ${fmtEur(surplus)} = ${fmtEur(bonus)}`;
-    }
+  // Règle Jennyfer / upsell : 2% du CA HT
+  if (name === "jennyfer" || input.commercialRole === "upsell") {
+    const c = myCA_HT * 0.02;
     return {
-      amount_eur: round2(base + bonus),
-      rate_label: bonus > 0 ? "5% + 10% surplus" : "5%",
+      amount_eur: round2(c),
+      rate_label: "2% (upsell)",
       ca_ht: myCA_HT,
       obj_reached: objReached,
       team_obj_reached: teamObjReached,
-      rule_used: "alex_5plus10",
+      rule_used: "upsell_2",
+      breakdown: `2% × ${fmtEurCents(myCA_HT)} = ${fmtEurCents(c)}`,
+    };
+  }
+
+  // Règle Alex : 5% de son CA HT + 10% sur le DÉPASSEMENT ÉQUIPE
+  if (name === "alexandre" || input.commercialRole === "sales_admin") {
+    const base = myCA_HT * 0.05;
+    let bonus = 0;
+    let breakdown = `5% × ${fmtEurCents(myCA_HT)} = ${fmtEurCents(base)}`;
+    if (teamObj_HT > 0 && teamCA_HT > teamObj_HT) {
+      const teamSurplus = teamCA_HT - teamObj_HT;
+      bonus = teamSurplus * 0.10;
+      breakdown += `  +  10% × dépassement équipe ${fmtEurCents(teamSurplus)} = ${fmtEurCents(bonus)}`;
+    } else if (teamObj_HT > 0) {
+      breakdown += `  ·  équipe ${fmtEurCents(teamCA_HT)} / obj ${fmtEurCents(teamObj_HT)} (pas de dépassement → pas de bonus)`;
+    }
+    return {
+      amount_eur: round2(base + bonus),
+      rate_label: bonus > 0 ? "5% + 10% dépassement équipe" : "5%",
+      ca_ht: myCA_HT,
+      obj_reached: objReached,
+      team_obj_reached: teamObjReached,
+      rule_used: "alex_5plus10_team",
       breakdown,
     };
   }
@@ -115,7 +131,7 @@ export function computeCommission(input: CommissionInput): CommissionResult {
       obj_reached: objReached,
       team_obj_reached: true,
       rule_used: "tiered_10",
-      breakdown: `10% × ${fmtEur(myCA_HT)} = ${fmtEur(c)} — obj équipe ${fmtEur(teamCA_HT)}/${fmtEur(teamObj_HT)} atteint`,
+      breakdown: `10% × ${fmtEurCents(myCA_HT)} = ${fmtEurCents(c)} — obj équipe ${fmtEurCents(teamCA_HT)}/${fmtEurCents(teamObj_HT)} atteint`,
     };
   }
   if (objReached) {
@@ -127,7 +143,7 @@ export function computeCommission(input: CommissionInput): CommissionResult {
       obj_reached: true,
       team_obj_reached: false,
       rule_used: "tiered_5",
-      breakdown: `5% × ${fmtEur(myCA_HT)} = ${fmtEur(c)} — obj perso ${fmtEur(myCA_HT)}/${fmtEur(myObj_HT)} atteint`,
+      breakdown: `5% × ${fmtEurCents(myCA_HT)} = ${fmtEurCents(c)} — obj perso ${fmtEurCents(myCA_HT)}/${fmtEurCents(myObj_HT)} atteint`,
     };
   }
   const c = myCA_HT * 0.03;
@@ -138,7 +154,7 @@ export function computeCommission(input: CommissionInput): CommissionResult {
     obj_reached: false,
     team_obj_reached: false,
     rule_used: "tiered_3",
-    breakdown: `3% × ${fmtEur(myCA_HT)} = ${fmtEur(c)} — obj perso ${fmtEur(myCA_HT)}/${fmtEur(myObj_HT)}`,
+    breakdown: `3% × ${fmtEurCents(myCA_HT)} = ${fmtEurCents(c)} — obj perso ${fmtEurCents(myCA_HT)}/${fmtEurCents(myObj_HT)}`,
   };
 }
 
@@ -146,6 +162,15 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function fmtEur(n: number): string {
-  return `${Math.round(n).toLocaleString("fr-FR")} €`;
+/**
+ * Formate un montant en euros avec centimes (ex: "1 234,56 €").
+ * Utilisé pour les commissions où la précision compte (paie réelle).
+ */
+export function fmtEurCents(n: number): string {
+  return (
+    n.toLocaleString("fr-FR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }) + " €"
+  );
 }

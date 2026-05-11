@@ -9,6 +9,7 @@ import MonthSelector from "@/components/internal/MonthSelector";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
 import { loadReportData, type DailyPoint, type NegoLine } from "@/lib/sales-report";
+import { fmtEurCents } from "@/lib/commissions";
 
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -57,7 +58,7 @@ export default async function RapportPage({
         />
         <KpiCard
           label="Commissions à verser"
-          value={fmtEur(data.totalCommissions)}
+          value={fmtEurCents(data.totalCommissions)}
           sub={`${data.negos.filter((n) => n.commission.amount_eur > 0).length} négos rémunérés`}
           highlight="primary"
         />
@@ -147,7 +148,7 @@ export default async function RapportPage({
                 </span>
               </td>
               <td className="px-4 py-3 text-right font-mono tabular-nums text-[#0A3855]">
-                {fmtEur(data.totalCommissions)}
+                {fmtEurCents(data.totalCommissions)}
               </td>
               <td className="px-4 py-3 text-xs text-gray-500">
                 {teamObjReached ? "Bonus 10% activé pour Hasan/Driss" : "Bonus équipe non activé"}
@@ -162,9 +163,10 @@ export default async function RapportPage({
         <summary className="cursor-pointer font-semibold text-[#0A3855]">Barème commissions appliqué</summary>
         <div className="mt-3 space-y-2">
           <div><strong>Hasan, Driss</strong> : 3% du CA HT si obj perso non atteint · 5% si obj perso atteint · 10% si obj équipe atteint (priorité absolue)</div>
-          <div><strong>Alex</strong> : 5% du CA HT toujours, + 10% sur le surplus au-delà de l&apos;obj perso si atteint</div>
-          <div><strong>Rudo, Jennyfer, Coline</strong> : pas de commission au barème actuel</div>
-          <div className="text-gray-500 mt-2">CA HT = CA TTC ÷ 1.20 (TVA 20%). Si tu réattribues une vente manuellement, la commission suit la nouvelle attribution.</div>
+          <div><strong>Alex</strong> : 5% de son CA HT toujours · + 10% sur le DÉPASSEMENT de l&apos;objectif ÉQUIPE (ex : équipe 125k€ / obj 110k€ → bonus = 10% × 15k€ HT)</div>
+          <div><strong>Jennyfer (upsell)</strong> : 2% du CA HT toujours</div>
+          <div><strong>Rudo, Coline, anciens</strong> : pas de commission au barème actuel</div>
+          <div className="text-gray-500 mt-2">CA HT = CA TTC ÷ 1.20 (TVA 20%). Centimes affichés pour le calcul de paie. Si tu réattribues une vente manuellement, la commission suit la nouvelle attribution.</div>
         </div>
       </details>
     </div>
@@ -231,7 +233,7 @@ function NegoRow({ nego, rank }: { nego: NegoLine; rank: number }) {
         ) : "—"}
       </td>
       <td className="px-4 py-3 text-right">
-        <div className="font-bold text-[#0A3855] font-mono tabular-nums">{fmtEur(commission.amount_eur)}</div>
+        <div className="font-bold text-[#0A3855] font-mono tabular-nums">{fmtEurCents(commission.amount_eur)}</div>
         <div className="text-[10px] text-gray-400 mt-0.5">{commission.rate_label}</div>
       </td>
       <td className="px-4 py-3 text-[11px] text-gray-500 max-w-xs">{commission.breakdown || "—"}</td>
