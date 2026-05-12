@@ -11,7 +11,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 import { resend, FROM } from "@/lib/resend";
 
 const SCOPES = new Set(["global", "plateforme", "support", "commission", "process"]);
-const ADMIN_NOTIF_EMAIL = "alexandre@qlower.com";
+const ADMIN_NOTIF_EMAILS = ["alexandre@qlower.com", "coline@qlower.com"];
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://partenaire.qlower.com";
 
 async function getAuthedPartner(request: NextRequest): Promise<{
@@ -137,7 +137,7 @@ async function notifyAdminNewRating(input: {
     </div>
   </div>
 </body></html>`;
-  await resend.emails.send({ from: FROM, to: ADMIN_NOTIF_EMAIL, subject, html });
+  await resend.emails.send({ from: FROM, to: ADMIN_NOTIF_EMAILS, subject, html });
 }
 
 function escapeHtml(s: string): string {
