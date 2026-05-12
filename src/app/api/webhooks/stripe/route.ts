@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase-server";
 import { scoreCharge } from "@/lib/sales-scoring";
+import { enrichCharge, type ChargeEnrichment } from "@/lib/charge-classifier";
 
 export const maxDuration = 60;
 export const runtime = "nodejs"; // need raw body for signature verification
@@ -24,6 +25,7 @@ interface ChargeUpsertInput {
   amount_refunded_eur: number;
   amount_net_eur: number;
   description: string | null;
+  enrichment: ChargeEnrichment;
 }
 
 function yearMonthFromDate(iso: string): string {
@@ -99,6 +101,10 @@ async function upsertCharge(input: ChargeUpsertInput): Promise<{ created: boolea
     amount_refunded_eur: input.amount_refunded_eur,
     amount_net_eur: input.amount_net_eur,
     description: input.description,
+    family: input.enrichment.family,
+    product_name: input.enrichment.product_name,
+    newbiz_1m: input.enrichment.newbiz_1m,
+    newbiz_3m: input.enrichment.newbiz_3m,
     auto_commercial_id: scoring.commercial_id,
     auto_score: scoring.score,
     auto_source: scoring.source,
@@ -182,6 +188,22 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Enrichissement : family + product_name + newbiz_1m/3m
+        // (récupéré via Stripe API : invoice.lines + previous charges du customer).
+        // Non bloquant : si l'enrichment échoue, on continue avec des valeurs par défaut.
+        let enrichment;
+        try {
+          enrichment = await enrichCharge(stripe, charge);
+        } catch (e) {
+          console.warn("[stripe-webhook] enrichment failed:", e instanceof Error ? e.message : e);
+          enrichment = {
+            family: "Autre",
+            product_name: charge.description || null,
+            newbiz_1m: "NewBiz" as const,
+            newbiz_3m: "NewBiz" as const,
+          };
+        }
+
         result = await upsertCharge({
           charge_id: charge.id,
           email,
@@ -193,6 +215,7 @@ export async function POST(request: NextRequest) {
           amount_refunded_eur: Math.round((charge.amount_refunded || 0) / 100),
           amount_net_eur: Math.round((charge.amount - (charge.amount_refunded || 0)) / 100),
           description: charge.description || null,
+          enrichment,
         });
         break;
       }
