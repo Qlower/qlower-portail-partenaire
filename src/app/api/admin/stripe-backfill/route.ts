@@ -31,6 +31,17 @@ const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 async function verifyAdminOrSalesAdmin(
   request: NextRequest,
 ): Promise<{ ok: true; email: string } | { ok: false; error: NextResponse }> {
+  // Bypass automation : header Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
+  // Permet de déclencher le backfill depuis un script CLI / cron sans cookie de session.
+  const authHeader = request.headers.get("authorization");
+  if (
+    authHeader &&
+    process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    authHeader === `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+  ) {
+    return { ok: true, email: "service-role-cli" };
+  }
+
   const adminCheck = await verifyAdmin(request);
   if (!adminCheck.error) {
     const supabase = createServerClient(
