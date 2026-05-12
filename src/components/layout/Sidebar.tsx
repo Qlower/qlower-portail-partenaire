@@ -73,6 +73,16 @@ export function Sidebar({ activeModule, onNavigate, showGuide, guideDone, contra
       ),
     },
     {
+      key: "avis",
+      label: "Donner mon avis",
+      icon: (
+        // Trèfle 4 feuilles — assemblé à partir de 4 ellipses (style Qlower)
+        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 12c-2.5-2.5-2.5-6 0-7.5 2.5 1.5 2.5 5 0 7.5zM12 12c-2.5 2.5-2.5 6 0 7.5 2.5-1.5 2.5-5 0-7.5zM12 12c-2.5-2.5-6-2.5-7.5 0 1.5 2.5 5 2.5 7.5 0zM12 12c2.5-2.5 6-2.5 7.5 0-1.5 2.5-5 2.5-7.5 0z" />
+        </svg>
+      ),
+    },
+    {
       key: "settings",
       label: "Parametres",
       icon: (

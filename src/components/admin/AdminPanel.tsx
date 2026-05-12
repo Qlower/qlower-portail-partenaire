@@ -20,6 +20,7 @@ import {
   Settings,
   RefreshCw,
   Copy,
+  Clover,
 } from "lucide-react";
 
 const TABS = [
@@ -56,6 +57,13 @@ export default function AdminPanel() {
               {syncMessage}
             </span>
           )}
+          <Link
+            href="/admin/avis"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-emerald-200 bg-emerald-50/50 text-emerald-800 hover:bg-emerald-50 transition-all"
+          >
+            <Clover className="size-4" />
+            Avis NTS
+          </Link>
           <Link
             href="/admin/doublons"
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-all"
