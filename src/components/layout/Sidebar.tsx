@@ -76,9 +76,11 @@ export function Sidebar({ activeModule, onNavigate, showGuide, guideDone, contra
       key: "avis",
       label: "Donner mon avis",
       icon: (
-        // Trèfle 4 feuilles — assemblé à partir de 4 ellipses (style Qlower)
-        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 12c-2.5-2.5-2.5-6 0-7.5 2.5 1.5 2.5 5 0 7.5zM12 12c-2.5 2.5-2.5 6 0 7.5 2.5-1.5 2.5-5 0-7.5zM12 12c-2.5-2.5-6-2.5-7.5 0 1.5 2.5 5 2.5 7.5 0zM12 12c2.5-2.5 6-2.5 7.5 0-1.5 2.5-5 2.5-7.5 0z" />
+        // Vrai trèfle 4 feuilles (Lucide Clover path)
+        <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16.17 7.83 2 22" />
+          <path d="M4.02 12a2.827 2.827 0 1 1 3.81-4.17A2.827 2.827 0 1 1 12 4.02a2.827 2.827 0 1 1 4.17 3.81A2.827 2.827 0 1 1 19.98 12a2.827 2.827 0 1 1-3.81 4.17A2.827 2.827 0 1 1 12 19.98a2.827 2.827 0 1 1-4.17-3.81A1 1 0 1 1 4.02 12" />
+          <path d="m7.83 7.83 8.34 8.34" />
         </svg>
       ),
     },
