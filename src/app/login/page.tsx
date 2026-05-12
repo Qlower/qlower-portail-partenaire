@@ -15,7 +15,7 @@ export default function LoginPage() {
     const role = meta?.role;
     const internalRole = meta?.internal_role;
     if (role === "admin") router.replace("/admin");
-    else if (internalRole === "sales" || internalRole === "sales_admin") router.replace("/sales");
+    else if (internalRole === "sales" || internalRole === "sales_admin") router.replace("/sales/ventes");
     else router.replace("/dashboard");
   }, [user, router]);
 

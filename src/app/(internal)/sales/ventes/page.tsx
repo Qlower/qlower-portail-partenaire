@@ -8,6 +8,7 @@ import AttributionTable, {
   type NoteEntry,
 } from "@/components/internal/AttributionTable";
 import MonthSelector from "@/components/internal/MonthSelector";
+import PersonalObjective from "@/components/internal/PersonalObjective";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
 
@@ -155,6 +156,9 @@ export default async function VentesPage({
         </div>
         <MonthSelector current={yearMonth} available={availableMonths} />
       </div>
+
+      {/* Mon objectif Jour / Semaine / Mois pour le négo connecté (mois courant seulement) */}
+      <PersonalObjective yearMonth={yearMonth} />
 
       <AttributionTable
         rows={rows}

@@ -69,7 +69,7 @@ export default function LoginForm() {
         role === "admin"
           ? "/admin"
           : internalRole === "sales" || internalRole === "sales_admin"
-            ? returnTo && returnTo.startsWith("/sales") ? returnTo : "/sales"
+            ? returnTo && returnTo.startsWith("/sales") ? returnTo : "/sales/ventes"
             : "/dashboard";
       router.push(target);
     } catch (err: unknown) {
