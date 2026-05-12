@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   const auth = await verifyAdminOrSalesAdmin(request);
   if (!auth.ok) return auth.error;
 
-  let body: { since?: string; limit?: number } = {};
+  let body: { since?: string; limit?: number; starting_after?: string } = {};
   try {
     body = await request.json();
   } catch {
@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
 
   const sb = createServiceClient();
   const start = Date.now();
+  const TIME_BUDGET_MS = 45_000; // Stop graceful avant 60s Vercel timeout
   const stats = {
     fetched: 0,
     skipped_existing: 0,
@@ -114,11 +115,17 @@ export async function POST(request: NextRequest) {
     created: 0,
     updated: 0,
     errors: [] as Array<{ charge_id: string; error: string }>,
+    last_processed_id: null as string | null,
+    time_budget_exceeded: false,
   };
 
   // Paginate stripe.charges.list
-  let cursor: string | undefined;
+  let cursor: string | undefined = body.starting_after;
   outer: while (stats.fetched < limit) {
+    if (Date.now() - start > TIME_BUDGET_MS) {
+      stats.time_budget_exceeded = true;
+      break outer;
+    }
     const page = await stripe.charges.list({
       created: { gte: sinceTs },
       limit: 100,
@@ -128,7 +135,12 @@ export async function POST(request: NextRequest) {
 
     for (const charge of page.data) {
       if (stats.fetched >= limit) break outer;
+      if (Date.now() - start > TIME_BUDGET_MS) {
+        stats.time_budget_exceeded = true;
+        break outer;
+      }
       stats.fetched++;
+      stats.last_processed_id = charge.id;
 
       try {
         if (!charge.captured) {
