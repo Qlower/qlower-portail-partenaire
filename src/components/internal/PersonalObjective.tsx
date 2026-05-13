@@ -15,6 +15,7 @@ import {
   startOfWeekIso,
   isWorkingDay,
 } from "@/lib/working-days";
+import SpeedometerGauge from "./SpeedometerGauge";
 
 interface CommercialAuth {
   commercial_id: string | null;
@@ -151,6 +152,19 @@ export default async function PersonalObjective({ yearMonth }: { yearMonth: stri
 
   const stats = await getPersonalStats(user.commercial_id, yearMonth, monthlyObj);
 
+  // Status texte pour le speedometer
+  const monthPct = stats.month.pct;
+  const ahead = stats.pacing.real >= stats.pacing.expected;
+  const absDays = Math.abs(stats.pacing.deltaDays);
+  let statusText: string;
+  if (monthPct >= 100) statusText = "🏆 Objectif atteint !";
+  else if (ahead && absDays >= 1) statusText = `🎯 +${absDays.toFixed(1)}j d'avance`;
+  else if (!ahead && absDays >= 1) statusText = `⏰ ${absDays.toFixed(1)}j de retard`;
+  else statusText = "À l'heure";
+
+  const realFmt = `${Math.round(stats.month.real).toLocaleString("fr-FR")} €`;
+  const objFmt = `${Math.round(stats.month.obj).toLocaleString("fr-FR")} €`;
+
   return (
     <div className="bg-gradient-to-br from-[#FFF5ED] to-white border border-[#F6CCA4]/50 rounded-xl p-5">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -162,29 +176,43 @@ export default async function PersonalObjective({ yearMonth }: { yearMonth: stri
             Décliné Jour / Semaine / Mois sur la base des jours ouvrés (Lun-Ven, hors fériés FR).
           </p>
         </div>
-        <PacingBadge pacing={stats.pacing} />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <PersonalCard
-          label="Aujourd'hui"
-          obj={stats.today.obj}
-          real={stats.today.real}
-          pct={stats.today.pct}
-          sub={stats.today.obj > 0 ? "" : "Pas un jour ouvré"}
-        />
-        <PersonalCard
-          label="Cette semaine"
-          obj={stats.week.obj}
-          real={stats.week.real}
-          pct={stats.week.pct}
-        />
-        <PersonalCard
-          label="Ce mois"
-          obj={stats.month.obj}
-          real={stats.month.real}
-          pct={stats.month.pct}
-          highlight
-        />
+
+      <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-6 items-center">
+        {/* Speedometer mensuel */}
+        <div className="flex justify-center lg:justify-start">
+          <SpeedometerGauge
+            pct={monthPct}
+            label={`${monthPct.toFixed(0)} %`}
+            sub={`${realFmt} / ${objFmt}`}
+            status={statusText}
+            size={320}
+          />
+        </div>
+
+        {/* 3 cards : jour / semaine / mois */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <PersonalCard
+            label="Aujourd'hui"
+            obj={stats.today.obj}
+            real={stats.today.real}
+            pct={stats.today.pct}
+            sub={stats.today.obj > 0 ? "" : "Pas un jour ouvré"}
+          />
+          <PersonalCard
+            label="Cette semaine"
+            obj={stats.week.obj}
+            real={stats.week.real}
+            pct={stats.week.pct}
+          />
+          <PersonalCard
+            label="Ce mois"
+            obj={stats.month.obj}
+            real={stats.month.real}
+            pct={stats.month.pct}
+            highlight
+          />
+        </div>
       </div>
     </div>
   );
@@ -255,32 +283,3 @@ function PersonalCard({
   );
 }
 
-function PacingBadge({
-  pacing,
-}: {
-  pacing: { expected: number; real: number; deltaDays: number };
-}) {
-  if (pacing.expected <= 0) return null;
-  const delta = pacing.real - pacing.expected;
-  const ahead = delta >= 0;
-  const absDays = Math.abs(pacing.deltaDays);
-  const formatDelta =
-    absDays >= 1
-      ? `${absDays.toFixed(1)}j ${ahead ? "d'avance" : "de retard"}`
-      : "à l'heure";
-  return (
-    <div className="inline-flex flex-col items-end text-right">
-      <span
-        className={`text-[11px] uppercase tracking-wider font-semibold ${
-          ahead ? "text-emerald-700" : "text-orange-700"
-        }`}
-      >
-        {ahead ? "🎯 En avance" : "⏰ À rattraper"}
-      </span>
-      <span className="text-xs text-gray-600 mt-0.5 tabular-nums">
-        {ahead ? "+" : ""}
-        {Math.round(delta).toLocaleString("fr-FR")} € · {formatDelta}
-      </span>
-    </div>
-  );
-}

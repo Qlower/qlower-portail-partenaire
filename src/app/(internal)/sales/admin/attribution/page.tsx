@@ -7,6 +7,7 @@ import AttributionTable, {
 } from "@/components/internal/AttributionTable";
 import LockMonthButton from "@/components/internal/LockMonthButton";
 import RescoreMonthButton from "@/components/internal/RescoreMonthButton";
+import ManualChargeButton from "@/components/internal/ManualChargeButton";
 import MonthSelector from "@/components/internal/MonthSelector";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
@@ -160,6 +161,7 @@ export default async function AttributionAdminPage({
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <MonthSelector current={yearMonth} available={availableMonths} />
+          <ManualChargeButton />
           <RescoreMonthButton yearMonth={yearMonth} isLocked={!!run?.locked} />
           <LockMonthButton yearMonth={yearMonth} isLocked={!!run?.locked} />
           <a
