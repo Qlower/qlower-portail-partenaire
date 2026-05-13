@@ -166,6 +166,7 @@ export default async function VentesPage({
       <PersonalObjective yearMonth={yearMonth} view={view || undefined} />
 
       <AttributionTable
+        key={`${yearMonth}-${view || "team"}`}
         rows={rows}
         commercials={commercials}
         mode="sales-team"

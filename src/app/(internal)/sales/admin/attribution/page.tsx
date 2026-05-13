@@ -202,6 +202,7 @@ export default async function AttributionAdminPage({
       <PersonalObjective yearMonth={yearMonth} view={view || undefined} />
 
       <AttributionTable
+        key={`${yearMonth}-${view || "team"}`}
         rows={rows}
         commercials={commercials}
         editable={editable}
