@@ -88,6 +88,41 @@ const fmtDt = (iso: string) => {
   return d.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
 };
 
+type SortableSortKey = "email" | "date" | "net" | "family" | "newbiz" | "attribution" | "reason";
+
+function SortableTh({
+  sortKey,
+  currentKey,
+  dir,
+  onClick,
+  className,
+  children,
+}: {
+  sortKey: SortableSortKey;
+  currentKey: SortableSortKey;
+  dir: "asc" | "desc";
+  onClick: (k: SortableSortKey) => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const isActive = currentKey === sortKey;
+  const arrow = isActive ? (dir === "asc" ? "↑" : "↓") : "";
+  return (
+    <th
+      className={`${className || ""} cursor-pointer select-none hover:bg-gray-100 transition-colors`}
+      onClick={() => onClick(sortKey)}
+      title={`Trier par ${typeof children === "string" ? children : sortKey}`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        <span className={`text-[10px] ${isActive ? "text-[#0A3855] font-bold" : "text-gray-300"}`}>
+          {arrow || "↕"}
+        </span>
+      </span>
+    </th>
+  );
+}
+
 function ScoreBadge({ score, isOverride }: { score: number | null; isOverride: boolean }) {
   if (isOverride) return <span className="inline-block min-w-[24px] px-1.5 py-0.5 rounded text-[10px] font-bold text-white bg-violet-600 text-center" title="Manuel">M</span>;
   const s = score ?? 0;
@@ -131,6 +166,19 @@ export default function AttributionTable({
   const [filterCommercialId, setFilterCommercialId] = useState<string | null>(null);
   // Charge dont on affiche le panel HubSpot timeline (null = panel fermé)
   const [panelChargeId, setPanelChargeId] = useState<string | null>(null);
+  // Tri des colonnes — par défaut : date la plus récente en haut
+  type SortKey = "email" | "date" | "net" | "family" | "newbiz" | "attribution" | "reason";
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      // Par défaut : numérique = desc (plus grand en haut), texte = asc
+      setSortDir(key === "net" || key === "date" ? "desc" : "asc");
+    }
+  }
   const [, startTransition] = useTransition();
   const router = useRouter();
   const [toast, setToast] = useState<{ msg: string; isError?: boolean } | null>(null);
@@ -181,8 +229,38 @@ export default function AttributionTable({
     ? rows.filter((r) => r.effective_commercial_id === myCommercialId).length
     : 0;
 
-  // Sort by net DESC
-  filteredRows.sort((a, b) => b.amount_net_eur - a.amount_net_eur);
+  // Tri dynamique selon la colonne cliquée. Défaut : date desc (récent en haut).
+  // Pour l'attribution : on trie par nom du commercial effectif (asc/desc).
+  filteredRows.sort((a, b) => {
+    let cmp = 0;
+    switch (sortKey) {
+      case "email":
+        cmp = (a.client_name || a.email).localeCompare(b.client_name || b.email);
+        break;
+      case "date":
+        cmp = (a.created_at || "").localeCompare(b.created_at || "");
+        break;
+      case "net":
+        cmp = a.amount_net_eur - b.amount_net_eur;
+        break;
+      case "family":
+        cmp = (a.family || "").localeCompare(b.family || "");
+        break;
+      case "newbiz":
+        cmp = (a.newbiz_1m || "").localeCompare(b.newbiz_1m || "");
+        break;
+      case "attribution": {
+        const nameA = commercials.find((c) => c.id === a.effective_commercial_id)?.name || "ZZZ";
+        const nameB = commercials.find((c) => c.id === b.effective_commercial_id)?.name || "ZZZ";
+        cmp = nameA.localeCompare(nameB);
+        break;
+      }
+      case "reason":
+        cmp = (a.auto_score ?? 0) - (b.auto_score ?? 0);
+        break;
+    }
+    return sortDir === "asc" ? cmp : -cmp;
+  });
 
   async function changeAttribution(chargeId: string, newCommercialId: string | null) {
     const row = rows.find((r) => r.charge_id === chargeId);
@@ -340,13 +418,27 @@ export default function AttributionTable({
         <table className="w-full text-xs">
           <thead className="bg-gray-50">
             <tr className="text-left text-[11px] uppercase tracking-wider text-gray-500">
-              <th className="px-3 py-2 sticky left-0 bg-gray-50">Email</th>
-              <th className="px-2 py-2">Date</th>
-              <th className="px-2 py-2 text-right">Net</th>
-              <th className="px-2 py-2">Famille</th>
-              <th className="px-2 py-2">1m / 3m</th>
-              <th className="px-2 py-2">Attribution</th>
-              <th className="px-2 py-2">Raison</th>
+              <SortableTh sortKey="email" currentKey={sortKey} dir={sortDir} onClick={toggleSort} className="px-3 py-2 sticky left-0 bg-gray-50">
+                Client / Email
+              </SortableTh>
+              <SortableTh sortKey="date" currentKey={sortKey} dir={sortDir} onClick={toggleSort} className="px-2 py-2">
+                Date
+              </SortableTh>
+              <SortableTh sortKey="net" currentKey={sortKey} dir={sortDir} onClick={toggleSort} className="px-2 py-2 text-right">
+                Net
+              </SortableTh>
+              <SortableTh sortKey="family" currentKey={sortKey} dir={sortDir} onClick={toggleSort} className="px-2 py-2">
+                Famille
+              </SortableTh>
+              <SortableTh sortKey="newbiz" currentKey={sortKey} dir={sortDir} onClick={toggleSort} className="px-2 py-2">
+                1m / 3m
+              </SortableTh>
+              <SortableTh sortKey="attribution" currentKey={sortKey} dir={sortDir} onClick={toggleSort} className="px-2 py-2">
+                Attribution
+              </SortableTh>
+              <SortableTh sortKey="reason" currentKey={sortKey} dir={sortDir} onClick={toggleSort} className="px-2 py-2">
+                Score / Raison
+              </SortableTh>
               <th className="px-2 py-2 w-24"></th>
             </tr>
           </thead>
