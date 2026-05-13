@@ -1,14 +1,14 @@
 // Speedometer SVG semi-circulaire — style tableau de bord voiture.
 //
-// Affiche un pourcentage 0-150% (au-delà → 150 plafonné visuellement).
-// L'aiguille pivote de -90° (gauche, 0%) à +90° (droite, 100%).
-// Au-delà de 100%, l'aiguille continue jusqu'à 150% en mode "boost".
-//
-// Zones de couleur :
-//   0-30%   : rouge (sous-performance)
-//   30-70%  : orange (en retard)
-//   70-100% : navy Qlower (à l'heure)
+// Aiguille pivote de -90° (gauche, 0%) à +90° (droite, 150%).
+// Zones alignées sur les ticks pour cohérence visuelle :
+//   0-25%   : rouge (sous-performance)
+//   25-75%  : orange (en retard)
+//   75-100% : navy Qlower (à l'heure)
 //   100%+   : vert (en dépassement)
+//
+// Le status text ("🎯 +1.5j d'avance") est rendu HTML au-dessus pour éviter
+// tout chevauchement avec les ticks du SVG.
 
 interface Props {
   /** Pourcentage 0-150+ (>150 affiché à 150) */
@@ -17,7 +17,7 @@ interface Props {
   label?: string;
   /** Sub-label sous le pourcentage (ex: "obj 25 000 € / réalisé 38 200 €") */
   sub?: string;
-  /** Status text en haut (ex: "🎯 En avance") */
+  /** Status text au-dessus du gauge (HTML, ex: "🎯 En avance") */
   status?: string;
   /** Taille en px (largeur). Hauteur ≈ largeur × 0.65 */
   size?: number;
@@ -26,32 +26,30 @@ interface Props {
 export default function SpeedometerGauge({ pct, label, sub, status, size = 320 }: Props) {
   // Clamp pour le dessin
   const clamped = Math.max(0, Math.min(150, pct));
-  // Aiguille : -90° à 0%, 0° à 75%, +90° à 150%
   // Mapping linéaire : angle = -90 + (clamped / 150) * 180
   const angle = -90 + (clamped / 150) * 180;
 
-  // Coordonnées du centre (au milieu en bas du semi-cercle)
+  // Coordonnées
   const W = size;
-  const H = Math.round(size * 0.65);
+  const H = Math.round(size * 0.6);
   const cx = W / 2;
-  const cy = H * 0.85;
-  const radius = (W / 2) * 0.85;
-  const innerRadius = radius * 0.72;
+  const cy = H * 0.92;
+  const radius = (W / 2) * 0.78;
+  const innerRadius = radius * 0.74;
 
-  // Couleur de l'aiguille selon zone
+  // Couleur de l'aiguille selon zone (cohérent avec les zones colorées)
   const needleColor =
-    clamped >= 100 ? "#10B981" : clamped >= 70 ? "#0A3855" : clamped >= 30 ? "#F59E0B" : "#EF4444";
+    clamped >= 100 ? "#059669" : clamped >= 75 ? "#0A3855" : clamped >= 25 ? "#D97706" : "#DC2626";
 
-  // Helper : angle en radian (0 = haut, mais on tourne via -90 → +90)
+  // Helper : angle en radian (style speedometer)
   const toRad = (deg: number) => ((deg - 90) * Math.PI) / 180;
 
-  // Calcule x,y sur le cercle pour un angle "speedometer" (-90 = gauche, +90 = droite)
   const pointAt = (deg: number, r: number) => {
     const rad = toRad(deg);
     return [cx + Math.cos(rad) * r, cy + Math.sin(rad) * r];
   };
 
-  // Construit un arc SVG entre 2 angles
+  // Arc SVG entre 2 angles (avec épaisseur radius - innerR)
   const arcPath = (startDeg: number, endDeg: number, r: number, innerR: number) => {
     const [x0, y0] = pointAt(startDeg, r);
     const [x1, y1] = pointAt(endDeg, r);
@@ -61,24 +59,35 @@ export default function SpeedometerGauge({ pct, label, sub, status, size = 320 }
     return `M ${x0} ${y0} A ${r} ${r} 0 ${largeArc} 1 ${x1} ${y1} L ${x2} ${y2} A ${innerR} ${innerR} 0 ${largeArc} 0 ${x3} ${y3} Z`;
   };
 
-  // Zones : 0-30 rouge, 30-70 orange, 70-100 navy, 100-150 vert
-  // Conversion pct → angle : pct/150 * 180 - 90
+  // Pct → angle dans le speedometer (-90 à +90)
   const pctToAngle = (p: number) => -90 + (p / 150) * 180;
+
+  // Zones alignées sur les ticks : 0-25, 25-75, 75-100, 100-150
   const zones = [
-    { from: 0, to: 30, color: "#FCA5A5" },
-    { from: 30, to: 70, color: "#FCD34D" },
-    { from: 70, to: 100, color: "#93C5FD" },
-    { from: 100, to: 150, color: "#86EFAC" },
+    { from: 0, to: 25, color: "#FCA5A5" },   // rouge clair
+    { from: 25, to: 75, color: "#FCD34D" },  // orange
+    { from: 75, to: 100, color: "#93C5FD" }, // bleu clair
+    { from: 100, to: 150, color: "#86EFAC" }, // vert
   ];
 
-  // Position de l'aiguille (ligne du centre vers le bord)
-  const [nx, ny] = pointAt(angle, radius * 0.9);
+  // Position de l'aiguille
+  const [nx, ny] = pointAt(angle, radius * 0.95);
 
   // Ticks aux multiples de 25%
   const ticks = [0, 25, 50, 75, 100, 125, 150];
 
   return (
-    <div className="inline-block" aria-label={`Compteur d'objectif : ${pct.toFixed(0)}%`}>
+    <div className="inline-flex flex-col items-center" aria-label={`Compteur d'objectif : ${pct.toFixed(0)}%`}>
+      {/* Status text — rendu HTML au-dessus pour éviter tout chevauchement */}
+      {status && (
+        <div
+          className="text-sm font-semibold mb-1"
+          style={{ color: needleColor }}
+        >
+          {status}
+        </div>
+      )}
+
       <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="overflow-visible">
         {/* Zones colorées */}
         {zones.map((z) => (
@@ -86,53 +95,53 @@ export default function SpeedometerGauge({ pct, label, sub, status, size = 320 }
             key={z.from}
             d={arcPath(pctToAngle(z.from), pctToAngle(z.to), radius, innerRadius)}
             fill={z.color}
-            opacity={0.55}
+            opacity={0.65}
           />
         ))}
 
-        {/* Ticks + labels */}
+        {/* Ticks (uniquement les marques, pas les labels) */}
         {ticks.map((t) => {
           const a = pctToAngle(t);
           const [tx1, ty1] = pointAt(a, radius);
-          const [tx2, ty2] = pointAt(a, radius * 1.04);
-          const [lx, ly] = pointAt(a, radius * 1.16);
+          const [tx2, ty2] = pointAt(a, radius * 1.05);
           return (
-            <g key={t}>
-              <line x1={tx1} y1={ty1} x2={tx2} y2={ty2} stroke="#475569" strokeWidth={1.5} />
-              <text
-                x={lx}
-                y={ly}
-                fontSize={W * 0.04}
-                fill="#475569"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontFamily="ui-monospace, monospace"
-              >
-                {t}
-              </text>
-            </g>
+            <line
+              key={`tick-${t}`}
+              x1={tx1}
+              y1={ty1}
+              x2={tx2}
+              y2={ty2}
+              stroke="#475569"
+              strokeWidth={1.5}
+            />
           );
         })}
 
-        {/* Aiguille */}
-        <line
-          x1={cx}
-          y1={cy}
-          x2={nx}
-          y2={ny}
-          stroke={needleColor}
-          strokeWidth={3.5}
-          strokeLinecap="round"
-          style={{ transition: "all 0.6s ease-out" }}
-        />
-        {/* Centre / pivot */}
-        <circle cx={cx} cy={cy} r={W * 0.04} fill="#0A3855" />
-        <circle cx={cx} cy={cy} r={W * 0.02} fill={needleColor} />
+        {/* Labels des ticks — placés bien au-delà du cercle pour éviter
+            le chevauchement avec le texte central */}
+        {ticks.map((t) => {
+          const a = pctToAngle(t);
+          const [lx, ly] = pointAt(a, radius * 1.22);
+          return (
+            <text
+              key={`label-${t}`}
+              x={lx}
+              y={ly}
+              fontSize={W * 0.038}
+              fill="#475569"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontFamily="ui-monospace, monospace"
+            >
+              {t}
+            </text>
+          );
+        })}
 
-        {/* Texte central */}
+        {/* Texte central : pourcentage géant */}
         <text
           x={cx}
-          y={cy - radius * 0.45}
+          y={cy - radius * 0.48}
           fontSize={W * 0.13}
           fontWeight={700}
           fill={needleColor}
@@ -142,7 +151,7 @@ export default function SpeedometerGauge({ pct, label, sub, status, size = 320 }
           {label || `${Math.round(pct)} %`}
         </text>
 
-        {/* Sub-label */}
+        {/* Sub-label : réalisé / objectif */}
         {sub && (
           <text
             x={cx}
@@ -155,19 +164,20 @@ export default function SpeedometerGauge({ pct, label, sub, status, size = 320 }
           </text>
         )}
 
-        {/* Status en haut */}
-        {status && (
-          <text
-            x={cx}
-            y={H * 0.1}
-            fontSize={W * 0.045}
-            fontWeight={600}
-            fill={needleColor}
-            textAnchor="middle"
-          >
-            {status}
-          </text>
-        )}
+        {/* Aiguille */}
+        <line
+          x1={cx}
+          y1={cy}
+          x2={nx}
+          y2={ny}
+          stroke={needleColor}
+          strokeWidth={3.5}
+          strokeLinecap="round"
+          style={{ transition: "all 0.6s ease-out" }}
+        />
+        {/* Pivot central */}
+        <circle cx={cx} cy={cy} r={W * 0.04} fill="#0A3855" />
+        <circle cx={cx} cy={cy} r={W * 0.02} fill={needleColor} />
       </svg>
     </div>
   );
