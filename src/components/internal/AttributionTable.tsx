@@ -34,6 +34,9 @@ export interface RowData {
   client_name: string | null;
   created_at: string;
   amount_net_eur: number;
+  amount_gross_eur?: number;
+  amount_refunded_eur?: number;
+  refunded_after_lock?: boolean;
   family: string | null;
   newbiz_1m: string | null;
   newbiz_3m: string | null;
@@ -162,7 +165,7 @@ export default function AttributionTable({
   const [noteFormChargeId, setNoteFormChargeId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
   const [filter, setFilter] = useState("");
-  const [filterMode, setFilterMode] = useState<"all" | "mine" | "flagged" | "manual" | "low_score" | "search">(
+  const [filterMode, setFilterMode] = useState<"all" | "mine" | "flagged" | "manual" | "low_score" | "search" | "refunded">(
     defaultFilterMine ? "mine" : "all",
   );
   // Filtre commercial / vue spéciale unifié avec la prop `view` (= URL ?view=).
@@ -202,6 +205,7 @@ export default function AttributionTable({
     if (filterMode === "flagged" && !r.flagged_for_review) return false;
     if (filterMode === "manual" && !r.is_override) return false;
     if (filterMode === "low_score" && (r.is_override || (r.auto_score ?? 0) >= 6)) return false;
+    if (filterMode === "refunded" && !(r.amount_refunded_eur && r.amount_refunded_eur > 0)) return false;
     if (filterMode === "search" && filter) {
       const q = filter.toLowerCase();
       const haystack = [
@@ -367,6 +371,7 @@ export default function AttributionTable({
           { v: "flagged", l: `🚩 Contestées (${rows.filter((r) => r.flagged_for_review).length})`, hidden: false },
           { v: "manual", l: `✎ Manuelles (${rows.filter((r) => r.is_override).length})`, hidden: false },
           { v: "low_score", l: `À vérifier (${rows.filter((r) => !r.is_override && (r.auto_score ?? 0) > 0 && (r.auto_score ?? 0) < 6).length})`, hidden: false },
+          { v: "refunded", l: `↩ Remboursées (${rows.filter((r) => r.amount_refunded_eur && r.amount_refunded_eur > 0).length})`, hidden: rows.filter((r) => r.amount_refunded_eur && r.amount_refunded_eur > 0).length === 0 },
         ] as const).filter((opt) => !opt.hidden).map((opt) => (
           <button
             key={opt.v}
@@ -551,7 +556,27 @@ function RowComponent({
           </a>
         </td>
         <td className="px-2 py-2 whitespace-nowrap">{fmtDate(row.created_at)}</td>
-        <td className="px-2 py-2 text-right font-mono tabular-nums">{fmtEur(row.amount_net_eur)}</td>
+        <td className="px-2 py-2 text-right font-mono tabular-nums">
+          {row.amount_refunded_eur && row.amount_refunded_eur > 0 ? (
+            <div className="flex flex-col items-end gap-0.5">
+              <span className={row.amount_net_eur === 0 ? "text-gray-400 line-through" : ""}>
+                {fmtEur(row.amount_net_eur)}
+              </span>
+              <span
+                className={`text-[10px] inline-flex items-center gap-0.5 ${row.refunded_after_lock ? "text-orange-600 font-semibold" : "text-red-600"}`}
+                title={
+                  row.refunded_after_lock
+                    ? `⚠️ Remboursement post-clôture : ${fmtEur(row.amount_refunded_eur)} (commission probablement déjà versée, prévoir clawback)`
+                    : `Remboursé : ${fmtEur(row.amount_refunded_eur)} sur ${fmtEur(row.amount_gross_eur || 0)} brut`
+                }
+              >
+                {row.refunded_after_lock ? "⚠️" : "↩"} −{fmtEur(row.amount_refunded_eur)}
+              </span>
+            </div>
+          ) : (
+            fmtEur(row.amount_net_eur)
+          )}
+        </td>
         <td className="px-2 py-2">{row.family || "—"}</td>
         <td className="px-2 py-2 text-[11px] text-gray-500">
           {row.newbiz_1m || "—"} / {row.newbiz_3m || "—"}

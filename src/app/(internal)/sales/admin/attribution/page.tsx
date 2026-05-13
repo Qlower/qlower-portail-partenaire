@@ -48,7 +48,7 @@ async function loadAttributionData(yearMonth: string) {
   const { data: rawRows } = await sb
     .from("attribution_rows")
     .select(
-      "charge_id, email, client_name, created_at, amount_net_eur, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason",
+      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
@@ -113,6 +113,9 @@ async function loadAttributionData(yearMonth: string) {
       client_name: r.client_name,
       created_at: r.created_at,
       amount_net_eur: r.amount_net_eur,
+      amount_gross_eur: (r as DbRow & { amount_gross_eur?: number }).amount_gross_eur,
+      amount_refunded_eur: (r as DbRow & { amount_refunded_eur?: number }).amount_refunded_eur,
+      refunded_after_lock: (r as DbRow & { refunded_after_lock?: boolean }).refunded_after_lock,
       family: r.family,
       newbiz_1m: r.newbiz_1m,
       newbiz_3m: r.newbiz_3m,
@@ -200,6 +203,35 @@ export default async function AttributionAdminPage({
       </div>
 
       <PersonalObjective yearMonth={yearMonth} view={view || undefined} />
+
+      {/* Alerte refund-after-lock : remboursements arrivés après verrouillage du mois */}
+      {(() => {
+        const refundedAfterLock = rows.filter((r) => r.refunded_after_lock);
+        if (refundedAfterLock.length === 0) return null;
+        const totalClawback = refundedAfterLock.reduce(
+          (s, r) => s + (r.amount_refunded_eur || 0),
+          0,
+        );
+        return (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl shrink-0">⚠️</div>
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-orange-900">
+                  Remboursements post-clôture détectés : {refundedAfterLock.length} ligne{refundedAfterLock.length > 1 ? "s" : ""}
+                </div>
+                <div className="text-xs text-orange-800 mt-1 leading-relaxed">
+                  Le mois est verrouillé mais des refunds sont arrivés depuis pour un total de{" "}
+                  <strong>{Math.round(totalClawback).toLocaleString("fr-FR")} € remboursés</strong>.
+                  Les commissions correspondantes ont probablement déjà été versées —
+                  pense au <strong>clawback</strong> sur la paie suivante des négos concernés.
+                  Filtre la liste avec le bouton <strong>"↩ Remboursées"</strong> pour voir le détail.
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <AttributionTable
         key={`${yearMonth}-${view || "team"}`}

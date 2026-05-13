@@ -224,10 +224,39 @@ export async function POST(request: NextRequest) {
         const sb = createServiceClient();
         const refunded = Math.round((charge.amount_refunded || 0) / 100);
         const net = Math.round((charge.amount - (charge.amount_refunded || 0)) / 100);
+
+        // Check si le mois de la charge originale est verrouillé.
+        // Si oui, on flag `refunded_after_lock=true` pour que l'admin voie
+        // le clawback potentiel sur la paie suivante du négo (commission
+        // déjà versée à l'époque mais le client a été remboursé depuis).
+        const { data: rowInfo } = await sb
+          .from("attribution_rows")
+          .select("run_id, monthly_runs!inner(locked, year_month)")
+          .eq("charge_id", charge.id)
+          .maybeSingle();
+        type RunInfo = { locked: boolean; year_month: string };
+        const runInfo = (rowInfo as unknown as { monthly_runs?: RunInfo } | null)?.monthly_runs;
+        const isMonthLocked = !!runInfo?.locked;
+
+        const updateFields: Record<string, unknown> = {
+          amount_refunded_eur: refunded,
+          amount_net_eur: net,
+        };
+        if (isMonthLocked) {
+          updateFields.refunded_after_lock = true;
+          updateFields.refund_post_lock_at = new Date().toISOString();
+        }
+
         const { error } = await sb
           .from("attribution_rows")
-          .update({ amount_refunded_eur: refunded, amount_net_eur: net })
+          .update(updateFields)
           .eq("charge_id", charge.id);
+
+        if (!error && isMonthLocked) {
+          console.warn(
+            `[stripe-webhook] REFUND-AFTER-LOCK : charge ${charge.id} (mois ${runInfo?.year_month}) — ${refunded} € remboursé sur mois locked. Le négo a probablement déjà été commissionné, prévoir un clawback.`,
+          );
+        }
         result = error ? { skipped: error.message } : { updated: true };
         break;
       }

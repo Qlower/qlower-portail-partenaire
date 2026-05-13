@@ -43,7 +43,7 @@ async function loadVentesData(yearMonth: string) {
   const { data: rawRows } = await sb
     .from("attribution_rows")
     .select(
-      "charge_id, email, client_name, created_at, amount_net_eur, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_at, flagged_for_review, flagged_reason",
+      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_at, flagged_for_review, flagged_reason",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
   const dbRows = rawRows || [];
@@ -93,6 +93,9 @@ async function loadVentesData(yearMonth: string) {
       client_name: r.client_name,
       created_at: r.created_at,
       amount_net_eur: r.amount_net_eur,
+      amount_gross_eur: (r as { amount_gross_eur?: number }).amount_gross_eur,
+      amount_refunded_eur: (r as { amount_refunded_eur?: number }).amount_refunded_eur,
+      refunded_after_lock: (r as { refunded_after_lock?: boolean }).refunded_after_lock,
       family: r.family,
       newbiz_1m: r.newbiz_1m,
       newbiz_3m: r.newbiz_3m,
