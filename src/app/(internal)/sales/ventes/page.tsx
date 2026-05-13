@@ -124,9 +124,10 @@ async function loadVentesData(yearMonth: string) {
 export default async function VentesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ym?: string | string[] }>;
+  searchParams: Promise<{ ym?: string | string[]; view?: string | string[] }>;
 }) {
   const params = await searchParams;
+  const view = Array.isArray(params.view) ? params.view[0] : params.view;
   const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
   const user = await getCurrentUser();
   const meta = (user?.user_metadata || {}) as Record<string, unknown>;
@@ -157,8 +158,9 @@ export default async function VentesPage({
         <MonthSelector current={yearMonth} available={availableMonths} />
       </div>
 
-      {/* Mon objectif Jour / Semaine / Mois pour le négo connecté (mois courant seulement) */}
-      <PersonalObjective yearMonth={yearMonth} />
+      {/* Objectif Jour / Semaine / Mois — admin = team par défaut, négo = self,
+          dropdown ?view= permet de basculer (mois courant seulement) */}
+      <PersonalObjective yearMonth={yearMonth} view={view} />
 
       <AttributionTable
         rows={rows}

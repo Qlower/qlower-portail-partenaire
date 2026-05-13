@@ -16,6 +16,7 @@ import {
   isWorkingDay,
 } from "@/lib/working-days";
 import SpeedometerGauge from "./SpeedometerGauge";
+import ObjectiveViewSelector from "./ObjectiveViewSelector";
 
 interface CommercialAuth {
   commercial_id: string | null;
@@ -52,8 +53,13 @@ interface PersonalStats {
   pacing: { expected: number; real: number; deltaDays: number };
 }
 
+// Filtre des charges selon le mode :
+//   - "team" : toutes les lignes (peu importe le commercial)
+//   - commercial_id : uniquement les lignes attribuées à ce commercial
+type ChargesFilter = { mode: "team" } | { mode: "commercial"; commercialId: string };
+
 async function getPersonalStats(
-  commercialId: string,
+  filter: ChargesFilter,
   yearMonth: string,
   monthlyObj: number,
 ): Promise<PersonalStats> {
@@ -82,8 +88,9 @@ async function getPersonalStats(
     .eq("run_id", run.id);
 
   const mine = (rows || []).filter((r) => {
+    if (filter.mode === "team") return true;
     const cid = r.override_commercial_id || r.auto_commercial_id;
-    return cid === commercialId;
+    return cid === filter.commercialId;
   });
 
   const monthReal = mine.reduce((s, r) => s + (r.amount_net_eur || 0), 0);
@@ -130,27 +137,110 @@ async function getPersonalStats(
 
 /**
  * Composant async server qui affiche la section "Mon objectif" Jour/Semaine/Mois.
+ *
+ * - sales_admin par défaut → vue "team" (objectif équipe entière)
+ * - sales par défaut → vue "self" (son propre objectif)
+ * - Tout user peut basculer via `?view=team` / `?view=<commercial_id>`
+ *
  * Affiche null si :
- *   - L'utilisateur n'a pas de commercial_id
+ *   - L'utilisateur n'a pas de rôle interne
  *   - Le mois sélectionné n'est pas le mois courant
- *   - L'utilisateur n'a pas d'objectif mensuel défini
+ *   - La vue sélectionnée n'a pas d'objectif défini
  */
-export default async function PersonalObjective({ yearMonth }: { yearMonth: string }) {
+export default async function PersonalObjective({
+  yearMonth,
+  view,
+}: {
+  yearMonth: string;
+  view?: string;
+}) {
   const user = await getCurrentUserCommercial();
-  if (!user?.commercial_id) return null;
+  if (!user) return null;
   if (yearMonth !== currentYearMonth()) return null;
 
-  const sb = createServiceClient();
-  const { data: targetRow } = await sb
-    .from("commercial_monthly_targets")
-    .select("target_eur")
-    .eq("year_month", yearMonth)
-    .eq("commercial_id", user.commercial_id)
-    .maybeSingle();
-  const monthlyObj = targetRow?.target_eur || 0;
-  if (monthlyObj <= 0) return null;
+  const isAdmin = user.internal_role === "sales_admin";
 
-  const stats = await getPersonalStats(user.commercial_id, yearMonth, monthlyObj);
+  // Résolution du mode de vue :
+  //   - URL param `view` prioritaire (team / commercial_id)
+  //   - sinon : sales_admin → team, sales → self (own commercial)
+  let resolvedView: string;
+  if (view === "team" && isAdmin) {
+    resolvedView = "team";
+  } else if (view && view !== "team") {
+    resolvedView = view; // commercial_id
+  } else if (isAdmin) {
+    resolvedView = "team";
+  } else if (user.commercial_id) {
+    resolvedView = user.commercial_id;
+  } else {
+    return null;
+  }
+
+  const sb = createServiceClient();
+
+  // Charge la liste des commerciaux pour le dropdown
+  const { data: commercialsList } = await sb
+    .from("commercials")
+    .select("id, name, role")
+    .in("role", ["sales", "sales_admin", "upsell"])
+    .order("name");
+
+  // Détermine objectif + nom de la vue
+  let monthlyObj = 0;
+  let viewTitle = "";
+  let filter: ChargesFilter;
+
+  if (resolvedView === "team") {
+    const { data: teamTarget } = await sb
+      .from("team_monthly_targets")
+      .select("target_eur")
+      .eq("year_month", yearMonth)
+      .maybeSingle();
+    monthlyObj = teamTarget?.target_eur || 0;
+    viewTitle = "Équipe entière";
+    filter = { mode: "team" };
+  } else {
+    // commercial_id
+    const c = commercialsList?.find((x) => x.id === resolvedView);
+    if (!c) return null;
+    const { data: targetRow } = await sb
+      .from("commercial_monthly_targets")
+      .select("target_eur")
+      .eq("year_month", yearMonth)
+      .eq("commercial_id", resolvedView)
+      .maybeSingle();
+    monthlyObj = targetRow?.target_eur || 0;
+    viewTitle = c.id === user.commercial_id ? `${c.name} (moi)` : c.name;
+    filter = { mode: "commercial", commercialId: resolvedView };
+  }
+
+  if (monthlyObj <= 0) {
+    // Pas d'objectif pour cette vue — on affiche un placeholder mais avec le dropdown
+    return (
+      <div className="bg-gradient-to-br from-[#FFF5ED] to-white border border-[#F6CCA4]/50 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-[#B8864E] font-semibold">
+              Objectif — {viewTitle}
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Aucun objectif défini pour cette vue sur {yearMonth}.
+            </p>
+          </div>
+          {isAdmin && (
+            <ObjectiveViewSelector
+              current={resolvedView}
+              commercials={commercialsList || []}
+              allowTeam={true}
+              myCommercialId={user.commercial_id}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const stats = await getPersonalStats(filter, yearMonth, monthlyObj);
 
   // Status texte pour le speedometer
   const monthPct = stats.month.pct;
@@ -170,12 +260,20 @@ export default async function PersonalObjective({ yearMonth }: { yearMonth: stri
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div>
           <div className="text-[11px] uppercase tracking-wider text-[#B8864E] font-semibold">
-            Mon objectif — {user.name || "Moi"}
+            Objectif — {viewTitle}
           </div>
           <p className="text-xs text-gray-500 mt-0.5">
             Décliné Jour / Semaine / Mois sur la base des jours ouvrés (Lun-Ven, hors fériés FR).
           </p>
         </div>
+        {isAdmin && (
+          <ObjectiveViewSelector
+            current={resolvedView}
+            commercials={commercialsList || []}
+            allowTeam={true}
+            myCommercialId={user.commercial_id}
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-6 items-center">

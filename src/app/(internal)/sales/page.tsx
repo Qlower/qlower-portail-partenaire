@@ -103,9 +103,10 @@ async function getDashboardData(yearMonth: string) {
 export default async function SalesHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ ym?: string | string[] }>;
+  searchParams: Promise<{ ym?: string | string[]; view?: string | string[] }>;
 }) {
   const params = await searchParams;
+  const view = Array.isArray(params.view) ? params.view[0] : params.view;
   const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
   const data = await getDashboardData(yearMonth);
 
@@ -127,8 +128,8 @@ export default async function SalesHomePage({
         <MonthSelector current={yearMonth} available={availableMonths} />
       </div>
 
-      {/* Personal "Mon obj" — Jour / Semaine / Mois (uniquement si mois courant) */}
-      <PersonalObjective yearMonth={yearMonth} />
+      {/* Objectif — Jour / Semaine / Mois (uniquement si mois courant) */}
+      <PersonalObjective yearMonth={yearMonth} view={view} />
 
       {/* Hero KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
