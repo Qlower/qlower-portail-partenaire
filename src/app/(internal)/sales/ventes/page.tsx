@@ -11,6 +11,7 @@ import MonthSelector from "@/components/internal/MonthSelector";
 import PersonalObjective from "@/components/internal/PersonalObjective";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
+import { resolveSalesView } from "@/lib/sales-view";
 
 async function getCurrentUser() {
   const cookieStore = await cookies();
@@ -127,13 +128,15 @@ export default async function VentesPage({
   searchParams: Promise<{ ym?: string | string[]; view?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const view = Array.isArray(params.view) ? params.view[0] : params.view;
+  const viewParam = params.view;
   const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
   const user = await getCurrentUser();
   const meta = (user?.user_metadata || {}) as Record<string, unknown>;
   const internalRole = meta.internal_role as "sales" | "sales_admin" | undefined;
   const myCommercialId = (meta.commercial_id as string | undefined) || null;
   const myName = (meta.name as string | undefined) || "Moi";
+  // Vue résolue (URL ?view ou défaut selon rôle) — partagée entre speedometer et tableau
+  const view = resolveSalesView({ viewParam, internalRole, myCommercialId });
 
   const { rows, commercials } = await loadVentesData(yearMonth);
 
@@ -160,15 +163,16 @@ export default async function VentesPage({
 
       {/* Objectif Jour / Semaine / Mois — admin = team par défaut, négo = self,
           dropdown ?view= permet de basculer (mois courant seulement) */}
-      <PersonalObjective yearMonth={yearMonth} view={view} />
+      <PersonalObjective yearMonth={yearMonth} view={view || undefined} />
 
       <AttributionTable
         rows={rows}
         commercials={commercials}
         mode="sales-team"
         myCommercialId={myCommercialId}
-        defaultFilterMine={internalRole === "sales"}
+        defaultFilterMine={false}
         yearMonth={yearMonth}
+        view={view || undefined}
       />
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-gray-700">

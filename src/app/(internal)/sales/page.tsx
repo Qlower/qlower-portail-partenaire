@@ -1,9 +1,12 @@
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 import { createServiceClient } from "@/lib/supabase-server";
 import Link from "next/link";
 import MonthSelector from "@/components/internal/MonthSelector";
 import PersonalObjective from "@/components/internal/PersonalObjective";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
+import { resolveSalesView } from "@/lib/sales-view";
 
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -100,14 +103,35 @@ async function getDashboardData(yearMonth: string) {
   };
 }
 
+async function getAuthedUserMeta() {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll(); },
+        setAll() {},
+      },
+    },
+  );
+  const { data: { user } } = await supabase.auth.getUser();
+  const meta = (user?.user_metadata || {}) as Record<string, unknown>;
+  return {
+    internalRole: (meta.internal_role as string | undefined) || null,
+    myCommercialId: (meta.commercial_id as string | undefined) || null,
+  };
+}
+
 export default async function SalesHomePage({
   searchParams,
 }: {
   searchParams: Promise<{ ym?: string | string[]; view?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const view = Array.isArray(params.view) ? params.view[0] : params.view;
   const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
+  const { internalRole, myCommercialId } = await getAuthedUserMeta();
+  const view = resolveSalesView({ viewParam: params.view, internalRole, myCommercialId });
   const data = await getDashboardData(yearMonth);
 
   const monthLabel = formatYearMonthFull(yearMonth);
@@ -129,7 +153,7 @@ export default async function SalesHomePage({
       </div>
 
       {/* Objectif — Jour / Semaine / Mois (uniquement si mois courant) */}
-      <PersonalObjective yearMonth={yearMonth} view={view} />
+      <PersonalObjective yearMonth={yearMonth} view={view || undefined} />
 
       {/* Hero KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -178,17 +178,52 @@ export default async function PersonalObjective({
 
   const sb = createServiceClient();
 
-  // Charge la liste des commerciaux pour le dropdown
-  const { data: commercialsList } = await sb
+  // Charge TOUS les commerciaux (incl. former et support) pour le dropdown
+  const { data: allCommercials } = await sb
     .from("commercials")
     .select("id, name, role")
-    .in("role", ["sales", "sales_admin", "upsell"])
     .order("name");
+  const commercialsList = allCommercials || [];
+
+  // Compute counts pour le dropdown : lignes par commercial + cas spéciaux
+  const { data: runForCount } = await sb
+    .from("monthly_runs")
+    .select("id")
+    .eq("year_month", yearMonth)
+    .maybeSingle();
+  const counts = {
+    team: 0,
+    byCommercialId: {} as Record<string, number>,
+    unassigned: 0,
+    autonome: 0,
+    support: 0,
+    former: 0,
+  };
+  if (runForCount?.id) {
+    const { data: allRows } = await sb
+      .from("attribution_rows")
+      .select("auto_commercial_id, override_commercial_id")
+      .eq("run_id", runForCount.id);
+    counts.team = allRows?.length || 0;
+    for (const r of allRows || []) {
+      const cid = r.override_commercial_id || r.auto_commercial_id;
+      if (!cid) {
+        counts.unassigned++;
+        continue;
+      }
+      counts.byCommercialId[cid] = (counts.byCommercialId[cid] || 0) + 1;
+      const c = commercialsList.find((x) => x.id === cid);
+      if (c?.role === "system_none") counts.autonome++;
+      if (c?.role === "support") counts.support++;
+      if (c?.role === "former") counts.former++;
+    }
+  }
 
   // Détermine objectif + nom de la vue
   let monthlyObj = 0;
   let viewTitle = "";
   let filter: ChargesFilter;
+  let isSpecialView = false; // unassigned / autonome / support / former → no speedometer
 
   if (resolvedView === "team") {
     const { data: teamTarget } = await sb
@@ -199,8 +234,28 @@ export default async function PersonalObjective({
     monthlyObj = teamTarget?.target_eur || 0;
     viewTitle = "Équipe entière";
     filter = { mode: "team" };
+  } else if (resolvedView === "unassigned") {
+    monthlyObj = 0;
+    viewTitle = "Non attribué";
+    isSpecialView = true;
+    filter = { mode: "team" }; // les stats elles-mêmes ne sont pas utilisées
+  } else if (resolvedView === "autonome") {
+    monthlyObj = 0;
+    viewTitle = "Achats autonomes";
+    isSpecialView = true;
+    filter = { mode: "team" };
+  } else if (resolvedView === "support") {
+    monthlyObj = 0;
+    viewTitle = "Support";
+    isSpecialView = true;
+    filter = { mode: "team" };
+  } else if (resolvedView === "former") {
+    monthlyObj = 0;
+    viewTitle = "Anciens collaborateurs";
+    isSpecialView = true;
+    filter = { mode: "team" };
   } else {
-    // commercial_id
+    // commercial_id classique
     const c = commercialsList?.find((x) => x.id === resolvedView);
     if (!c) return null;
     const { data: targetRow } = await sb
@@ -214,17 +269,27 @@ export default async function PersonalObjective({
     filter = { mode: "commercial", commercialId: resolvedView };
   }
 
-  if (monthlyObj <= 0) {
-    // Pas d'objectif pour cette vue — on affiche un placeholder mais avec le dropdown
+  if (isSpecialView || monthlyObj <= 0) {
+    // Vue spéciale (non attribué / autonome / support / anciens) OU pas d'objectif :
+    // pas de speedometer. On affiche juste le récap + dropdown pour rebasculer.
+    const specialCounts: Record<string, number> = {
+      unassigned: counts.unassigned,
+      autonome: counts.autonome,
+      support: counts.support,
+      former: counts.former,
+    };
+    const ventesCount = isSpecialView ? specialCounts[resolvedView] || 0 : 0;
     return (
-      <div className="bg-gradient-to-br from-[#FFF5ED] to-white border border-[#F6CCA4]/50 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+      <div className="bg-gradient-to-br from-[#FFF5ED] to-white border border-[#F6CCA4]/50 rounded-xl p-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-[#B8864E] font-semibold">
-              Objectif — {viewTitle}
+              Vue — {viewTitle}
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
-              Aucun objectif défini pour cette vue sur {yearMonth}.
+              {isSpecialView
+                ? `${ventesCount} vente${ventesCount > 1 ? "s" : ""} dans cette vue. Pas d'objectif individuel — hors classement.`
+                : `Aucun objectif défini pour cette vue sur ${yearMonth}.`}
             </p>
           </div>
           {isAdmin && (
@@ -233,6 +298,7 @@ export default async function PersonalObjective({
               commercials={commercialsList || []}
               allowTeam={true}
               myCommercialId={user.commercial_id}
+              counts={counts}
             />
           )}
         </div>
@@ -272,6 +338,7 @@ export default async function PersonalObjective({
             commercials={commercialsList || []}
             allowTeam={true}
             myCommercialId={user.commercial_id}
+            counts={counts}
           />
         )}
       </div>

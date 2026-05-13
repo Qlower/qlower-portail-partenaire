@@ -9,26 +9,39 @@ interface Commercial {
 }
 
 interface Props {
-  /** Vue actuellement sélectionnée : "team" | "self" | commercial_id */
+  /** Vue actuellement sélectionnée :
+   *   "team" | "self" | commercial_id | "unassigned" | special role group ("autonome", "support", "former") */
   current: string;
-  /** Liste des commerciaux affichables dans le dropdown */
   commercials: Commercial[];
   /** Si true, l'option "Équipe entière" est proposée (admin only) */
   allowTeam: boolean;
-  /** Commercial_id de l'utilisateur connecté pour afficher "Moi" si présent */
+  /** Commercial_id de l'utilisateur connecté pour afficher "Moi" */
   myCommercialId: string | null;
+  /** Nb de lignes par catégorie pour afficher les compteurs */
+  counts: {
+    team: number;
+    byCommercialId: Record<string, number>;
+    unassigned: number;
+    autonome: number;
+    support: number;
+    former: number;
+  };
 }
 
 /**
- * Dropdown qui permet au manager de basculer le speedometer entre :
- *   - Équipe entière (défaut admin)
- *   - Lui-même ("Moi")
- *   - N'importe quel autre commercial
+ * Dropdown unique qui contrôle :
+ *   - Le speedometer (PersonalObjective)
+ *   - Le filtre des lignes du tableau (AttributionTable)
  *
- * Met à jour le query param `?view=` → la page server re-render avec la vue
- * choisie, sans recharger ni perdre l'état.
+ * URL param `?view=` (omis si "team" = défaut admin).
  */
-export default function ObjectiveViewSelector({ current, commercials, allowTeam, myCommercialId }: Props) {
+export default function ObjectiveViewSelector({
+  current,
+  commercials,
+  allowTeam,
+  myCommercialId,
+  counts,
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -36,8 +49,7 @@ export default function ObjectiveViewSelector({ current, commercials, allowTeam,
   function navigate(view: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (view === "team" && allowTeam) {
-      // "team" = défaut admin, on peut omettre le param pour simplifier l'URL
-      params.delete("view");
+      params.delete("view"); // défaut admin → URL clean
     } else {
       params.set("view", view);
     }
@@ -45,13 +57,19 @@ export default function ObjectiveViewSelector({ current, commercials, allowTeam,
     router.push(qs ? `${pathname}?${qs}` : pathname);
   }
 
-  // Tri : Moi en haut, puis sales/sales_admin, puis upsell, puis le reste
-  const sorted = [...commercials].sort((a, b) => {
+  // Tri intra-groupe : moi en premier dans son groupe
+  const sortInGroup = (a: Commercial, b: Commercial) => {
     if (a.id === myCommercialId) return -1;
     if (b.id === myCommercialId) return 1;
-    const order = (r: string) => (r === "sales_admin" ? 0 : r === "sales" ? 1 : r === "upsell" ? 2 : 3);
-    return order(a.role) - order(b.role) || a.name.localeCompare(b.name);
-  });
+    return a.name.localeCompare(b.name);
+  };
+
+  const salesActifs = commercials
+    .filter((c) => c.role === "sales" || c.role === "sales_admin" || c.role === "upsell")
+    .sort(sortInGroup);
+
+  const anciens = commercials.filter((c) => c.role === "former").sort(sortInGroup);
+  const supports = commercials.filter((c) => c.role === "support");
 
   return (
     <div className="flex items-center gap-2">
@@ -61,17 +79,47 @@ export default function ObjectiveViewSelector({ current, commercials, allowTeam,
       <select
         value={current}
         onChange={(e) => navigate(e.target.value)}
-        className="text-xs px-2 py-1 border border-gray-200 rounded bg-white hover:border-gray-300 font-medium text-[#0A3855]"
+        className="text-xs px-2 py-1 border border-gray-200 rounded bg-white hover:border-gray-300 font-medium text-[#0A3855] max-w-[260px]"
       >
-        {allowTeam && <option value="team">🏆 Équipe entière</option>}
-        {sorted.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.id === myCommercialId ? "👤 " : ""}
-            {c.name}
-            {c.id === myCommercialId ? " (moi)" : ""}
-            {c.role === "upsell" ? " · upsell" : ""}
-          </option>
-        ))}
+        {allowTeam && (
+          <option value="team">🏆 Équipe entière ({counts.team})</option>
+        )}
+
+        <optgroup label="— Sales actifs —">
+          {salesActifs.map((c) => {
+            const n = counts.byCommercialId[c.id] || 0;
+            const isMe = c.id === myCommercialId;
+            const tag = c.role === "upsell" ? " · upsell" : c.role === "sales_admin" ? " · admin" : "";
+            return (
+              <option key={c.id} value={c.id}>
+                {isMe ? "👤 " : ""}
+                {c.name}
+                {isMe ? " (moi)" : ""}
+                {tag} ({n})
+              </option>
+            );
+          })}
+        </optgroup>
+
+        {(counts.unassigned > 0 || counts.autonome > 0 || supports.length > 0) && (
+          <optgroup label="— Spécial —">
+            {counts.unassigned > 0 && (
+              <option value="unassigned">⏵ Non attribué ({counts.unassigned})</option>
+            )}
+            {counts.autonome > 0 && (
+              <option value="autonome">🚫 Achats autonomes ({counts.autonome})</option>
+            )}
+            {supports.length > 0 && (
+              <option value="support">🛟 Support ({counts.support})</option>
+            )}
+          </optgroup>
+        )}
+
+        {anciens.length > 0 && counts.former > 0 && (
+          <optgroup label="— Anciens —">
+            <option value="former">💤 Anciens collaborateurs ({counts.former})</option>
+          </optgroup>
+        )}
       </select>
     </div>
   );

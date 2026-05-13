@@ -9,8 +9,12 @@ import LockMonthButton from "@/components/internal/LockMonthButton";
 import RescoreMonthButton from "@/components/internal/RescoreMonthButton";
 import ManualChargeButton from "@/components/internal/ManualChargeButton";
 import MonthSelector from "@/components/internal/MonthSelector";
+import PersonalObjective from "@/components/internal/PersonalObjective";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
+import { resolveSalesView } from "@/lib/sales-view";
 
 interface DbRow {
   charge_id: string;
@@ -138,16 +142,38 @@ async function loadAttributionData(yearMonth: string) {
   return { rows, commercials: commercialOptions, run };
 }
 
+async function getAuthedUserMeta() {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll(); },
+        setAll() {},
+      },
+    },
+  );
+  const { data: { user } } = await supabase.auth.getUser();
+  const meta = (user?.user_metadata || {}) as Record<string, unknown>;
+  return {
+    internalRole: (meta.internal_role as string | undefined) || null,
+    myCommercialId: (meta.commercial_id as string | undefined) || null,
+  };
+}
+
 export default async function AttributionAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ym?: string | string[] }>;
+  searchParams: Promise<{ ym?: string | string[]; view?: string | string[] }>;
 }) {
   const params = await searchParams;
   const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
   const { rows, commercials, run } = await loadAttributionData(yearMonth);
   const monthLabel = formatYearMonthFull(yearMonth);
   const editable = !run?.locked;
+  const { internalRole, myCommercialId } = await getAuthedUserMeta();
+  const view = resolveSalesView({ viewParam: params.view, internalRole, myCommercialId });
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
@@ -173,11 +199,14 @@ export default async function AttributionAdminPage({
         </div>
       </div>
 
+      <PersonalObjective yearMonth={yearMonth} view={view || undefined} />
+
       <AttributionTable
         rows={rows}
         commercials={commercials}
         editable={editable}
         yearMonth={yearMonth}
+        view={view || undefined}
       />
     </div>
   );
