@@ -13,6 +13,7 @@ import {
   ExternalLink,
   AlertTriangle,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface AdminRating {
   id: string;
@@ -50,6 +51,13 @@ const USE_CONTEXTS = [
 ];
 
 export default function AdminAvisPage() {
+  const { user } = useAuth();
+  const meta = (user?.user_metadata || {}) as Record<string, unknown>;
+  const isAdminEmail = meta.role === "admin";
+  const isSalesAdmin = meta.internal_role === "sales_admin";
+  const backHref = isAdminEmail ? "/admin" : isSalesAdmin ? "/sales" : "/dashboard";
+  const backLabel = isAdminEmail ? "Retour admin" : isSalesAdmin ? "Retour Tour de contrôle" : "Retour";
+
   const [ratings, setRatings] = useState<AdminRating[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "curated" | "uncurated" | "top">("all");
@@ -99,8 +107,8 @@ export default function AdminAvisPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/admin" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#0A3855]">
-        <ArrowLeft className="w-3 h-3" /> Retour admin
+      <Link href={backHref} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#0A3855]">
+        <ArrowLeft className="w-3 h-3" /> {backLabel}
       </Link>
 
       <div>

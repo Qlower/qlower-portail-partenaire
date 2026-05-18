@@ -13,6 +13,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { hubspotContactUrl, hubspotContactsListUrl } from "@/lib/hubspot-urls";
+import { useAuth } from "@/hooks/useAuth";
 
 interface DuplicateGroup {
   id: string;
@@ -35,6 +36,16 @@ const fmtDt = (iso: string) => {
 };
 
 export default function DoublonsPage() {
+  const { user } = useAuth();
+  // Détecte le rôle du user pour adapter le lien de retour :
+  //   - admin email → retour /admin (panel partenaires)
+  //   - sales_admin (alex+manager) → retour /sales/admin/attribution (TDC)
+  const meta = (user?.user_metadata || {}) as Record<string, unknown>;
+  const isAdminEmail = meta.role === "admin";
+  const isSalesAdmin = meta.internal_role === "sales_admin";
+  const backHref = isAdminEmail ? "/admin" : isSalesAdmin ? "/sales/admin/attribution" : "/sales";
+  const backLabel = isAdminEmail ? "Retour admin" : isSalesAdmin ? "Retour Tour de contrôle" : "Retour";
+
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -113,8 +124,8 @@ export default function DoublonsPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/admin" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#0A3855]">
-        <ArrowLeft className="w-3 h-3" /> Retour admin
+      <Link href={backHref} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#0A3855]">
+        <ArrowLeft className="w-3 h-3" /> {backLabel}
       </Link>
 
       <div className="flex flex-wrap items-end justify-between gap-3">
