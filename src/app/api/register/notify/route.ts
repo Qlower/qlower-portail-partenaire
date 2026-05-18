@@ -1,23 +1,68 @@
 import { NextRequest, NextResponse } from "next/server";
+import { renderContractHtml } from "@/lib/contract-template";
+import type { Partner } from "@/types";
 
 // POST — notify Coline + send welcome email to partner
+// Phase 2 contrat : si tous les champs juridiques sont renseignés, un brouillon
+// de contrat est généré (HTML) et joint à l'email envoyé à Coline.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { resend, FROM } = await import("@/lib/resend");
     const prenom = body.prenom || body.partnerName || "Partenaire";
 
+    // Construit un objet Partner-like avec ce que RegisterForm a envoyé
+    const partnerLike: Partial<Partner> = {
+      id: body.partnerId || "",
+      nom: body.partnerName || "",
+      contact_prenom: body.prenom || null,
+      contact_nom: body.nom || null,
+      email: body.partnerEmail || null,
+      siret: body.siret || null,
+      adresse: body.adresse || null,
+      ville: body.ville || null,
+      code_postal: body.codePostal || null,
+      forme_juridique: body.formeJuridique || null,
+      capital: body.capital || null,
+      rcs: body.rcs || null,
+      contact_civilite: body.contactCivilite || null,
+      contact_position: body.contactPosition || null,
+    };
+
+    // Le contrat n'a de sens que si les champs juridiques sont fournis.
+    // Sinon Coline reçoit juste l'email d'info sans brouillon.
+    const hasContractFields =
+      !!body.formeJuridique && !!body.capital && !!body.rcs &&
+      !!body.contactCivilite && !!body.contactPosition;
+
+    const contractHtml = hasContractFields
+      ? renderContractHtml(partnerLike as Partner)
+      : null;
+    // Nom du fichier propre pour Coline : "Contrat-MaSociete-2026.html"
+    const safeName = (body.partnerName || "partenaire")
+      .replace(/[^a-zA-Z0-9-_]/g, "-").replace(/-+/g, "-").slice(0, 40);
+    const contractFilename = `Contrat-${safeName}-${new Date().getFullYear()}.html`;
+
     // 1. Notify Coline
     const notifyColine = resend.emails.send({
       from: FROM,
       to: "coline@qlower.com",
       cc: "alexandre@qlower.com",
-      subject: `Nouveau partenaire inscrit — ${body.partnerName}`,
-      html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px;">
+      subject: `Nouveau partenaire inscrit — ${body.partnerName}${contractHtml ? " (contrat joint)" : ""}`,
+      html: `<div style="font-family:sans-serif;max-width:620px;margin:0 auto;padding:32px;">
         <h2 style="color:#0A3855;">Nouveau partenaire inscrit</h2>
+        ${contractHtml ? `
+        <div style="background:#FFF6E5;border-left:4px solid #F6CCA4;border-radius:8px;padding:14px 16px;margin:0 0 18px;">
+          <strong style="color:#0A3855;">📄 Un brouillon de contrat est joint à cet email.</strong><br/>
+          <span style="font-size:13px;color:#555;">Ouvrir la pièce jointe <code>${contractFilename}</code> dans le navigateur, vérifier les infos puis Ctrl+P → Enregistrer en PDF avant envoi pour signature.</span>
+        </div>` : `
+        <div style="background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:8px;padding:14px 16px;margin:0 0 18px;">
+          <strong style="color:#92400E;">⚠️ Brouillon de contrat non joint</strong><br/>
+          <span style="font-size:13px;color:#555;">Le partenaire n'a pas renseigné toutes les infos juridiques (forme, capital, RCS, civilité ou fonction du signataire). Utilise le bouton "Générer contrat" dans l'admin une fois ces champs complétés.</span>
+        </div>`}
         <p><strong>Entreprise :</strong> ${body.partnerName || ""}</p>
-        <p><strong>Prénom :</strong> ${body.prenom || ""}</p>
-        <p><strong>Nom :</strong> ${body.nom || ""}</p>
+        <p><strong>Forme :</strong> ${body.formeJuridique || "—"}, capital ${body.capital || "—"}, RCS ${body.rcs || "—"}</p>
+        <p><strong>Signataire :</strong> ${body.contactCivilite || ""} ${body.prenom || ""} ${body.nom || ""} — ${body.contactPosition || "—"}</p>
         <p><strong>Email :</strong> ${body.partnerEmail || ""}</p>
         <p><strong>Téléphone :</strong> ${body.telephone || ""}</p>
         <p><strong>Métier :</strong> ${body.metier || ""}</p>
@@ -28,8 +73,14 @@ export async function POST(request: NextRequest) {
         <p><strong>BIC :</strong> ${body.bic || ""}</p>
         ${body.kbisUrl ? `<p><a href="${body.kbisUrl}">Voir le Kbis</a></p>` : ""}
         <hr>
-        <a href="https://partenaire.qlower.com/admin">Voir dans l'admin</a>
+        <a href="https://partenaire.qlower.com/admin" style="color:#0A3855;">Voir dans l'admin →</a>
       </div>`,
+      attachments: contractHtml ? [
+        {
+          filename: contractFilename,
+          content: Buffer.from(contractHtml, "utf-8"),
+        },
+      ] : undefined,
     });
 
     // 2. Welcome email to partner
@@ -63,7 +114,7 @@ export async function POST(request: NextRequest) {
     }) : Promise.resolve(null);
 
     await Promise.all([notifyColine, welcomePartner]);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, contractAttached: hasContractFields });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[register/notify] Error:", message);

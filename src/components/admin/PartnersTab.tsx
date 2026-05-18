@@ -36,6 +36,7 @@ import {
   Mail,
   Trash2,
   CheckCircle2,
+  FileText,
 } from "lucide-react";
 
 const STATUT_OPTIONS = [
@@ -795,6 +796,14 @@ export default function PartnersTab() {
                           >
                             <Eye className="size-3.5 mr-1" /> Voir comme partenaire
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(`/api/admin/contract/${p.id}`, "_blank")}
+                            title="Génère un brouillon de contrat pré-rempli avec les infos de ce partenaire (à imprimer en PDF depuis le navigateur)"
+                          >
+                            <FileText className="size-3.5 mr-1" /> Générer contrat
+                          </Button>
                         </>
                       )}
                       <Button
@@ -1069,6 +1078,50 @@ export default function PartnersTab() {
                           <Input
                             value={(editForm.tva as string) ?? ""}
                             onChange={(e) => setEditForm({ ...editForm, tva: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Forme juridique</Label>
+                          <Input
+                            value={(editForm.forme_juridique as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, forme_juridique: e.target.value })}
+                            placeholder="SAS, SARL, EURL..."
+                          />
+                          <p className="text-[10px] text-gray-400">Utilisé dans le cartouche du contrat.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Capital social</Label>
+                          <Input
+                            value={(editForm.capital as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, capital: e.target.value })}
+                            placeholder="10 000 €"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>RCS de</Label>
+                          <Input
+                            value={(editForm.rcs as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, rcs: e.target.value })}
+                            placeholder="Paris, Nanterre..."
+                          />
+                          <p className="text-[10px] text-gray-400">Ville du greffe d&apos;immatriculation.</p>
+                        </div>
+                        <Select
+                          label="Civilité du signataire"
+                          value={(editForm.contact_civilite as string) ?? ""}
+                          onChange={(e) => setEditForm({ ...editForm, contact_civilite: e.target.value })}
+                          options={[
+                            { value: "", label: "— Sélectionner —" },
+                            { value: "M.", label: "M." },
+                            { value: "Mme", label: "Mme" },
+                          ]}
+                        />
+                        <div className="space-y-1.5">
+                          <Label>Fonction du signataire</Label>
+                          <Input
+                            value={(editForm.contact_position as string) ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, contact_position: e.target.value })}
+                            placeholder="Président, Gérant..."
                           />
                         </div>
                         <div className="space-y-1.5">

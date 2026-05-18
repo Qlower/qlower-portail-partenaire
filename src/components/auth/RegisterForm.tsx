@@ -27,6 +27,9 @@ interface FormData {
   company: string; metier: string; siret: string; tva: string; address: string;
   city: string; postalCode: string; contactEmail: string; contactPhone: string;
   kbisFile: File | null; promoCode: string; iban: string; bic: string;
+  // Champs pour génération auto du contrat
+  formeJuridique: string; capital: string; rcs: string;
+  contactCivilite: string; contactPosition: string;
 }
 
 const initial: FormData = {
@@ -34,6 +37,8 @@ const initial: FormData = {
   company: "", metier: METIERS[0], siret: "", tva: "", address: "",
   city: "", postalCode: "", contactEmail: "", contactPhone: "",
   kbisFile: null, promoCode: "", iban: "", bic: "",
+  formeJuridique: "", capital: "", rcs: "",
+  contactCivilite: "", contactPosition: "",
 };
 
 export default function RegisterForm() {
@@ -60,8 +65,16 @@ export default function RegisterForm() {
       if (form.password !== form.passwordConfirm) return "Les mots de passe ne correspondent pas.";
       if (!form.company) return "Nom de société requis.";
     }
-    if (step === 1 && (!form.siret || !form.address || !form.city || !form.postalCode)) {
-      return "Adresse complète et SIRET requis.";
+    if (step === 1) {
+      if (!form.siret || !form.address || !form.city || !form.postalCode) {
+        return "Adresse complète et SIRET requis.";
+      }
+      if (!form.formeJuridique || !form.capital || !form.rcs) {
+        return "Forme juridique, capital social et ville du RCS sont nécessaires pour générer votre contrat.";
+      }
+      if (!form.contactCivilite || !form.contactPosition) {
+        return "Civilité et fonction du signataire requises pour le contrat.";
+      }
     }
     // RIB is optional, but if one field is filled, both are required
     if (step === 4 && ((form.iban && !form.bic) || (!form.iban && form.bic))) {
@@ -117,6 +130,12 @@ export default function RegisterForm() {
         telephone: form.contactPhone || null,
         iban: form.iban, bic: form.bic,
         statut: "en_attente",
+        // Champs juridiques pour génération auto du contrat
+        forme_juridique: form.formeJuridique || null,
+        capital: form.capital || null,
+        rcs: form.rcs || null,
+        contact_civilite: form.contactCivilite || null,
+        contact_position: form.contactPosition || null,
         comm_rules: [
           { type: "annuelle", montant: 100, actif: true },
           { type: "souscription", montant: 0, actif: false },
@@ -141,11 +160,12 @@ export default function RegisterForm() {
         }
       }
 
-      // Notify Coline with full partner info for contract
+      // Notify Coline with full partner info + contract draft attached
       fetch("/api/register/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          partnerId,
           partnerName: form.company,
           partnerEmail: form.email,
           kbisUrl: kbisPublicUrl || null,
@@ -160,6 +180,12 @@ export default function RegisterForm() {
           telephone: form.contactPhone || null,
           iban: form.iban,
           bic: form.bic,
+          // Champs juridiques pour le contrat
+          formeJuridique: form.formeJuridique || null,
+          capital: form.capital || null,
+          rcs: form.rcs || null,
+          contactCivilite: form.contactCivilite || null,
+          contactPosition: form.contactPosition || null,
         }),
       }).catch(() => {});
 
@@ -241,12 +267,36 @@ export default function RegisterForm() {
       );
       case 1: return (
         <div className="space-y-4">
-          <div className="space-y-2"><Label>SIRET</Label><Input value={form.siret} onChange={(e) => set("siret", e.target.value)} placeholder="123 456 789 00012" /></div>
-          <div className="space-y-2"><Label>N° TVA (optionnel)</Label><Input value={form.tva} onChange={(e) => set("tva", e.target.value)} placeholder="FR12345678901" /></div>
+          <div className="grid grid-cols-[1fr_1fr] gap-3">
+            <div className="space-y-2"><Label>SIRET</Label><Input value={form.siret} onChange={(e) => set("siret", e.target.value)} placeholder="123 456 789 00012" /></div>
+            <div className="space-y-2"><Label>N° TVA (optionnel)</Label><Input value={form.tva} onChange={(e) => set("tva", e.target.value)} placeholder="FR12345678901" /></div>
+          </div>
+          <div className="grid grid-cols-[2fr_1fr_1fr] gap-3">
+            <div className="space-y-2"><Label>Forme juridique</Label><Input value={form.formeJuridique} onChange={(e) => set("formeJuridique", e.target.value)} placeholder="SAS, SARL, EURL..." /></div>
+            <div className="space-y-2"><Label>Capital</Label><Input value={form.capital} onChange={(e) => set("capital", e.target.value)} placeholder="10 000 €" /></div>
+            <div className="space-y-2"><Label>RCS de</Label><Input value={form.rcs} onChange={(e) => set("rcs", e.target.value)} placeholder="Paris" /></div>
+          </div>
           <div className="space-y-2"><Label>Adresse</Label><Input value={form.address} onChange={(e) => set("address", e.target.value)} placeholder="12 rue des Lilas" /></div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2"><Label>Ville</Label><Input value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="Paris" /></div>
             <div className="space-y-2"><Label>Code postal</Label><Input value={form.postalCode} onChange={(e) => set("postalCode", e.target.value)} placeholder="75001" /></div>
+          </div>
+          <Separator />
+          <p className="text-xs text-muted-foreground -mb-1">Signataire du contrat — ces infos sont utilisées pour générer automatiquement votre contrat d&apos;affiliation.</p>
+          <div className="grid grid-cols-[1fr_2fr] gap-3">
+            <div className="space-y-2">
+              <Label>Civilité</Label>
+              <select
+                value={form.contactCivilite}
+                onChange={(e) => set("contactCivilite", e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">—</option>
+                <option value="M.">M.</option>
+                <option value="Mme">Mme</option>
+              </select>
+            </div>
+            <div className="space-y-2"><Label>Fonction du signataire</Label><Input value={form.contactPosition} onChange={(e) => set("contactPosition", e.target.value)} placeholder="Président, Gérant, DG..." /></div>
           </div>
           <Separator />
           <div className="space-y-2"><Label>Téléphone</Label><Input type="tel" value={form.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} placeholder="06 12 34 56 78" /></div>

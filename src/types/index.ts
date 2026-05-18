@@ -57,6 +57,12 @@ export interface Partner {
   updated_at: string;
   contract_signed_at?: string | null;
   commission_ht?: boolean;
+  // Champs juridiques pour génération auto du contrat
+  forme_juridique?: string | null;
+  capital?: string | null;
+  rcs?: string | null;
+  contact_civilite?: string | null;
+  contact_position?: string | null;
 }
 
 // ── Lead ──────────────────────────────────────────────────────

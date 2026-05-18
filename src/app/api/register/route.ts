@@ -11,6 +11,8 @@ export async function POST(request: NextRequest) {
     id, user_id, nom, contact_prenom, contact_nom, email, utm,
     metier, siret, tva, adresse, ville, code_postal, telephone, iban, bic,
     comm_rules,
+    // Champs juridiques contrat (Phase 2)
+    forme_juridique, capital, rcs, contact_civilite, contact_position,
   } = body;
 
   if (!id || !nom || !utm || !user_id) {
@@ -46,6 +48,11 @@ export async function POST(request: NextRequest) {
     telephone: telephone || null,
     iban: iban || null,
     bic: bic || null,
+    forme_juridique: forme_juridique || null,
+    capital: capital || null,
+    rcs: rcs || null,
+    contact_civilite: contact_civilite || null,
+    contact_position: contact_position || null,
   }).select().single();
 
   if (error) {

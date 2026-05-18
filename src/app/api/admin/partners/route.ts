@@ -34,6 +34,8 @@ export async function POST(request: NextRequest) {
     comm_rules, comm_obj_annuel, user_id, sendEmail,
     statut, metier, siret, tva, adresse, ville, code_postal, telephone, iban, bic, kbis_url,
     contract_signed_at, commission_ht,
+    // Champs juridiques pour génération auto du contrat (Phase 1)
+    forme_juridique, capital, rcs, contact_civilite, contact_position,
   } = body;
 
   if (!id || !nom || !utm) {
@@ -104,6 +106,11 @@ export async function POST(request: NextRequest) {
     kbis_url: kbis_url || null,
     contract_signed_at: contract_signed_at || null,
     commission_ht: !!commission_ht,
+    forme_juridique: forme_juridique || null,
+    capital: capital || null,
+    rcs: rcs || null,
+    contact_civilite: contact_civilite || null,
+    contact_position: contact_position || null,
   }).select().single();
 
   if (error) {
