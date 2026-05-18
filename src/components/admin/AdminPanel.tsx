@@ -8,6 +8,7 @@ import BatchTab from "./BatchTab";
 import UtmTab from "./UtmTab";
 import StatsTab from "./StatsTab";
 import FacturationTab from "./FacturationTab";
+import PartnersRevenueTab from "./PartnersRevenueTab";
 import SettingsTab from "./SettingsTab";
 import { useAdminPartners, useSyncHubspot } from "@/hooks/useAdminData";
 import {
@@ -21,6 +22,7 @@ import {
   RefreshCw,
   Copy,
   Clover,
+  Euro,
 } from "lucide-react";
 
 const TABS = [
@@ -29,6 +31,7 @@ const TABS = [
   { key: "batch", label: "Batch", icon: Layers },
   { key: "utm", label: "UTM", icon: Link2 },
   { key: "stats", label: "Stats", icon: BarChart3 },
+  { key: "revenus", label: "Revenus", icon: Euro },
   { key: "facturation", label: "Facturation", icon: Receipt },
   { key: "parametres", label: "Parametres", icon: Settings },
 ] as const;
@@ -129,6 +132,7 @@ export default function AdminPanel() {
         {activeTab === "batch" && <BatchTab />}
         {activeTab === "utm" && <UtmTab />}
         {activeTab === "stats" && <StatsTab />}
+        {activeTab === "revenus" && <PartnersRevenueTab />}
         {activeTab === "facturation" && <FacturationTab />}
         {activeTab === "parametres" && <SettingsTab />}
       </div>
