@@ -3,6 +3,11 @@ import Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase-server";
 import { scoreCharge } from "@/lib/sales-scoring";
 import { enrichCharge, type ChargeEnrichment } from "@/lib/charge-classifier";
+import {
+  findPartnerByStripePromoCode,
+  attributeLeadFromPromoMatch,
+  syncPromoAttributionToHubSpot,
+} from "@/lib/promo-code-matcher";
 
 export const maxDuration = 60;
 export const runtime = "nodejs"; // need raw body for signature verification
@@ -217,6 +222,31 @@ export async function POST(request: NextRequest) {
           description: charge.description || null,
           enrichment,
         });
+
+        // Rattachement automatique au partenaire si un code promo Stripe matche
+        // un `partners.code` (cas du client orienté par un partenaire à l'oral,
+        // sans UTM). Non bloquant : si fail, on continue.
+        try {
+          const sb = createServiceClient();
+          const match = await findPartnerByStripePromoCode(stripe, charge, sb);
+          if (match) {
+            const leadAction = await attributeLeadFromPromoMatch(
+              sb,
+              match,
+              new Date(charge.created * 1000),
+            );
+            // Sync à HubSpot en best-effort (n'écrase pas une attribution existante)
+            const hs = await syncPromoAttributionToHubSpot(match);
+            console.log(
+              `[stripe-webhook] promo-code attribution: charge=${charge.id} email=${match.customer_email} → partner=${match.partner_code} (${match.partner_id}) via=${match.matched_via} lead=${leadAction.action} hs=${hs.ok ? "synced" : hs.reason}`,
+            );
+          }
+        } catch (e) {
+          console.warn(
+            "[stripe-webhook] promo-code matcher failed:",
+            e instanceof Error ? e.message : e,
+          );
+        }
         break;
       }
       case "charge.refunded": {

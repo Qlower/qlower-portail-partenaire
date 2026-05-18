@@ -19,6 +19,8 @@ import {
   Shield,
   Database,
   PlayCircle,
+  Link as LinkIcon,
+  Tag,
 } from "lucide-react";
 
 export default function SettingsTab() {
@@ -200,6 +202,8 @@ export default function SettingsTab() {
       </Card>
 
       <MigrationCard />
+
+      <PromoCodeBackfillCard />
     </div>
   );
 }
@@ -350,5 +354,244 @@ function MigrationCard() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ============================================================================
+// Carte "Rattachement codes promo Stripe" — scanne les charges Stripe pour
+// rattraper les clients orientés par un partenaire offline (sans UTM) mais qui
+// ont utilisé son code promo.
+// ============================================================================
+function PromoCodeBackfillCard() {
+  const [days, setDays] = useState(365);
+  const [limit, setLimit] = useState(500);
+  const [running, setRunning] = useState<"dry" | "apply" | null>(null);
+  const [result, setResult] = useState<{
+    dryRun: boolean;
+    scanned: number;
+    matched: number;
+    created: number;
+    updated: number;
+    skipped: number;
+    hs_synced: number;
+    time_budget_exceeded: boolean;
+    samples: Array<{
+      charge_id: string;
+      email: string;
+      partner_code: string;
+      matched_via: string;
+      action: string;
+      hs_synced: boolean;
+      hs_reason?: string;
+    }>;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async (dry: boolean) => {
+    setRunning(dry ? "dry" : "apply");
+    setError(null);
+    setResult(null);
+    try {
+      const url = `/api/admin/promo-code-backfill?days=${days}&limit=${limit}${dry ? "&dry_run=true" : ""}`;
+      const res = await fetch(url, { method: "POST" });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Erreur");
+      setResult(j);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur");
+    } finally {
+      setRunning(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Tag className="size-4 text-[#0A3855]" />
+          Rattachement leads via codes promo Stripe
+        </CardTitle>
+        <CardDescription className="text-xs leading-relaxed">
+          Scanne les paiements Stripe récents pour détecter ceux qui utilisent
+          un <strong>code promo correspondant à un partenaire</strong>. Crée le
+          lead manquant côté Supabase + met à jour <code>partenaire__lead_</code>{" "}
+          côté HubSpot (sans écraser une attribution existante).
+          <br />
+          <span className="text-gray-500">
+            Utile quand un partenaire a orienté un client à l&apos;oral : pas
+            d&apos;UTM, mais le code promo a bien été saisi au paiement.
+          </span>
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-end gap-2 flex-wrap">
+          <div className="space-y-1">
+            <Label className="text-[11px]">Période (jours)</Label>
+            <Input
+              type="number"
+              value={days}
+              onChange={(e) => setDays(parseInt(e.target.value, 10) || 365)}
+              className="w-24 text-xs h-8"
+              min={1}
+              max={3650}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px]">Max charges à scanner</Label>
+            <Input
+              type="number"
+              value={limit}
+              onChange={(e) => setLimit(parseInt(e.target.value, 10) || 500)}
+              className="w-24 text-xs h-8"
+              min={1}
+              max={5000}
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => run(true)}
+            disabled={!!running}
+          >
+            {running === "dry" ? (
+              <>
+                <Loader2 className="size-3.5 mr-1.5 animate-spin" /> Simulation…
+              </>
+            ) : (
+              <>
+                <Eye className="size-3.5 mr-1.5" /> Simuler (dry-run)
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => run(false)}
+            disabled={!!running}
+            className="bg-[#0A3855] hover:bg-[#0A3855]/90"
+          >
+            {running === "apply" ? (
+              <>
+                <Loader2 className="size-3.5 mr-1.5 animate-spin" /> Rattachement…
+              </>
+            ) : (
+              <>
+                <LinkIcon className="size-3.5 mr-1.5" /> Lancer le rattachement
+              </>
+            )}
+          </Button>
+        </div>
+
+        {result && (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-[11px]">
+              <Stat label="Scannées" value={result.scanned} />
+              <Stat label="Match code" value={result.matched} highlight={result.matched > 0} />
+              <Stat label="Leads créés" value={result.created} tone="emerald" />
+              <Stat label="Mis à jour" value={result.updated} tone="blue" />
+              <Stat label="Skip" value={result.skipped} tone="gray" />
+              <Stat label="HubSpot sync" value={result.hs_synced} tone="violet" />
+            </div>
+            {result.time_budget_exceeded && (
+              <Alert>
+                <AlertCircle className="size-4 text-amber-600" />
+                <AlertDescription className="text-[11px]">
+                  Budget temps (50s) atteint. Relance le scan pour continuer là où on s&apos;est arrêté.
+                </AlertDescription>
+              </Alert>
+            )}
+            {result.samples && result.samples.length > 0 && (
+              <div className="border border-gray-100 rounded overflow-x-auto">
+                <table className="w-full text-[11px]">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left text-gray-500 font-medium">Email</th>
+                      <th className="px-2 py-1.5 text-left text-gray-500 font-medium">Partenaire</th>
+                      <th className="px-2 py-1.5 text-left text-gray-500 font-medium">Via</th>
+                      <th className="px-2 py-1.5 text-left text-gray-500 font-medium">Action</th>
+                      <th className="px-2 py-1.5 text-left text-gray-500 font-medium">HubSpot</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {result.samples.map((s) => (
+                      <tr key={s.charge_id}>
+                        <td className="px-2 py-1 font-mono text-[10px]">{s.email}</td>
+                        <td className="px-2 py-1 font-semibold text-[#0A3855]">{s.partner_code}</td>
+                        <td className="px-2 py-1 text-gray-500">{s.matched_via}</td>
+                        <td className="px-2 py-1">
+                          <span
+                            className={
+                              s.action.startsWith("created")
+                                ? "text-emerald-700"
+                                : s.action.startsWith("updated")
+                                  ? "text-blue-700"
+                                  : "text-gray-500"
+                            }
+                          >
+                            {s.action}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1 text-gray-500">
+                          {s.hs_synced ? (
+                            <span className="text-violet-600">✓ synced</span>
+                          ) : (
+                            <span className="text-gray-400" title={s.hs_reason}>
+                              {s.hs_reason || "—"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {result.dryRun && result.matched > 0 && (
+              <Alert>
+                <CheckCircle2 className="size-4 text-emerald-600" />
+                <AlertDescription className="text-xs">
+                  Simulation : <strong>{result.matched}</strong> lead(s) seraient
+                  rattaché(s) — relance avec &quot;Lancer le rattachement&quot; pour appliquer.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="size-4" />
+            <AlertDescription className="text-xs">{error}</AlertDescription>
+          </Alert>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  highlight = false,
+  tone = "gray",
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+  tone?: "gray" | "emerald" | "blue" | "violet" | "amber";
+}) {
+  const tones: Record<string, string> = {
+    gray: "text-gray-700",
+    emerald: "text-emerald-700",
+    blue: "text-blue-700",
+    violet: "text-violet-700",
+    amber: "text-amber-700",
+  };
+  return (
+    <div className={`bg-gray-50 rounded p-2 ${highlight ? "ring-1 ring-[#0A3855]" : ""}`}>
+      <p className="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">{label}</p>
+      <p className={`text-lg font-bold tabular-nums ${tones[tone]}`}>{value}</p>
+    </div>
   );
 }
