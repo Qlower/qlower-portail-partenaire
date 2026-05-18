@@ -1,45 +1,48 @@
 // Résolution de la vue active pour le tour de contrôle sales.
 //
-// Vues possibles (dans l'URL ?view=) :
-//   - "team"          : équipe entière (défaut admin)
-//   - <commercial_id> : un commercial spécifique
-//   - "unassigned"    : lignes non attribuées
-//   - "autonome"      : role=system_none
-//   - "support"       : role=support
-//   - "former"        : role=former (anciens collaborateurs)
+// IMPORTANT : 2 dimensions distinctes !
+//   - `tableView` : quelle filtration appliquer au tableau (rows visibles)
+//   - `speedometerView` : quel scope pour le speedometer + cards Jour/Sem/Mois
 //
-// Logique de résolution :
-//   1. Si URL ?view= explicite → on respecte (sauf "team" non admin)
-//   2. Sinon : sales_admin → "team", sales → leur commercial_id, autres → null
+// Logique par rôle :
+//
+//   sales_admin (manager) :
+//     - ?view= explicite contrôle LES DEUX (table + speedometer)
+//     - Sans ?view= : team par défaut (vue d'ensemble)
+//
+//   sales (négo) :
+//     - tableView : TOUJOURS "team" → voit toutes les ventes équipe
+//       (pour pouvoir contester ou réclamer des attributions d'autres collègues)
+//     - speedometerView : TOUJOURS son commercial_id → son compteur perso
+//     - L'URL ?view= est ignoré pour les sales (pas de dropdown pour eux)
 
 export interface ResolvedViewInput {
-  /** Raw `?view=` value depuis l'URL */
   viewParam?: string | string[];
-  /** Internal role du user connecté */
   internalRole?: string | null;
-  /** Commercial id du user connecté (si lié) */
   myCommercialId?: string | null;
 }
 
-/**
- * Renvoie la vue résolue à utiliser pour filtrer le speedometer et le tableau.
- * Si l'utilisateur ne devrait rien voir (pas d'auth interne), renvoie null.
- */
-export function resolveSalesView(input: ResolvedViewInput): string | null {
+export interface ResolvedView {
+  tableView: string;        // filtre pour le tableau ("team" | commercial_id | "unassigned" | ...)
+  speedometerView: string;  // scope pour le speedometer (idem syntaxe)
+}
+
+export function resolveSalesView(input: ResolvedViewInput): ResolvedView | null {
   const isAdmin = input.internalRole === "sales_admin";
   const isSales = input.internalRole === "sales";
   if (!isAdmin && !isSales) return null;
 
-  const raw = Array.isArray(input.viewParam) ? input.viewParam[0] : input.viewParam;
-
-  // URL param explicite
-  if (raw) {
-    // "team" autorisé uniquement aux admins
-    if (raw === "team") return isAdmin ? "team" : input.myCommercialId || null;
-    return raw;
+  if (isAdmin) {
+    // Admin : ?view explicite contrôle tout, sinon team
+    const raw = Array.isArray(input.viewParam) ? input.viewParam[0] : input.viewParam;
+    const view = raw || "team";
+    return { tableView: view, speedometerView: view };
   }
 
-  // Pas de URL param → défaut selon rôle
-  if (isAdmin) return "team";
-  return input.myCommercialId || null;
+  // Sales : tableau = toute l'équipe (sinon impossible de contester / réclamer).
+  // Speedometer = son propre objectif perso.
+  return {
+    tableView: "team",
+    speedometerView: input.myCommercialId || "",
+  };
 }

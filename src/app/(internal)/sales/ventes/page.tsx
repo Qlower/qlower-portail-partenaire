@@ -138,8 +138,10 @@ export default async function VentesPage({
   const internalRole = meta.internal_role as "sales" | "sales_admin" | undefined;
   const myCommercialId = (meta.commercial_id as string | undefined) || null;
   const myName = (meta.name as string | undefined) || "Moi";
-  // Vue résolue (URL ?view ou défaut selon rôle) — partagée entre speedometer et tableau
-  const view = resolveSalesView({ viewParam, internalRole, myCommercialId });
+  // Vues résolues (2 dimensions distinctes : table vs speedometer)
+  const resolved = resolveSalesView({ viewParam, internalRole, myCommercialId });
+  const tableView = resolved?.tableView;
+  const speedometerView = resolved?.speedometerView;
 
   const { rows, commercials } = await loadVentesData(yearMonth);
 
@@ -164,19 +166,18 @@ export default async function VentesPage({
         <MonthSelector current={yearMonth} available={availableMonths} />
       </div>
 
-      {/* Objectif Jour / Semaine / Mois — admin = team par défaut, négo = self,
-          dropdown ?view= permet de basculer (mois courant seulement) */}
-      <PersonalObjective yearMonth={yearMonth} view={view || undefined} />
+      {/* Speedometer : pour sales = leur perso, pour admin = ?view ou team */}
+      <PersonalObjective yearMonth={yearMonth} view={speedometerView || undefined} />
 
       <AttributionTable
-        key={`${yearMonth}-${view || "team"}`}
+        key={`${yearMonth}-${tableView || "team"}`}
         rows={rows}
         commercials={commercials}
         mode="sales-team"
         myCommercialId={myCommercialId}
         defaultFilterMine={false}
         yearMonth={yearMonth}
-        view={view || undefined}
+        view={tableView || undefined}
       />
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-gray-700">

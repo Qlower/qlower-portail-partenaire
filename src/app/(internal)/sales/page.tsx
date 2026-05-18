@@ -131,7 +131,8 @@ export default async function SalesHomePage({
   const params = await searchParams;
   const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
   const { internalRole, myCommercialId } = await getAuthedUserMeta();
-  const view = resolveSalesView({ viewParam: params.view, internalRole, myCommercialId });
+  const resolved = resolveSalesView({ viewParam: params.view, internalRole, myCommercialId });
+  const speedometerView = resolved?.speedometerView;
   const data = await getDashboardData(yearMonth);
 
   const monthLabel = formatYearMonthFull(yearMonth);
@@ -153,7 +154,7 @@ export default async function SalesHomePage({
       </div>
 
       {/* Objectif — Jour / Semaine / Mois (uniquement si mois courant) */}
-      <PersonalObjective yearMonth={yearMonth} view={view || undefined} />
+      <PersonalObjective yearMonth={yearMonth} view={speedometerView || undefined} />
 
       {/* Hero KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

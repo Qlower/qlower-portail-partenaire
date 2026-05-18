@@ -176,7 +176,9 @@ export default async function AttributionAdminPage({
   const monthLabel = formatYearMonthFull(yearMonth);
   const editable = !run?.locked;
   const { internalRole, myCommercialId } = await getAuthedUserMeta();
-  const view = resolveSalesView({ viewParam: params.view, internalRole, myCommercialId });
+  const resolved = resolveSalesView({ viewParam: params.view, internalRole, myCommercialId });
+  const tableView = resolved?.tableView;
+  const speedometerView = resolved?.speedometerView;
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
@@ -202,7 +204,7 @@ export default async function AttributionAdminPage({
         </div>
       </div>
 
-      <PersonalObjective yearMonth={yearMonth} view={view || undefined} />
+      <PersonalObjective yearMonth={yearMonth} view={speedometerView || undefined} />
 
       {/* Alerte refund-after-lock : remboursements arrivés après verrouillage du mois */}
       {(() => {
@@ -234,12 +236,12 @@ export default async function AttributionAdminPage({
       })()}
 
       <AttributionTable
-        key={`${yearMonth}-${view || "team"}`}
+        key={`${yearMonth}-${tableView || "team"}`}
         rows={rows}
         commercials={commercials}
         editable={editable}
         yearMonth={yearMonth}
-        view={view || undefined}
+        view={tableView || undefined}
       />
     </div>
   );
