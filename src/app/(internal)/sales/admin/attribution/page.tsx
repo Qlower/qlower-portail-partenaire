@@ -180,13 +180,16 @@ export default async function AttributionAdminPage({
   const tableView = resolved?.tableView;
   const speedometerView = resolved?.speedometerView;
 
+  // Total CA du mois — utile pour visualiser l'atteinte d'objectif
+  const totalCA = rows.reduce((s, r) => s + (r.amount_net_eur || 0), 0);
+
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[#0A3855]">Attribution — {monthLabel}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {rows.length} ligne{rows.length > 1 ? "s" : ""} en scope · Édition admin{" "}
+            {rows.length} ligne{rows.length > 1 ? "s" : ""} · <strong className="text-[#0A3855]">{Math.round(totalCA).toLocaleString("fr-FR")} €</strong> · Édition admin{" "}
             {run?.locked ? "(verrouillé)" : "(active)"}
           </p>
         </div>

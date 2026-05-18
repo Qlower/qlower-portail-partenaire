@@ -136,15 +136,20 @@ async function getPersonalStats(
 }
 
 /**
- * Composant async server qui affiche la section "Mon objectif" Jour/Semaine/Mois.
+ * Composant async server qui affiche la section "Mon objectif".
  *
  * - sales_admin par défaut → vue "team" (objectif équipe entière)
  * - sales par défaut → vue "self" (son propre objectif)
  * - Tout user peut basculer via `?view=team` / `?view=<commercial_id>`
  *
+ * Selon le mois sélectionné :
+ *   - Mois courant : 3 cartes (Jour / Semaine / Mois) + pacing
+ *   - Mois passé : 1 carte (Mois) + speedometer avec % final
+ *   - Mois futur : null (pas de sens)
+ *
  * Affiche null si :
  *   - L'utilisateur n'a pas de rôle interne
- *   - Le mois sélectionné n'est pas le mois courant
+ *   - Le mois sélectionné est dans le futur
  *   - La vue sélectionnée n'a pas d'objectif défini
  */
 export default async function PersonalObjective({
@@ -156,7 +161,9 @@ export default async function PersonalObjective({
 }) {
   const user = await getCurrentUserCommercial();
   if (!user) return null;
-  if (yearMonth !== currentYearMonth()) return null;
+  // Mois futur → pas de speedometer
+  if (yearMonth > currentYearMonth()) return null;
+  const isPastMonth = yearMonth < currentYearMonth();
 
   const isAdmin = user.internal_role === "sales_admin";
 
@@ -308,15 +315,26 @@ export default async function PersonalObjective({
 
   const stats = await getPersonalStats(filter, yearMonth, monthlyObj);
 
-  // Status texte pour le speedometer
+  // Status texte pour le speedometer.
+  // Mois passé : juste le verdict final ("Atteint" / "Manqué").
+  // Mois courant : pacing en jours d'avance/retard.
   const monthPct = stats.month.pct;
   const ahead = stats.pacing.real >= stats.pacing.expected;
   const absDays = Math.abs(stats.pacing.deltaDays);
   let statusText: string;
-  if (monthPct >= 100) statusText = "🏆 Objectif atteint !";
-  else if (ahead && absDays >= 1) statusText = `🎯 +${absDays.toFixed(1)}j d'avance`;
-  else if (!ahead && absDays >= 1) statusText = `⏰ ${absDays.toFixed(1)}j de retard`;
-  else statusText = "À l'heure";
+  if (isPastMonth) {
+    if (monthPct >= 100) statusText = "🏆 Objectif atteint";
+    else if (monthPct >= 80) statusText = "📊 Proche de l'objectif";
+    else statusText = "⚠️ Objectif manqué";
+  } else if (monthPct >= 100) {
+    statusText = "🏆 Objectif atteint !";
+  } else if (ahead && absDays >= 1) {
+    statusText = `🎯 +${absDays.toFixed(1)}j d'avance`;
+  } else if (!ahead && absDays >= 1) {
+    statusText = `⏰ ${absDays.toFixed(1)}j de retard`;
+  } else {
+    statusText = "À l'heure";
+  }
 
   const realFmt = `${Math.round(stats.month.real).toLocaleString("fr-FR")} €`;
   const objFmt = `${Math.round(stats.month.obj).toLocaleString("fr-FR")} €`;
@@ -329,7 +347,9 @@ export default async function PersonalObjective({
             Objectif — {viewTitle}
           </div>
           <p className="text-xs text-gray-500 mt-0.5">
-            Décliné Jour / Semaine / Mois sur la base des jours ouvrés (Lun-Ven, hors fériés FR).
+            {isPastMonth
+              ? `Bilan rétroactif du mois ${yearMonth} — comparé à l'objectif.`
+              : "Décliné Jour / Semaine / Mois sur la base des jours ouvrés (Lun-Ven, hors fériés FR)."}
           </p>
         </div>
         {isAdmin && (
@@ -355,23 +375,27 @@ export default async function PersonalObjective({
           />
         </div>
 
-        {/* 3 cards : jour / semaine / mois */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Cards : 3 (jour/sem/mois) pour le mois courant, 1 (mois) pour les mois passés */}
+        <div className={`grid grid-cols-1 ${isPastMonth ? "" : "sm:grid-cols-3"} gap-3`}>
+          {!isPastMonth && (
+            <PersonalCard
+              label="Aujourd'hui"
+              obj={stats.today.obj}
+              real={stats.today.real}
+              pct={stats.today.pct}
+              sub={stats.today.obj > 0 ? "" : "Pas un jour ouvré"}
+            />
+          )}
+          {!isPastMonth && (
+            <PersonalCard
+              label="Cette semaine"
+              obj={stats.week.obj}
+              real={stats.week.real}
+              pct={stats.week.pct}
+            />
+          )}
           <PersonalCard
-            label="Aujourd'hui"
-            obj={stats.today.obj}
-            real={stats.today.real}
-            pct={stats.today.pct}
-            sub={stats.today.obj > 0 ? "" : "Pas un jour ouvré"}
-          />
-          <PersonalCard
-            label="Cette semaine"
-            obj={stats.week.obj}
-            real={stats.week.real}
-            pct={stats.week.pct}
-          />
-          <PersonalCard
-            label="Ce mois"
+            label={isPastMonth ? `Bilan ${yearMonth}` : "Ce mois"}
             obj={stats.month.obj}
             real={stats.month.real}
             pct={stats.month.pct}
