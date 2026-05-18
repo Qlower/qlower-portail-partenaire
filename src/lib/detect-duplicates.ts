@@ -101,23 +101,31 @@ async function fetchContactsPage(after: string | undefined): Promise<{
 }
 
 export async function detectDuplicates(options: {
-  /** Limite de contacts à scanner (sécurité contre rate-limit HubSpot). Défaut 1000. */
+  /** Limite de contacts à scanner (sécurité contre rate-limit HubSpot). Défaut 800. */
   maxContacts?: number;
-  /** Scanner uniquement les contacts créés ces N jours. Défaut 365 (1 an). */
+  /** Scanner uniquement les contacts créés ces N jours. Défaut 180 (6 mois). */
   windowDays?: number;
-}): Promise<DetectReport> {
+  /** Budget temps avant d'arrêter le scan et de grouper ce qu'on a (ms). Défaut 45000. */
+  timeBudgetMs?: number;
+}): Promise<DetectReport & { timed_out: boolean; scanned_contacts: number }> {
   const start = Date.now();
-  const maxContacts = options.maxContacts ?? 1000;
-  const windowDays = options.windowDays ?? 365;
+  const maxContacts = options.maxContacts ?? 800;
+  const windowDays = options.windowDays ?? 180;
+  const timeBudgetMs = options.timeBudgetMs ?? 45_000;
   const minCreatedAt = new Date(Date.now() - windowDays * 24 * 3600 * 1000).getTime();
 
   const sb = createServiceClient();
 
-  // 1) Scan paginé
+  // 1) Scan paginé — break si on dépasse le budget temps (Vercel timeout 60s)
   const contacts: HsContact[] = [];
   let after: string | undefined;
   let pages = 0;
+  let timedOut = false;
   while (contacts.length < maxContacts) {
+    if (Date.now() - start > timeBudgetMs) {
+      timedOut = true;
+      break;
+    }
     const page = await fetchContactsPage(after);
     pages++;
     for (const c of page.results) {
@@ -227,5 +235,7 @@ export async function detectDuplicates(options: {
     groups_inserted: inserted,
     groups_existing: existing,
     duration_ms: Date.now() - start,
+    timed_out: timedOut,
+    scanned_contacts: contacts.length,
   };
 }

@@ -74,12 +74,21 @@ export default function DoublonsPage() {
       const r = await fetch("/api/admin/detect-duplicates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ maxContacts: 1500, windowDays: 365 }),
+        body: JSON.stringify({ maxContacts: 800, windowDays: 180, timeBudgetMs: 45000 }),
       });
-      const j = await r.json();
+      const text = await r.text();
+      let j: { error?: string; ok?: boolean; scanned?: number; groups_found?: number; groups_inserted?: number; pages?: number; duration_ms?: number; timed_out?: boolean };
+      try {
+        j = JSON.parse(text);
+      } catch {
+        throw new Error(`Réponse non-JSON (HTTP ${r.status}). Le scan a probablement timeout. Réessaie sur une fenêtre plus courte (90 jours).`);
+      }
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-      setLastScan(j);
+      setLastScan(j as { scanned: number; pages: number; groups_found: number; groups_inserted: number; duration_ms: number });
       await load(showResolved);
+      if (j.timed_out) {
+        setError(`⚠️ Scan partiel : la fenêtre de temps Vercel (60s) a été atteinte. ${j.scanned || 0} contacts traités. Relance pour scanner les suivants.`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
