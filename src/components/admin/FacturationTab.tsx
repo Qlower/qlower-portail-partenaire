@@ -41,6 +41,9 @@ export default function FacturationTab() {
   const { data: partners = [], isLoading: loading } = useAdminPartners();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  // Filtre par année : "all" = toutes années, sinon 2024/2025/2026/...
+  const currentYear = new Date().getFullYear();
+  const [yearFilter, setYearFilter] = useState<number | "all">(currentYear);
 
   // Real commissions per partner (HubSpot live, same logic as partner dashboard)
   const { data: commSummaries = [] } = useQuery<CommSummary[]>({
@@ -91,22 +94,38 @@ export default function FacturationTab() {
     );
   });
 
-  // Totals
+  // Filtre toutes les factures sur l'année sélectionnée
+  const scopedInvoices = yearFilter === "all" ? allInvoices : allInvoices.filter((i) => i.year === yearFilter);
+
+  // Totals (basés sur l'année sélectionnée)
   const totalDue = commSummaries.reduce((s, c) => s + (c.totalCommission || 0), 0);
   let totalPending = 0;
   let totalPaid = 0;
-  for (const inv of allInvoices) {
+  for (const inv of scopedInvoices) {
     if (inv.historical) continue;
     if (inv.is_paid) totalPaid += Number(inv.amount) || 0;
     else if (inv.file_url) totalPending += Number(inv.amount) || 0;
   }
 
-  // Status computation for each partner
-  const partnerStatus = (partnerId: string): "waiting" | "uploaded" | "paid" | "none" => {
+  // Liste des années existantes pour le dropdown
+  const availableYears = Array.from(new Set(allInvoices.map((i) => i.year))).sort((a, b) => b - a);
+  // Toujours proposer l'année courante même sans facture encore
+  if (!availableYears.includes(currentYear)) availableYears.unshift(currentYear);
+
+  // Status computation for each partner, SCOPÉ à l'année sélectionnée si différente de "all"
+  // (fix du bug : avant on regardait toutes les années → un partenaire avec 2025 payé et 2026
+  // non payé était marqué "uploaded" même quand on cherchait 2025)
+  const partnerStatus = (partnerId: string): "waiting" | "uploaded" | "paid" | "paid_no_invoice" | "none" => {
     const invs = invoicesByPartner.get(partnerId) ?? [];
-    const nonHistorical = invs.filter((i) => !i.historical);
+    const scoped = yearFilter === "all" ? invs : invs.filter((i) => i.year === yearFilter);
+    const nonHistorical = scoped.filter((i) => !i.historical);
     if (nonHistorical.length === 0) return "none";
-    if (nonHistorical.every((i) => i.is_paid)) return "paid";
+    // Tous payés ?
+    if (nonHistorical.every((i) => i.is_paid)) {
+      // Tous payés sans facture uploadée → soldé hors facture
+      if (nonHistorical.every((i) => !i.file_url)) return "paid_no_invoice";
+      return "paid";
+    }
     if (nonHistorical.some((i) => i.file_url && !i.is_paid)) return "uploaded";
     return "waiting";
   };
@@ -118,6 +137,13 @@ export default function FacturationTab() {
           <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] shadow-none">
             <CheckCircle2 className="size-3 mr-0.5" />
             Soldé
+          </Badge>
+        );
+      case "paid_no_invoice":
+        return (
+          <Badge className="bg-violet-50 text-violet-700 border border-violet-200 text-[10px] shadow-none">
+            <CheckCircle2 className="size-3 mr-0.5" />
+            Soldé hors facture
           </Badge>
         );
       case "uploaded":
@@ -204,7 +230,7 @@ export default function FacturationTab() {
         </Card>
       </div>
 
-      {/* Search */}
+      {/* Search + filtre année */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-gray-400" />
@@ -214,6 +240,21 @@ export default function FacturationTab() {
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 text-xs"
           />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+            Année :
+          </label>
+          <select
+            value={String(yearFilter)}
+            onChange={(e) => setYearFilter(e.target.value === "all" ? "all" : parseInt(e.target.value, 10))}
+            className="text-xs px-2.5 py-1.5 border border-gray-200 rounded bg-white hover:border-gray-300 font-medium text-[#0A3855]"
+          >
+            <option value="all">Toutes années</option>
+            {availableYears.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
         </div>
         <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855]">
           {filtered.length}/{activePartners.length} partenaires
@@ -276,6 +317,7 @@ export default function FacturationTab() {
                         partnerName={p.nom}
                         partnerEmail={p.email}
                         commissionHt={p.commission_ht}
+                        focusYear={yearFilter === "all" ? null : yearFilter}
                       />
                     </div>
                   )}

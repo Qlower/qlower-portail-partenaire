@@ -24,9 +24,11 @@ interface Props {
   partnerName?: string;
   partnerEmail?: string | null;
   commissionHt?: boolean;
+  /** Si fourni, on n'affiche QUE cette année (sinon toutes les années éligibles) */
+  focusYear?: number | null;
 }
 
-export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEmail, commissionHt }: Props) {
+export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEmail, commissionHt, focusYear }: Props) {
   const qc = useQueryClient();
   const [confirmSend, setConfirmSend] = useState<{ year: number; amount: number } | null>(null);
   const [sending, setSending] = useState(false);
@@ -150,6 +152,38 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
     }
   };
 
+  // Crée une invoice "soldée hors facture" pour un placeholder year.
+  // Utile quand le partenaire a déjà été payé en cash/virement et qu'on ne
+  // veut pas l'embêter avec un appel à facture.
+  const markPaidNoInvoice = async (year: number, amount: number) => {
+    const note = window.prompt(
+      `Marquer ${year} comme soldé hors facture (commission ${amount.toLocaleString("fr-FR")} €).\n\nMotif (optionnel, pour audit) :`,
+      "Soldé hors facture",
+    );
+    if (note === null) return; // Cancelled
+    try {
+      const res = await fetch("/api/admin/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          partner_id: partnerId,
+          year,
+          amount,
+          is_paid: true,
+          notes: note || "Soldé hors facture",
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json();
+        throw new Error(j.error || "Erreur création invoice");
+      }
+      await qc.invalidateQueries({ queryKey: ["admin-partner-invoices", partnerId] });
+      await qc.invalidateQueries({ queryKey: ["admin-all-invoices"] });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erreur");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-4">
@@ -161,11 +195,13 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
   // Merge: invoices in DB + eligible years without invoice yet (placeholders)
   const rowsByYear = new Map<number, PartnerInvoice>();
   for (const inv of invoices) {
+    if (focusYear != null && inv.year !== focusYear) continue;
     if (eligibleYears.size === 0 || eligibleYears.has(inv.year)) {
       rowsByYear.set(inv.year, inv);
     }
   }
   for (const y of eligibleYears) {
+    if (focusYear != null && y !== focusYear) continue;
     if (!rowsByYear.has(y)) {
       rowsByYear.set(y, {
         id: `placeholder-${y}`,
@@ -356,6 +392,21 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
                     >
                       <Mail className="size-3 mr-0.5" />
                       Envoyer appel
+                    </Button>
+                  )}
+                  {/* Soldé hors facture : pour placeholder year uniquement (pas de
+                      facture déposée), permet de marquer comme déjà payé sans appel.
+                      Utile pour commissions versées en cash / virement direct. */}
+                  {inv.id.startsWith("placeholder-") && inv.amount > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 text-[10px] px-2 border-violet-200 text-violet-700 hover:bg-violet-50"
+                      onClick={() => markPaidNoInvoice(inv.year, inv.amount)}
+                      title="Marquer comme soldé hors facture (commission versée en cash/virement direct, n'envoie pas d'appel)"
+                    >
+                      <Check className="size-3 mr-0.5" />
+                      Soldé hors facture
                     </Button>
                   )}
                   {!inv.historical && !inv.id.startsWith("placeholder-") && (
