@@ -16,4 +16,7 @@ export const resend = new Proxy({} as Resend, {
     return (getResend() as unknown as Record<string, unknown>)[prop as string];
   },
 });
-export const FROM = "Qlower <noreply@qlower.com>";
+// Adresse d'expédition par défaut. Coline étant le contact principal des
+// partenaires/affiliés, on évite noreply@ ou partenaires@ (qui ne redirige
+// nulle part) : si un partenaire répond, il atterrit direct chez Coline.
+export const FROM = "Coline Sinquin <coline@qlower.com>";

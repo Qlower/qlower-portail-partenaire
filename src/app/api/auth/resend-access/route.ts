@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "Qlower <partenaires@qlower.com>",
+          from: "Coline Sinquin <coline@qlower.com>",
           to: [partner.email],
           subject: "Votre nouveau lien de connexion Qlower",
           html: `

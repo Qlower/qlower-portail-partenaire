@@ -131,8 +131,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             Votre espace partenaire <strong>{partner.nom}</strong> est actuellement suspendu.
             <br />
             Pour toute question, merci de contacter notre équipe à{" "}
-            <a href="mailto:partenaires@qlower.com" className="text-[#0A3855] underline font-semibold">
-              partenaires@qlower.com
+            <a href="mailto:coline@qlower.com" className="text-[#0A3855] underline font-semibold">
+              coline@qlower.com
             </a>
             .
           </p>

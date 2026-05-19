@@ -330,7 +330,7 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
             </table>
             <p className="text-[11px] text-gray-400 mt-3 leading-relaxed italic">
               Seules les années où vous aviez des clients actifs et un contrat signé sont affichées.
-              Pour toute question sur un historique antérieur, contactez-nous à partenaires@qlower.com.
+              Pour toute question sur un historique antérieur, contactez Coline à coline@qlower.com.
             </p>
           </div>
         )}

@@ -45,7 +45,7 @@ export default function LoginForm() {
       const data = await res.json();
       setResendMsg(data.message || "Lien envoyé si l'email est reconnu.");
     } catch {
-      setResendMsg("Erreur lors de l'envoi. Réessayez ou contactez partenaires@qlower.com.");
+      setResendMsg("Erreur lors de l'envoi. Réessayez ou contactez coline@qlower.com.");
     } finally {
       setResending(false);
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Partner, ContratType } from "@/types";
 import { useAdminPartners, useEmailTemplates, useUpdateEmailTemplate } from "@/hooks/useAdminData";
@@ -27,12 +27,54 @@ import {
   Check,
   X,
   AlertTriangle,
+  User,
+  Link2,
+  Hash,
+  TrendingUp,
+  Lock,
+  Plus,
 } from "lucide-react";
 
 type Audience = "tous" | "affiliation" | "marque_blanche";
 
 function replaceVars(text: string, vars: Record<string, string>): string {
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
+}
+
+// ─── Variables disponibles dans les templates ──────────────────────────────
+// Chaque variable expose un label humain (FR), une icône et un placeholder
+// d'aperçu pour montrer ce que ça donnera dans le mail final.
+type VarKey = "nom" | "email" | "code" | "utm" | "leads" | "abonnes" | "link" | "setup_link" | "magic_link";
+
+interface VarDef {
+  key: VarKey;
+  label: string;          // affiché sur le bouton
+  description: string;    // tooltip
+  icon: typeof User;
+  exampleHint: string;    // ce qui sera substitué (ex: "Cocoonr")
+}
+
+const AVAILABLE_VARS: VarDef[] = [
+  { key: "nom",         label: "Nom du partenaire",    description: "Raison sociale (ex: Cocoonr)",            icon: User,        exampleHint: "Cocoonr" },
+  { key: "email",       label: "Email",                description: "Email du partenaire",                     icon: Mail,        exampleHint: "contact@cocoonr.fr" },
+  { key: "code",        label: "Code promo",           description: "Code promo Stripe (ex: COCOONR)",         icon: Hash,        exampleHint: "COCOONR" },
+  { key: "utm",         label: "UTM",                  description: "Identifiant UTM utilisé dans les liens",  icon: Hash,        exampleHint: "Cocoonr" },
+  { key: "leads",       label: "Nb leads",             description: "Nombre total de leads apportés",          icon: TrendingUp,  exampleHint: "78" },
+  { key: "abonnes",     label: "Nb abonnés",           description: "Nombre d'abonnés actifs apportés",        icon: TrendingUp,  exampleHint: "35" },
+  { key: "link",        label: "Lien d'affiliation",   description: "Lien tracké avec UTM + code promo",       icon: Link2,       exampleHint: "https://www.qlower.com/qlower-x-partenaire?utm_source=..." },
+  { key: "setup_link",  label: "Lien connexion 7j",    description: "Lien d'accès sécurisé valable 7 jours",   icon: Lock,        exampleHint: "(généré à l'envoi, 7 jours)" },
+  { key: "magic_link",  label: "Lien magique 24h",     description: "Lien magique Supabase, valable 24h",      icon: Lock,        exampleHint: "(généré à l'envoi, 24h)" },
+];
+
+const VALID_KEYS = new Set<string>(AVAILABLE_VARS.map((v) => v.key));
+
+// Extrait toutes les {{xxx}} du texte (valides ou pas)
+function extractUsedVars(text: string): Array<{ key: string; valid: boolean }> {
+  const found = new Set<string>();
+  const re = /\{\{(\w+)\}\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) found.add(m[1]);
+  return [...found].map((k) => ({ key: k, valid: VALID_KEYS.has(k) }));
 }
 
 type CampaignSend = {
@@ -323,55 +365,18 @@ export default function CampagnesTab() {
 
       {/* Template editor */}
       {selectedTemplateId && template && (
-        <Card>
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="size-4 text-[#0A3855]" />
-              Éditer le template : {template.title}
-              <span className="text-xs font-normal text-gray-400 ml-2">
-                Variables : {"{{nom}} {{code}} {{utm}} {{leads}} {{abonnes}} {{link}}"}
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-4">
-            <div className="space-y-1.5">
-              <Label>Objet de l'email</Label>
-              <Input
-                value={editSubject}
-                onChange={(e) => { setEditSubject(e.target.value); setSaved(false); }}
-                placeholder="Objet du mail..."
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Contenu HTML</Label>
-              <textarea
-                value={editBody}
-                onChange={(e) => { setEditBody(e.target.value); setSaved(false); }}
-                rows={12}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0A3855]/20 focus:border-[#0A3855]"
-                placeholder="Contenu HTML du template..."
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={handleSaveTemplate}
-                disabled={updateTemplate.isPending || saved}
-                className={saved ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
-              >
-                {updateTemplate.isPending ? (
-                  <><Loader2 className="size-4 mr-1.5 animate-spin" /> Sauvegarde...</>
-                ) : saved ? (
-                  <><Check className="size-4 mr-1.5" /> Sauvegardé</>
-                ) : (
-                  <><Save className="size-4 mr-1.5" /> Sauvegarder le template</>
-                )}
-              </Button>
-              {editSubject !== template.subject || editBody !== template.body ? (
-                <span className="text-xs text-amber-600 font-medium">Modifications non sauvegardées</span>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
+        <TemplateEditor
+          template={template}
+          editSubject={editSubject}
+          setEditSubject={(v) => { setEditSubject(v); setSaved(false); }}
+          editBody={editBody}
+          setEditBody={(v) => { setEditBody(v); setSaved(false); }}
+          previewVars={previewVars}
+          previewPartnerName={previewPartner?.nom}
+          saved={saved}
+          saving={updateTemplate.isPending}
+          onSave={handleSaveTemplate}
+        />
       )}
 
       {/* Preview & Send */}
@@ -732,6 +737,261 @@ function CampaignHistory() {
             })}
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
+// TemplateEditor — éditeur enrichi avec toolbar d'insertion de variables
+// + détection live des variables utilisées (badges valides/invalides).
+//
+// Approche : on garde le textarea HTML brut (Coline peut toujours retoucher),
+// mais on rajoute :
+//   1. Une toolbar "Insérer" : boutons cliquables → insère la balise {{xxx}}
+//      à la position du curseur (focus restauré derrière).
+//   2. Une carte "Variables détectées" sous le textarea qui affiche en pills
+//      colorés les variables utilisées, avec leur valeur d'aperçu pour le
+//      premier partenaire de la sélection. Pill rouge si la balise est
+//      incorrecte (typo type {{Nom}} ou {{xyz}}).
+// ============================================================================
+function TemplateEditor({
+  template,
+  editSubject,
+  setEditSubject,
+  editBody,
+  setEditBody,
+  previewVars,
+  previewPartnerName,
+  saved,
+  saving,
+  onSave,
+}: {
+  template: EmailTemplate;
+  editSubject: string;
+  setEditSubject: (v: string) => void;
+  editBody: string;
+  setEditBody: (v: string) => void;
+  previewVars: Record<string, string>;
+  previewPartnerName?: string;
+  saved: boolean;
+  saving: boolean;
+  onSave: () => void;
+}) {
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  // Le dernier champ focusé reçoit l'insertion via la toolbar
+  const [activeField, setActiveField] = useState<"subject" | "body">("body");
+
+  const insertVar = (key: VarKey) => {
+    const placeholder = `{{${key}}}`;
+    if (activeField === "subject") {
+      const el = subjectRef.current;
+      if (!el) {
+        setEditSubject(editSubject + placeholder);
+        return;
+      }
+      const start = el.selectionStart ?? editSubject.length;
+      const end = el.selectionEnd ?? editSubject.length;
+      const next = editSubject.slice(0, start) + placeholder + editSubject.slice(end);
+      setEditSubject(next);
+      // Replace caret position
+      requestAnimationFrame(() => {
+        el.focus();
+        const pos = start + placeholder.length;
+        el.setSelectionRange(pos, pos);
+      });
+    } else {
+      const el = bodyRef.current;
+      if (!el) {
+        setEditBody(editBody + placeholder);
+        return;
+      }
+      const start = el.selectionStart ?? editBody.length;
+      const end = el.selectionEnd ?? editBody.length;
+      const next = editBody.slice(0, start) + placeholder + editBody.slice(end);
+      setEditBody(next);
+      requestAnimationFrame(() => {
+        el.focus();
+        const pos = start + placeholder.length;
+        el.setSelectionRange(pos, pos);
+      });
+    }
+  };
+
+  // Variables détectées dans le texte courant (sujet + corps)
+  const detectedSubject = useMemo(() => extractUsedVars(editSubject), [editSubject]);
+  const detectedBody = useMemo(() => extractUsedVars(editBody), [editBody]);
+  const allDetected = useMemo(() => {
+    const map = new Map<string, { valid: boolean; in: Array<"subject" | "body"> }>();
+    for (const d of detectedSubject) {
+      const cur = map.get(d.key) || { valid: d.valid, in: [] };
+      cur.in.push("subject");
+      map.set(d.key, cur);
+    }
+    for (const d of detectedBody) {
+      const cur = map.get(d.key) || { valid: d.valid, in: [] };
+      if (!cur.in.includes("body")) cur.in.push("body");
+      map.set(d.key, cur);
+    }
+    return Array.from(map.entries()).map(([key, info]) => ({
+      key,
+      valid: info.valid,
+      inSubject: info.in.includes("subject"),
+      inBody: info.in.includes("body"),
+    }));
+  }, [detectedSubject, detectedBody]);
+
+  const dirty = editSubject !== template.subject || editBody !== template.body;
+  const invalidVars = allDetected.filter((d) => !d.valid);
+
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="size-4 text-[#0A3855]" />
+          Éditer le template : {template.title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-4 space-y-4">
+
+        {/* TOOLBAR D'INSERTION ─────────────────────────────────────────── */}
+        <div className="bg-[#E5EDF1]/40 border border-[#0A3855]/10 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] uppercase tracking-wider text-[#0A3855]/70 font-semibold flex items-center gap-1.5">
+              <Plus className="size-3" />
+              Insérer une variable
+            </p>
+            <p className="text-[10px] text-gray-500 italic">
+              Clique dans l&apos;objet ou le corps avant, puis sur un bouton — la variable se met au bon endroit.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {AVAILABLE_VARS.map((v) => {
+              const Icon = v.icon;
+              return (
+                <button
+                  key={v.key}
+                  type="button"
+                  onClick={() => insertVar(v.key)}
+                  title={`${v.description} — sera remplacé par : ${v.exampleHint}`}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-white border border-[#0A3855]/20 text-[#0A3855] hover:bg-[#0A3855] hover:text-white hover:border-[#0A3855] transition-colors"
+                >
+                  <Icon className="size-3" />
+                  {v.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* OBJET ──────────────────────────────────────────────────────── */}
+        <div className="space-y-1.5">
+          <Label>Objet de l&apos;email</Label>
+          <Input
+            ref={subjectRef}
+            value={editSubject}
+            onChange={(e) => setEditSubject(e.target.value)}
+            onFocus={() => setActiveField("subject")}
+            placeholder="Objet du mail…"
+          />
+        </div>
+
+        {/* CORPS ──────────────────────────────────────────────────────── */}
+        <div className="space-y-1.5">
+          <Label>Contenu du mail (HTML)</Label>
+          <textarea
+            ref={bodyRef}
+            value={editBody}
+            onChange={(e) => setEditBody(e.target.value)}
+            onFocus={() => setActiveField("body")}
+            rows={12}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0A3855]/20 focus:border-[#0A3855]"
+            placeholder="Contenu HTML du template…"
+          />
+        </div>
+
+        {/* VARIABLES DÉTECTÉES (surlignage live) ──────────────────────── */}
+        <div className="rounded-lg border border-gray-100 bg-white p-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+              Variables détectées dans le mail
+            </p>
+            {allDetected.length === 0 && (
+              <span className="text-[10px] text-gray-400 italic">Aucune variable utilisée</span>
+            )}
+          </div>
+          {allDetected.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {allDetected.map((d) => {
+                const def = AVAILABLE_VARS.find((v) => v.key === d.key);
+                const exampleValue = previewVars[d.key];
+                if (d.valid && def) {
+                  const Icon = def.icon;
+                  return (
+                    <span
+                      key={d.key}
+                      title={`Sera remplacé par : ${exampleValue || def.exampleHint}${previewPartnerName ? ` (pour ${previewPartnerName})` : ""}`}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    >
+                      <Icon className="size-2.5" />
+                      {def.label}
+                      <span className="text-emerald-400">·</span>
+                      <span className="text-emerald-600 font-mono truncate max-w-[180px]">
+                        {exampleValue || def.exampleHint}
+                      </span>
+                    </span>
+                  );
+                }
+                // Invalide : typo
+                return (
+                  <span
+                    key={d.key}
+                    title={`Variable inconnue. Vérifie l'orthographe (sensible à la casse).`}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-rose-50 text-rose-700 border border-rose-200"
+                  >
+                    <AlertTriangle className="size-2.5" />
+                    {`{{${d.key}}}`}
+                    <span className="text-rose-400">·</span>
+                    <span className="text-rose-500 italic">non reconnue</span>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {invalidVars.length > 0 && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertTriangle className="size-4" />
+              <AlertDescription className="text-xs">
+                {invalidVars.length} variable{invalidVars.length > 1 ? "s" : ""} non reconnue
+                {invalidVars.length > 1 ? "s" : ""} — elle{invalidVars.length > 1 ? "s" : ""}
+                {invalidVars.length > 1 ? " resteront" : " restera"} affichée
+                {invalidVars.length > 1 ? "s" : ""} telles quelles dans le mail.
+                Utilise les boutons « Insérer » au-dessus plutôt que de taper à la main.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        {/* ACTIONS ────────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={onSave}
+            disabled={saving || saved}
+            className={saved ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
+          >
+            {saving ? (
+              <><Loader2 className="size-4 mr-1.5 animate-spin" /> Sauvegarde…</>
+            ) : saved ? (
+              <><Check className="size-4 mr-1.5" /> Sauvegardé</>
+            ) : (
+              <><Save className="size-4 mr-1.5" /> Sauvegarder le template</>
+            )}
+          </Button>
+          {dirty && (
+            <span className="text-xs text-amber-600 font-medium">Modifications non sauvegardées</span>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

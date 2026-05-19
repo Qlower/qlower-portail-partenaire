@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "Qlower <noreply@qlower.com>",
+        from: "Coline Sinquin <coline@qlower.com>",
         to: [partner.email],
         subject: "Votre espace partenaire Qlower",
         html: `

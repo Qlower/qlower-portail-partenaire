@@ -68,14 +68,14 @@ export async function GET(request: NextRequest) {
           <strong>BIC</strong> &nbsp;&nbsp;&nbsp;QNTOFRP1XXX
         </p>
       </div>
-      <p style="font-size: 12px; color: #666;">Pour toute question : partenaires@qlower.com</p>
+      <p style="font-size: 12px; color: #666;">Pour toute question : coline@qlower.com</p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
       <p style="font-size: 11px; color: #999;">Qlower / ComptAppart SAS — Programme partenaire</p>
     </div>
   `;
 
   return NextResponse.json({
-    from: "Qlower <partenaires@qlower.com>",
+    from: "Coline Sinquin <coline@qlower.com>",
     to: partner.email,
     subject,
     html,

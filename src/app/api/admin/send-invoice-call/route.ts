@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "Qlower <partenaires@qlower.com>",
+          from: "Coline Sinquin <coline@qlower.com>",
           to: [p.email],
           subject: `Appel à facturation ${year} — ${amount.toLocaleString("fr-FR")}€ ${p.commission_ht ? "HT" : "TTC"} de commission`,
           html: `
