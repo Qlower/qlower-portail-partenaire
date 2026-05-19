@@ -213,17 +213,19 @@ export async function GET(request: NextRequest) {
 
   // 3) Contacts HubSpot (1 seul fetch, paginé)
   const allContacts = await fetchAllPartnerContacts();
+  // Index case-insensitive (HubSpot enum peut avoir un casing différent de partners.utm)
   const byUtm = new Map<string, HSContact[]>();
   for (const c of allContacts) {
     const utm = c.properties.partenaire__lead_ || c.properties.utm_source;
     if (!utm) continue;
-    if (!byUtm.has(utm)) byUtm.set(utm, []);
-    byUtm.get(utm)!.push(c);
+    const key = utm.toLowerCase();
+    if (!byUtm.has(key)) byUtm.set(key, []);
+    byUtm.get(key)!.push(c);
   }
 
   // 4) Compute per-partner status pour year sélectionnée
   const rows: BillingRow[] = partners.map((p) => {
-    const partnerContacts = byUtm.get(p.utm) || [];
+    const partnerContacts = byUtm.get((p.utm || "").toLowerCase()) || [];
     const contractYear = p.contract_signed_at
       ? new Date(p.contract_signed_at).getFullYear()
       : null;

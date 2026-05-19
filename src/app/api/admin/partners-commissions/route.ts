@@ -162,17 +162,20 @@ export async function GET(request: NextRequest) {
 
   const allContacts = await fetchAllPartnerContacts();
 
-  // Index contacts by UTM (partenaire__lead_)
+  // Index contacts by UTM (partenaire__lead_) — case-insensitive
+  // Cas réel : HubSpot enum a "CocoonR" alors que partners.utm = "Cocoonr".
+  // On normalise les deux côtés en lowercase pour éviter les zéros silencieux.
   const byUtm = new Map<string, HSContact[]>();
   for (const c of allContacts) {
     const utm = c.properties.partenaire__lead_ || c.properties.utm_source;
     if (!utm) continue;
-    if (!byUtm.has(utm)) byUtm.set(utm, []);
-    byUtm.get(utm)!.push(c);
+    const key = utm.toLowerCase();
+    if (!byUtm.has(key)) byUtm.set(key, []);
+    byUtm.get(key)!.push(c);
   }
 
   const results = partners.map((p) => {
-    const partnerContacts = byUtm.get(p.utm) || [];
+    const partnerContacts = byUtm.get((p.utm || "").toLowerCase()) || [];
     const contractYear = p.contract_signed_at
       ? new Date(p.contract_signed_at).getFullYear()
       : null;

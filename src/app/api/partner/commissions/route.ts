@@ -61,14 +61,38 @@ export async function GET(request: NextRequest) {
   }
 
   // Fetch all HubSpot contacts for this partner
+  // ⚠️ HubSpot's `EQ` est case-sensitive. Or l'enum `partenaire__lead_` peut
+  // contenir un casing différent de `partners.utm` (ex. réel : enum "CocoonR"
+  // vs partners.utm "Cocoonr"). On résout en récupérant d'abord toutes les
+  // variantes de casing présentes dans l'enum qui matchent partner.utm
+  // (case-insensitive), puis on requête avec OR sur chacune via filterGroups.
+  let utmVariants: string[] = [partner.utm];
+  try {
+    const propRes = await fetch(`${HS_BASE}/crm/v3/properties/contacts/partenaire__lead_`, {
+      headers: { Authorization: `Bearer ${HS_TOKEN}` },
+    });
+    if (propRes.ok) {
+      const propData = (await propRes.json()) as { options?: Array<{ value: string }> };
+      const targetLower = partner.utm.toLowerCase();
+      const matches = (propData.options || [])
+        .map((o) => o.value)
+        .filter((v) => v && v.toLowerCase() === targetLower);
+      if (matches.length > 0) utmVariants = matches;
+    }
+  } catch {
+    // fallback : on garde la valeur brute partner.utm
+  }
+
   const contacts: Array<{ id: string; properties: Record<string, string | null> }> = [];
   let after: string | undefined;
 
   do {
+    // filterGroups au pluriel = OR. On match toutes les variantes de casing
+    // de l'enum HubSpot qui correspondent à partner.utm (case-insensitive).
     const body: Record<string, unknown> = {
-      filterGroups: [
-        { filters: [{ propertyName: "partenaire__lead_", operator: "EQ", value: partner.utm }] },
-      ],
+      filterGroups: utmVariants.map((v) => ({
+        filters: [{ propertyName: "partenaire__lead_", operator: "EQ", value: v }],
+      })),
       properties: PROPERTIES,
       limit: 100,
       ...(after ? { after } : {}),
