@@ -258,16 +258,6 @@ export function Dashboard({
         />
       </div>
 
-      {/* Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-bold text-gray-900">Évolution mensuelle</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <BarChart data={chartData} />
-        </CardContent>
-      </Card>
-
       {/* Leads Table */}
       <Card>
         <CardContent className="pt-2">
@@ -447,6 +437,16 @@ export function Dashboard({
               </tbody>
             </table>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Chart (en bas — souvent vide tant que l'historique mensuel n'est pas alimenté) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-bold text-gray-900">Évolution mensuelle</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <BarChart data={chartData} />
         </CardContent>
       </Card>
     </div>
