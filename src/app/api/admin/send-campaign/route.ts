@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://partenaire.qlower.com";
+  const perRecipient: Array<{ partner_id: string; email: string; ok: boolean; error?: string }> = [];
   const results = await Promise.allSettled(
     (partners ?? [])
       .filter((p) => p.email)
@@ -131,13 +132,32 @@ export async function POST(request: NextRequest) {
         const subject = replaceVars(template.subject, vars);
         const html = layout(replaceVars(template.body, vars));
 
-        await resend.emails.send({ from: FROM, to: p.email!, subject, html });
-        return p.id;
+        try {
+          const resendRes = await resend.emails.send({ from: FROM, to: p.email!, subject, html });
+          // Resend SDK retourne { data, error } et NE THROW PAS sur erreur API.
+          // On doit lire .error explicitement pour ne pas considérer un faux succès.
+          const r = resendRes as unknown as { data?: { id?: string }; error?: { message?: string; name?: string } };
+          if (r.error) {
+            const errMsg = r.error.message || r.error.name || "Resend a renvoyé une erreur sans détail";
+            perRecipient.push({ partner_id: p.id, email: p.email!, ok: false, error: errMsg });
+            throw new Error(errMsg);
+          }
+          perRecipient.push({ partner_id: p.id, email: p.email!, ok: true });
+          return p.id;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          // Si on n'a pas encore pushé (cas réseau / autre), on push maintenant
+          if (!perRecipient.some((x) => x.partner_id === p.id)) {
+            perRecipient.push({ partner_id: p.id, email: p.email!, ok: false, error: msg });
+          }
+          throw e;
+        }
       })
   );
 
   const sent = results.filter((r) => r.status === "fulfilled").length;
   const failed = results.filter((r) => r.status === "rejected").length;
+  const failures = perRecipient.filter((p) => !p.ok);
 
   // Log the campaign send for the history view
   const recipientIds = (partners ?? []).filter((p) => p.email).map((p) => p.id);
@@ -151,5 +171,20 @@ export async function POST(request: NextRequest) {
     failed_count: failed,
   });
 
-  return NextResponse.json({ sent, failed });
+  // Si TOUS les envois ont échoué → on remonte un 500 explicite pour que la
+  // modal affiche un vrai message d'erreur (au lieu du faux "envoyé à X partenaires").
+  if (failed > 0 && sent === 0) {
+    console.error("[send-campaign] All sends failed", failures);
+    return NextResponse.json(
+      {
+        error: `Aucun email n'a pu être envoyé. Premier message d'erreur Resend : ${failures[0]?.error || "inconnu"}`,
+        failures,
+        sent,
+        failed,
+      },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ sent, failed, failures });
 }

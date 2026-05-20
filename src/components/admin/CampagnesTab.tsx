@@ -217,17 +217,35 @@ export default function CampagnesTab() {
           expectedRecipientCount: selected.filter((p) => p.email).length,
         }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Erreur serveur");
+        // Backend remonte maintenant un message précis (typiquement l'erreur Resend
+        // du premier destinataire qui a échoué). On l'affiche tel quel.
+        throw new Error(data.error || `Erreur serveur (HTTP ${res.status})`);
+      }
+      // Si certains ont échoué mais pas tous, on alerte sans bloquer
+      type Failure = { email: string; error?: string };
+      const failures = (data.failures as Failure[] | undefined) || [];
+      const failed = (data.failed as number | undefined) || 0;
+      const sent = (data.sent as number | undefined) || 0;
+      if (failed > 0) {
+        const firstErrs = failures
+          .filter((f) => !!f.error)
+          .slice(0, 3)
+          .map((f) => `• ${f.email} — ${f.error}`)
+          .join("\n");
+        alert(
+          `${sent} email(s) envoyé(s), ${failed} échec(s).\n\nPremières erreurs :\n${firstErrs || "(détail indisponible)"}`,
+        );
       }
       const ids = new Set(selected.map((p) => p.id));
       setSentPartners(ids);
       setAllSent(true);
       // Refresh history list
       queryClient.invalidateQueries({ queryKey: ["campaign-history"] });
-    } catch {
-      alert("Erreur lors de l'envoi des emails. Vérifiez la configuration Resend.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur inconnue";
+      alert(`Erreur lors de l'envoi des emails :\n\n${msg}`);
     } finally {
       setSending(false);
     }
