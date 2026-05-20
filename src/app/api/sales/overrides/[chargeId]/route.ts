@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { verifySales } from "@/lib/sales-auth";
-import { notifyOverrideOnFlaggedRow } from "@/lib/sales-notifications";
+import { notifyAttributionChange } from "@/lib/sales-notifications";
 
 interface OverrideBody {
   commercial_id?: string | null;     // commercials.id; null/empty = clear override
@@ -94,15 +94,21 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ charge
     comment: body.comment || null,
   });
 
-  // Si la ligne ÉTAIT flaggée, on notifie le flagger que le manager a tranché.
-  if (wasFlagged) {
-    await notifyOverrideOnFlaggedRow({
+  // Notif systématique : on prévient l'ancien propriétaire ET le nouveau
+  // que leur attribution a changé, plus le flagger éventuel si la ligne
+  // était contestée. Skip si les emails se confondent avec celui de l'acteur.
+  // Ne se déclenche que s'il y a eu un vrai changement (from != to).
+  if (fromId !== toId) {
+    await notifyAttributionChange({
       chargeId,
       fromCommercialName: fromName,
+      fromCommercialId: fromId,
       toCommercialName: toName,
+      toCommercialId: toId,
       byEmail: auth.email,
       byName: auth.name || auth.email,
       comment: body.comment || null,
+      wasFlagged,
     });
   }
 
