@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select-custom";
 import BlockEditor, { type BlockEditorHandle } from "./BlockEditor";
+import TemplateVersionsPanel from "./TemplateVersionsPanel";
 import {
   Loader2,
   Target,
@@ -34,6 +35,7 @@ import {
   TrendingUp,
   Lock,
   Plus,
+  Camera,
 } from "lucide-react";
 
 type Audience = "tous" | "affiliation" | "marque_blanche";
@@ -170,6 +172,7 @@ export default function CampagnesTab() {
     setSentPartners(new Set());
   };
 
+  // Sauvegarde standard (versionLabel=null → auto-save dans l'historique)
   const handleSaveTemplate = async () => {
     if (!selectedTemplateId) return;
     try {
@@ -177,6 +180,34 @@ export default function CampagnesTab() {
         id: selectedTemplateId,
         subject: editSubject,
         body: editBody,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      alert("Erreur lors de la sauvegarde du template.");
+    }
+  };
+
+  // Sauvegarde avec un nom : prompt → archive l'état actuel sous ce nom AVANT
+  // d'écraser avec le nouveau contenu. Permet à Coline de marquer un point
+  // de repère facile à retrouver dans l'historique.
+  const handleSaveTemplateWithName = async () => {
+    if (!selectedTemplateId) return;
+    const label = window.prompt(
+      "Nom de cette version (pour la retrouver facilement plus tard) :\n\nEx: \"Avant refonte wording\", \"Validé par Alex\"",
+      "",
+    );
+    if (label === null) return; // annulé
+    if (!label.trim()) {
+      alert("Le nom ne peut pas être vide.");
+      return;
+    }
+    try {
+      await updateTemplate.mutateAsync({
+        id: selectedTemplateId,
+        subject: editSubject,
+        body: editBody,
+        versionLabel: label.trim(),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -395,6 +426,7 @@ export default function CampagnesTab() {
           saved={saved}
           saving={updateTemplate.isPending}
           onSave={handleSaveTemplate}
+          onSaveWithName={handleSaveTemplateWithName}
         />
       )}
 
@@ -785,6 +817,7 @@ function TemplateEditor({
   saved,
   saving,
   onSave,
+  onSaveWithName,
 }: {
   template: EmailTemplate;
   editSubject: string;
@@ -796,6 +829,7 @@ function TemplateEditor({
   saved: boolean;
   saving: boolean;
   onSave: () => void;
+  onSaveWithName: () => void;
 }) {
   const subjectRef = useRef<HTMLInputElement>(null);
   const blockEditorRef = useRef<BlockEditorHandle>(null);
@@ -989,7 +1023,7 @@ function TemplateEditor({
         </div>
 
         {/* ACTIONS ────────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             onClick={onSave}
             disabled={saving || saved}
@@ -1000,13 +1034,29 @@ function TemplateEditor({
             ) : saved ? (
               <><Check className="size-4 mr-1.5" /> Sauvegardé</>
             ) : (
-              <><Save className="size-4 mr-1.5" /> Sauvegarder le template</>
+              <><Save className="size-4 mr-1.5" /> Sauvegarder</>
             )}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onSaveWithName}
+            disabled={saving}
+            title="Sauvegarder en donnant un nom à cette version (utile pour retrouver facilement plus tard)"
+          >
+            <Camera className="size-4 mr-1.5" />
+            Sauver avec un nom
           </Button>
           {dirty && (
             <span className="text-xs text-amber-600 font-medium">Modifications non sauvegardées</span>
           )}
         </div>
+
+        {/* HISTORIQUE DES VERSIONS ────────────────────────────────────── */}
+        <TemplateVersionsPanel
+          templateId={template.id}
+          currentSubject={editSubject}
+          currentBody={editBody}
+        />
       </CardContent>
     </Card>
   );

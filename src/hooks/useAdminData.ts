@@ -111,11 +111,79 @@ export function useEmailTemplates() {
 export function useUpdateEmailTemplate() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (update: { id: string; subject?: string; body?: string }) => {
+    mutationFn: async (update: {
+      id: string;
+      subject?: string;
+      body?: string;
+      versionLabel?: string | null;
+    }) => {
       const { data } = await api.patch("/admin/email-templates", update);
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "email-templates"] }),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["admin", "email-templates"] });
+      // Refresh versions list après chaque save
+      qc.invalidateQueries({ queryKey: ["admin", "email-template-versions", variables.id] });
+    },
+  });
+}
+
+// ─── Versions d'un template (historique pour revenir en arrière) ────────────
+export interface EmailTemplateVersion {
+  id: string;
+  label: string | null;
+  saved_at: string;
+  saved_by_email: string | null;
+  subject: string;
+  body: string;
+}
+
+export function useEmailTemplateVersions(templateId: string | null) {
+  return useQuery<EmailTemplateVersion[]>({
+    queryKey: ["admin", "email-template-versions", templateId],
+    queryFn: async () => {
+      if (!templateId) return [];
+      const { data } = await api.get(`/admin/email-templates/${templateId}/versions`);
+      return data as EmailTemplateVersion[];
+    },
+    enabled: !!templateId,
+  });
+}
+
+export function useRestoreEmailTemplateVersion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { templateId: string; versionId: string }) => {
+      const { data } = await api.post(
+        `/admin/email-templates/${input.templateId}/restore`,
+        { version_id: input.versionId },
+      );
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["admin", "email-templates"] });
+      qc.invalidateQueries({ queryKey: ["admin", "email-template-versions", variables.templateId] });
+    },
+  });
+}
+
+export function useStarEmailTemplateVersion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      templateId: string;
+      versionId: string;
+      label: string | null;
+    }) => {
+      const { data } = await api.post(
+        `/admin/email-templates/${input.templateId}/versions`,
+        { version_id: input.versionId, label: input.label },
+      );
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["admin", "email-template-versions", variables.templateId] });
+    },
   });
 }
 
