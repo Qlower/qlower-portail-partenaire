@@ -282,7 +282,10 @@ function Section({
   color: "blue" | "amber" | "green" | "orange";
   children: React.ReactNode;
 }) {
-  const colorMap = {
+  // Le bandeau-icône reste coloré pour identifier la section au coup d'œil,
+  // mais le LABEL devient un vrai H2 navy gros — comme le titre "Dispositifs
+  // fiscaux 2026" plus bas. Plus lisible et sémantiquement correct.
+  const iconBg = {
     blue: "bg-blue-50 text-blue-700",
     amber: "bg-amber-50 text-amber-700",
     green: "bg-green-50 text-green-700",
@@ -290,9 +293,11 @@ function Section({
   };
   return (
     <div>
-      <div className={`inline-flex items-center gap-1.5 rounded-md ${colorMap[color]} px-2 py-1 text-[11px] font-semibold mb-2`}>
-        {icon}
-        <span>{label}</span>
+      <div className="flex items-center gap-2 mb-3">
+        <div className={`inline-flex items-center justify-center rounded-md ${iconBg[color]} p-1.5`}>
+          {icon}
+        </div>
+        <h2 className="text-base font-semibold text-[#0A3855]">{label}</h2>
       </div>
       {children}
     </div>
