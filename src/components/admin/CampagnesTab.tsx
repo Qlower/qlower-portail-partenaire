@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select-custom";
+import BlockEditor, { type BlockEditorHandle } from "./BlockEditor";
 import {
   Loader2,
   Target,
@@ -797,8 +798,10 @@ function TemplateEditor({
   onSave: () => void;
 }) {
   const subjectRef = useRef<HTMLInputElement>(null);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
-  // Le dernier champ focusé reçoit l'insertion via la toolbar
+  const blockEditorRef = useRef<BlockEditorHandle>(null);
+  // Le dernier champ focusé reçoit l'insertion via la toolbar :
+  //   - "subject" → l'input objet
+  //   - "body"    → un bloc dans l'éditeur (via API impérative)
   const [activeField, setActiveField] = useState<"subject" | "body">("body");
 
   const insertVar = (key: VarKey) => {
@@ -813,27 +816,20 @@ function TemplateEditor({
       const end = el.selectionEnd ?? editSubject.length;
       const next = editSubject.slice(0, start) + placeholder + editSubject.slice(end);
       setEditSubject(next);
-      // Replace caret position
       requestAnimationFrame(() => {
         el.focus();
         const pos = start + placeholder.length;
         el.setSelectionRange(pos, pos);
       });
     } else {
-      const el = bodyRef.current;
-      if (!el) {
-        setEditBody(editBody + placeholder);
-        return;
+      // Délègue à l'éditeur de blocs (insertion dans le dernier champ focusé)
+      const ok = blockEditorRef.current?.insertVariableAtCursor(placeholder);
+      if (!ok) {
+        // Si aucun bloc n'est focusé, on append en fin de corps comme fallback
+        // (l'utilisateur verra le placeholder apparaître quelque part — il peut
+        // le couper-coller à l'endroit voulu, ou cliquer dans un bloc avant)
+        setEditBody(editBody + (editBody.endsWith("\n") ? "" : "\n") + placeholder);
       }
-      const start = el.selectionStart ?? editBody.length;
-      const end = el.selectionEnd ?? editBody.length;
-      const next = editBody.slice(0, start) + placeholder + editBody.slice(end);
-      setEditBody(next);
-      requestAnimationFrame(() => {
-        el.focus();
-        const pos = start + placeholder.length;
-        el.setSelectionRange(pos, pos);
-      });
     }
   };
 
@@ -916,16 +912,17 @@ function TemplateEditor({
         </div>
 
         {/* CORPS ──────────────────────────────────────────────────────── */}
-        <div className="space-y-1.5">
-          <Label>Contenu du mail (HTML)</Label>
-          <textarea
-            ref={bodyRef}
-            value={editBody}
-            onChange={(e) => setEditBody(e.target.value)}
-            onFocus={() => setActiveField("body")}
-            rows={12}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0A3855]/20 focus:border-[#0A3855]"
-            placeholder="Contenu HTML du template…"
+        {/* Éditeur par blocs : Coline ne voit plus jamais de HTML. Elle */}
+        {/* empile des blocs (titre, paragraphe, liste, bouton…) et tape  */}
+        {/* du texte. Le HTML est généré au moment de la sauvegarde.      */}
+        <div
+          onFocus={() => setActiveField("body")}
+          onClick={() => setActiveField("body")}
+        >
+          <BlockEditor
+            ref={blockEditorRef}
+            html={editBody}
+            onChange={setEditBody}
           />
         </div>
 
