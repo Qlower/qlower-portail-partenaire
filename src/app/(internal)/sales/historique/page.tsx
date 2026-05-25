@@ -1,5 +1,10 @@
 import { createServiceClient } from "@/lib/supabase-server";
 
+// Toujours fresh : l'historique est un flux temps réel et l'utilisateur
+// s'attend à voir ses derniers changements immédiatement. Sans ça, Next.js 16
+// cache la page → on voit des données périmées.
+export const dynamic = "force-dynamic";
+
 const MONTHS_FR: Record<string, string> = {
   "01": "Janvier", "02": "Février", "03": "Mars", "04": "Avril",
   "05": "Mai", "06": "Juin", "07": "Juillet", "08": "Août",

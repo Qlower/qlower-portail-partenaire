@@ -13,6 +13,10 @@ import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
 import { resolveSalesView } from "@/lib/sales-view";
 
+// Données live : vues "mes ventes" + historique doivent refléter l'état temps
+// réel. Sans force-dynamic, Next.js 16 sert un rendu caché.
+export const dynamic = "force-dynamic";
+
 async function getCurrentUser() {
   const cookieStore = await cookies();
   const supabase = createServerClient(

@@ -16,6 +16,11 @@ import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
 import { resolveSalesView } from "@/lib/sales-view";
 
+// Données live : l'historique des modifications et les overrides doivent
+// refléter l'état temps réel. Sans force-dynamic, Next.js 16 sert un rendu
+// caché et les changements récents n'apparaissent pas.
+export const dynamic = "force-dynamic";
+
 interface DbRow {
   charge_id: string;
   email: string;
