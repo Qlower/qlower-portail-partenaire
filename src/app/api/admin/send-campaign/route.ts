@@ -5,6 +5,10 @@ import { layout } from "@/services/emailTemplates";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { generateSetupPasswordLink } from "@/lib/setup-token";
 
+// Throttle à ~4 req/sec pour respecter la limite Resend (5/sec) → on a besoin
+// d'un peu de marge sur 60s. 100 partenaires = ~28s.
+export const maxDuration = 60;
+
 function replaceVars(text: string, vars: Record<string, string>): string {
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
 }
@@ -96,76 +100,102 @@ export async function POST(request: NextRequest) {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://partenaire.qlower.com";
   const perRecipient: Array<{ partner_id: string; email: string; ok: boolean; error?: string }> = [];
-  const results = await Promise.allSettled(
-    partners
-      .filter((p) => p.email)
-      .map(async (p) => {
-        const link = `https://www.qlower.com/qlower-x-partenaire?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}`;
 
-        // Setup-password link 7j (NOT consumed by email scanners) — preferred for new comm
-        let setupLink = `${siteUrl}/login`;
-        try {
-          const generated = await generateSetupPasswordLink(p.email!);
-          if (generated) setupLink = generated;
-        } catch {
-          // fallback déjà sur /login
-        }
+  // ⚠️ Throttle : Resend limite à 5 requêtes/seconde sur la plupart des plans.
+  // On envoie séquentiellement avec 260ms entre chaque (= ~3.8 req/sec, sous
+  // la limite). Pour 100 partenaires : 26s, OK dans les 60s Vercel.
+  // En cas de 429 (rate limit), on retry une fois avec un backoff de 1.5s.
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  const THROTTLE_MS = 260;
+  const eligible = partners.filter((p) => p.email);
 
-        // Magic link 24h (legacy, gardé pour compat)
-        let magicLink = setupLink; // fallback to setup link
-        try {
-          const { data: linkData } = await supabase.auth.admin.generateLink({
-            type: "magiclink",
-            email: p.email!,
-            options: { redirectTo: `${siteUrl}/auth/magic` },
-          });
-          if (linkData?.properties?.action_link) {
-            magicLink = linkData.properties.action_link;
-          }
-        } catch {
-          // fallback déjà sur setupLink
-        }
+  const isRateLimitError = (msg: string): boolean =>
+    /too many requests|rate limit|429/i.test(msg);
 
-        const vars: Record<string, string> = {
-          nom: p.nom,
+  for (let i = 0; i < eligible.length; i++) {
+    const p = eligible[i];
+    if (i > 0) await sleep(THROTTLE_MS);
+
+    const link = `https://www.qlower.com/qlower-x-partenaire?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}`;
+
+    // Setup-password link 7j (NOT consumed by email scanners) — preferred for new comm
+    let setupLink = `${siteUrl}/login`;
+    try {
+      const generated = await generateSetupPasswordLink(p.email!);
+      if (generated) setupLink = generated;
+    } catch {
+      // fallback déjà sur /login
+    }
+
+    // Magic link 24h (legacy, gardé pour compat)
+    let magicLink = setupLink;
+    try {
+      const { data: linkData } = await supabase.auth.admin.generateLink({
+        type: "magiclink",
+        email: p.email!,
+        options: { redirectTo: `${siteUrl}/auth/magic` },
+      });
+      if (linkData?.properties?.action_link) {
+        magicLink = linkData.properties.action_link;
+      }
+    } catch {
+      // fallback déjà sur setupLink
+    }
+
+    const vars: Record<string, string> = {
+      nom: p.nom,
+      email: p.email!,
+      utm: p.utm,
+      code: p.code,
+      leads: String(p.leads ?? 0),
+      abonnes: String(p.abonnes ?? 0),
+      link,
+      setup_link: setupLink,
+      magic_link: magicLink,
+    };
+
+    const subject = replaceVars(template.subject, vars);
+    const html = layout(replaceVars(template.body, vars));
+
+    // Helper qui fait UN essai d'envoi → renvoie {ok, error}
+    const trySend = async () => {
+      const resendRes = await resend.emails.send({ from: FROM, to: p.email!, subject, html });
+      const r = resendRes as unknown as {
+        data?: { id?: string };
+        error?: { message?: string; name?: string };
+      };
+      if (r.error) {
+        return { ok: false, error: r.error.message || r.error.name || "Resend error" };
+      }
+      return { ok: true };
+    };
+
+    try {
+      let attempt = await trySend();
+      // Retry une fois sur rate-limit, avec backoff
+      if (!attempt.ok && isRateLimitError(attempt.error || "")) {
+        console.warn(`[send-campaign] rate-limit on ${p.email}, retry in 1.5s`);
+        await sleep(1500);
+        attempt = await trySend();
+      }
+      if (attempt.ok) {
+        perRecipient.push({ partner_id: p.id, email: p.email!, ok: true });
+      } else {
+        perRecipient.push({
+          partner_id: p.id,
           email: p.email!,
-          utm: p.utm,
-          code: p.code,
-          leads: String(p.leads ?? 0),
-          abonnes: String(p.abonnes ?? 0),
-          link,
-          setup_link: setupLink,
-          magic_link: magicLink,
-        };
+          ok: false,
+          error: attempt.error || "unknown",
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      perRecipient.push({ partner_id: p.id, email: p.email!, ok: false, error: msg });
+    }
+  }
 
-        const subject = replaceVars(template.subject, vars);
-        const html = layout(replaceVars(template.body, vars));
-
-        try {
-          const resendRes = await resend.emails.send({ from: FROM, to: p.email!, subject, html });
-          // Resend SDK retourne { data, error } et NE THROW PAS sur erreur API.
-          // On doit lire .error explicitement pour ne pas considérer un faux succès.
-          const r = resendRes as unknown as { data?: { id?: string }; error?: { message?: string; name?: string } };
-          if (r.error) {
-            const errMsg = r.error.message || r.error.name || "Resend a renvoyé une erreur sans détail";
-            perRecipient.push({ partner_id: p.id, email: p.email!, ok: false, error: errMsg });
-            throw new Error(errMsg);
-          }
-          perRecipient.push({ partner_id: p.id, email: p.email!, ok: true });
-          return p.id;
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          // Si on n'a pas encore pushé (cas réseau / autre), on push maintenant
-          if (!perRecipient.some((x) => x.partner_id === p.id)) {
-            perRecipient.push({ partner_id: p.id, email: p.email!, ok: false, error: msg });
-          }
-          throw e;
-        }
-      })
-  );
-
-  const sent = results.filter((r) => r.status === "fulfilled").length;
-  const failed = results.filter((r) => r.status === "rejected").length;
+  const sent = perRecipient.filter((p) => p.ok).length;
+  const failed = perRecipient.filter((p) => !p.ok).length;
   const failures = perRecipient.filter((p) => !p.ok);
 
   // Log the campaign send for the history view

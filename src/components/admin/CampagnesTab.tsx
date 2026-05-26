@@ -106,6 +106,9 @@ export default function CampagnesTab() {
   const [sentPartners, setSentPartners] = useState<Set<string>>(new Set());
   const [allSent, setAllSent] = useState(false);
   const [sending, setSending] = useState(false);
+  // Liste des partenaires en échec après le dernier envoi → permet de
+  // proposer un "Renvoyer uniquement aux échoués" sans re-spammer les ok.
+  const [lastFailures, setLastFailures] = useState<Array<{ partner_id: string; email: string; error?: string }>>([]);
   // Confirmation modal — pour éviter tout envoi accidentel.
   // L'utilisateur doit cliquer "Préparer l'envoi" → modal s'ouvre →
   // taper le nombre exact de destinataires → "Envoyer maintenant".
@@ -229,8 +232,14 @@ export default function CampagnesTab() {
 
   // Étape 2 : la modal a fait taper le bon nombre + cliquer "Envoyer maintenant".
   // C'est SEULEMENT à ce moment-là que les emails partent.
-  const handleSendAll = async () => {
-    if (!selectedTemplateId || selected.length === 0) return;
+  // Si `partnerIdsOverride` est fourni → on envoie seulement à ces ids (utilisé
+  // par le bouton "Renvoyer aux échoués" pour ne pas re-spammer les ok).
+  const handleSendAll = async (partnerIdsOverride?: string[]) => {
+    if (!selectedTemplateId) return;
+    const targets = partnerIdsOverride
+      ? selected.filter((p) => partnerIdsOverride.includes(p.id))
+      : selected;
+    if (targets.length === 0) return;
     setConfirmOpen(false);
     setSending(true);
     try {
@@ -248,22 +257,23 @@ export default function CampagnesTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           templateKey: selectedTemplateId,
-          partnerIds: selected.map((p) => p.id),
+          partnerIds: targets.map((p) => p.id),
           confirm: true,
-          expectedRecipientCount: selected.filter((p) => p.email).length,
+          expectedRecipientCount: targets.filter((p) => p.email).length,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        // Backend remonte maintenant un message précis (typiquement l'erreur Resend
-        // du premier destinataire qui a échoué). On l'affiche tel quel.
         throw new Error(data.error || `Erreur serveur (HTTP ${res.status})`);
       }
-      // Si certains ont échoué mais pas tous, on alerte sans bloquer
-      type Failure = { email: string; error?: string };
+      type Failure = { partner_id: string; email: string; error?: string };
       const failures = (data.failures as Failure[] | undefined) || [];
       const failed = (data.failed as number | undefined) || 0;
       const sent = (data.sent as number | undefined) || 0;
+
+      // On stocke les échoués pour proposer un "Renvoyer aux échoués"
+      setLastFailures(failures);
+
       if (failed > 0) {
         const firstErrs = failures
           .filter((f) => !!f.error)
@@ -271,13 +281,17 @@ export default function CampagnesTab() {
           .map((f) => `• ${f.email} — ${f.error}`)
           .join("\n");
         alert(
-          `${sent} email(s) envoyé(s), ${failed} échec(s).\n\nPremières erreurs :\n${firstErrs || "(détail indisponible)"}`,
+          `${sent} email(s) envoyé(s), ${failed} échec(s).\n\nPremières erreurs :\n${firstErrs || "(détail indisponible)"}` +
+            (failed > 0
+              ? `\n\n💡 Tu peux retenter l'envoi UNIQUEMENT aux ${failed} échec(s) via le bouton "Renvoyer aux échoués" qui apparaît en bas (les ${sent} déjà envoyés ne recevront pas de doublon).`
+              : ""),
         );
       }
-      const ids = new Set(selected.map((p) => p.id));
-      setSentPartners(ids);
-      setAllSent(true);
-      // Refresh history list
+      // Marque tous les destinataires CIBLÉS comme "envoyé" SAUF les échoués
+      const failedIds = new Set(failures.map((f) => f.partner_id));
+      const succeededIds = new Set(targets.map((p) => p.id).filter((id) => !failedIds.has(id)));
+      setSentPartners((prev) => new Set([...prev, ...succeededIds]));
+      if (failed === 0) setAllSent(true);
       queryClient.invalidateQueries({ queryKey: ["campaign-history"] });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur inconnue";
@@ -285,6 +299,22 @@ export default function CampagnesTab() {
     } finally {
       setSending(false);
     }
+  };
+
+  // Renvoie UNIQUEMENT aux partenaires de la dernière vague qui ont échoué.
+  // Pratique sur rate-limit (Resend 5 req/sec) : on retape sans bloquer ceux
+  // qui ont déjà reçu le mail.
+  const handleResendFailed = async () => {
+    if (lastFailures.length === 0) return;
+    if (
+      !confirm(
+        `Renvoyer le mail UNIQUEMENT aux ${lastFailures.length} échec(s) ?\n\n` +
+          "Les destinataires déjà envoyés ne recevront pas de doublon.",
+      )
+    ) {
+      return;
+    }
+    await handleSendAll(lastFailures.map((f) => f.partner_id));
   };
 
   if (loadingPartners || loadingTemplates) {
@@ -477,6 +507,19 @@ export default function CampagnesTab() {
                     <><Send className="size-4 mr-1.5" /> Préparer l&apos;envoi à {selected.length} partenaire(s)</>
                   )}
                 </Button>
+                {/* Bouton "Renvoyer aux échoués" : visible uniquement après un envoi
+                   où des destinataires ont échoué (typiquement : rate-limit Resend) */}
+                {lastFailures.length > 0 && !sending && (
+                  <Button
+                    variant="outline"
+                    className="border-rose-300 text-rose-700 hover:bg-rose-50"
+                    onClick={handleResendFailed}
+                    title="Re-tente l'envoi uniquement aux échecs — les destinataires déjà OK ne sont pas re-spammés"
+                  >
+                    <Send className="size-4 mr-1.5" />
+                    Renvoyer aux {lastFailures.length} échec{lastFailures.length > 1 ? "s" : ""}
+                  </Button>
+                )}
               </div>
 
               {/* Preview */}
