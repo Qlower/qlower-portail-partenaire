@@ -108,23 +108,17 @@ export default function KitPage() {
 
           <div className="section-title">Télécharger nos logos</div>
           <div className="kit-grid">
-            <a className="card" href="https://drive.google.com/drive/folders/qlower-brand-kit" target="_blank" rel="noreferrer">
+            <a className="card" href="https://drive.google.com/drive/u/0/folders/1OO5amjVgYxdDFmz1IHmE1lA8f1cWwfhX" target="_blank" rel="noreferrer">
               <div className="card-icon blue">◆</div>
-              <h3>Pack logos complet</h3>
-              <p>Tous les formats (PNG, SVG, fond clair / fond foncé)</p>
-              <span className="card-link">Télécharger le pack Drive →</span>
+              <h3>Logos Qlower</h3>
+              <p>Pack principal : PNG, SVG, fond clair / fond foncé</p>
+              <span className="card-link">Ouvrir le Drive →</span>
             </a>
-            <a className="card" href="https://drive.google.com/drive/folders/qlower-brand-kit-png" target="_blank" rel="noreferrer">
-              <div className="card-icon teal">⬡</div>
-              <h3>Logo PNG (haute déf)</h3>
-              <p>Fond transparent — pour vos slides et docs partenaires</p>
-              <span className="card-link">Télécharger les PNG →</span>
-            </a>
-            <a className="card" href="https://drive.google.com/drive/folders/qlower-brand-kit-svg" target="_blank" rel="noreferrer">
+            <a className="card" href="https://drive.google.com/drive/u/0/folders/1PfvimSTeSyzF7MDbQ1P00ALT0jXe8mTQ" target="_blank" rel="noreferrer">
               <div className="card-icon purple">◇</div>
-              <h3>Logo SVG (vectoriel)</h3>
-              <p>Pour print, signalétique, supports grand format</p>
-              <span className="card-link">Télécharger les SVG →</span>
+              <h3>Variantes &amp; déclinaisons</h3>
+              <p>Logos monochromes, couleurs alternatives, formats spécifiques</p>
+              <span className="card-link">Ouvrir le Drive →</span>
             </a>
           </div>
 
