@@ -106,6 +106,28 @@ export default function KitPage() {
             </a>
           </div>
 
+          <div className="section-title">Télécharger nos logos</div>
+          <div className="kit-grid">
+            <a className="card" href="https://drive.google.com/drive/folders/qlower-brand-kit" target="_blank" rel="noreferrer">
+              <div className="card-icon blue">◆</div>
+              <h3>Pack logos complet</h3>
+              <p>Tous les formats (PNG, SVG, fond clair / fond foncé)</p>
+              <span className="card-link">Télécharger le pack Drive →</span>
+            </a>
+            <a className="card" href="https://drive.google.com/drive/folders/qlower-brand-kit-png" target="_blank" rel="noreferrer">
+              <div className="card-icon teal">⬡</div>
+              <h3>Logo PNG (haute déf)</h3>
+              <p>Fond transparent — pour vos slides et docs partenaires</p>
+              <span className="card-link">Télécharger les PNG →</span>
+            </a>
+            <a className="card" href="https://drive.google.com/drive/folders/qlower-brand-kit-svg" target="_blank" rel="noreferrer">
+              <div className="card-icon purple">◇</div>
+              <h3>Logo SVG (vectoriel)</h3>
+              <p>Pour print, signalétique, supports grand format</p>
+              <span className="card-link">Télécharger les SVG →</span>
+            </a>
+          </div>
+
           <div className="section-title">Templates de communication</div>
           <div className="kit-grid">
             <a className="card" href="/dashboard/emails">
