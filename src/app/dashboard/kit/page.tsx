@@ -109,15 +109,15 @@ export default function KitPage() {
           <div className="section-title">Télécharger nos logos</div>
           <div className="kit-grid">
             <a className="card" href="https://drive.google.com/drive/u/0/folders/1OO5amjVgYxdDFmz1IHmE1lA8f1cWwfhX" target="_blank" rel="noreferrer">
-              <div className="card-icon blue">◆</div>
-              <h3>Logos Qlower</h3>
-              <p>Pack principal : PNG, SVG, fond clair / fond foncé</p>
+              <div className="card-icon blue">▤</div>
+              <h3>Logos verticaux</h3>
+              <p>3 variantes — pour applis, signatures mail, formats portrait</p>
               <span className="card-link">Ouvrir le Drive →</span>
             </a>
             <a className="card" href="https://drive.google.com/drive/u/0/folders/1PfvimSTeSyzF7MDbQ1P00ALT0jXe8mTQ" target="_blank" rel="noreferrer">
-              <div className="card-icon purple">◇</div>
-              <h3>Variantes &amp; déclinaisons</h3>
-              <p>Logos monochromes, couleurs alternatives, formats spécifiques</p>
+              <div className="card-icon purple">▥</div>
+              <h3>Logos horizontaux</h3>
+              <p>3 variantes — pour en-têtes, bandeaux web, plaquettes</p>
               <span className="card-link">Ouvrir le Drive →</span>
             </a>
           </div>
