@@ -51,7 +51,9 @@ export async function POST(request: NextRequest) {
   }
 
   // Load partners
-  let query = supabase.from("partners").select("id, nom, email, utm, code, leads, abonnes, active, contrat");
+  let query = supabase
+    .from("partners")
+    .select("id, nom, email, utm, code, leads, abonnes, active, statut, contrat");
 
   if (partnerIds && partnerIds.length > 0) {
     // Explicit list of partner IDs
@@ -63,16 +65,23 @@ export async function POST(request: NextRequest) {
     if (audience === "marque_blanche") query = query.eq("contrat", "marque_blanche");
   }
 
-  const { data: partners, error } = await query;
+  const { data: partnersRaw, error } = await query;
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // ⚠️ Sécurité : on FORCE le filtre statut="actif" + active=true serveur-side.
+  // Si le client envoie un id de partenaire "en_attente" ou "suspendu" (par
+  // bug UI ou requête forgée), l'API les exclut quand même. C'est la dernière
+  // ligne de défense pour ne JAMAIS envoyer un mail à un partenaire qui n'est
+  // pas commercialement actif.
+  const partners = (partnersRaw ?? []).filter((p) => p.active && p.statut === "actif");
 
   // Cross-check entre ce que le user voit dans la modal et ce que le serveur
   // s'apprête à envoyer. Si la liste a changé (partenaire ajouté/désactivé
   // entre l'ouverture de la modal et la confirmation), on refuse pour ne pas
   // envoyer à un autre périmètre que celui validé.
-  const eligiblePartners = (partners ?? []).filter((p) => p.email);
+  const eligiblePartners = partners.filter((p) => p.email);
   if (
     typeof expectedRecipientCount === "number" &&
     expectedRecipientCount !== eligiblePartners.length
@@ -88,7 +97,7 @@ export async function POST(request: NextRequest) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://partenaire.qlower.com";
   const perRecipient: Array<{ partner_id: string; email: string; ok: boolean; error?: string }> = [];
   const results = await Promise.allSettled(
-    (partners ?? [])
+    partners
       .filter((p) => p.email)
       .map(async (p) => {
         const link = `https://www.qlower.com/qlower-x-partenaire?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}`;
@@ -160,7 +169,7 @@ export async function POST(request: NextRequest) {
   const failures = perRecipient.filter((p) => !p.ok);
 
   // Log the campaign send for the history view
-  const recipientIds = (partners ?? []).filter((p) => p.email).map((p) => p.id);
+  const recipientIds = partners.filter((p) => p.email).map((p) => p.id);
   await supabase.from("campaign_sends").insert({
     template_id: templateKey,
     subject: template.subject,

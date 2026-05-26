@@ -117,8 +117,12 @@ export default function CampagnesTab() {
   const [editBody, setEditBody] = useState("");
   const [saved, setSaved] = useState(false);
 
+  // Cible = partenaires `active=true` ET `statut="actif"`. Les "en_attente"
+  // (onboarding pas fini) et les "suspendu" sont exclus des campagnes :
+  // pas de relation commerciale active → pas de mail.
   const targeted = partners.filter((p) => {
     if (!p.active) return false;
+    if (p.statut !== "actif") return false;
     if (audience === "tous") return true;
     return p.contrat === (audience as ContratType);
   });
