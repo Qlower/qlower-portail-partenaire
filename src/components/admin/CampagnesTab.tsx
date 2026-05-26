@@ -80,6 +80,8 @@ function extractUsedVars(text: string): Array<{ key: string; valid: boolean }> {
   return [...found].map((k) => ({ key: k, valid: VALID_KEYS.has(k) }));
 }
 
+type FailedRecipient = { partner_id: string; email: string; error?: string };
+
 type CampaignSend = {
   id: string;
   template_id: string | null;
@@ -89,6 +91,7 @@ type CampaignSend = {
   partner_count: number;
   sent_count: number;
   failed_count: number;
+  failed_recipients: FailedRecipient[] | null;
   sent_at: string;
   recipients: Array<{ id: string; nom: string }>;
 };
@@ -576,7 +579,42 @@ export default function CampagnesTab() {
       </Card>
 
       {/* Historique des envois */}
-      <CampaignHistory />
+      <CampaignHistory
+        onResendCampaign={async (h, idsToRetry) => {
+          // Renvoie le template `h.template_id` à `idsToRetry` (= seulement
+          // les échoués de cette campagne). Réutilise le même endpoint que
+          // l'envoi initial.
+          if (!h.template_id) {
+            alert("Cette campagne n'a pas de template_id associé.");
+            return;
+          }
+          if (!confirm(
+            `Renvoyer ce mail à ${idsToRetry.length} destinataire${idsToRetry.length > 1 ? "s" : ""} échoué${idsToRetry.length > 1 ? "s" : ""} ?\n\n` +
+            "Les destinataires déjà envoyés avec succès ne recevront PAS de doublon.",
+          )) return;
+          try {
+            const res = await fetch("/api/admin/send-campaign", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                templateKey: h.template_id,
+                partnerIds: idsToRetry,
+                confirm: true,
+                expectedRecipientCount: idsToRetry.length,
+              }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            alert(
+              `${data.sent || 0} envoyé(s), ${data.failed || 0} échec(s).` +
+              (data.failed > 0 ? `\n\nTu peux retenter via le même bouton sur la nouvelle entrée d'historique.` : ""),
+            );
+            queryClient.invalidateQueries({ queryKey: ["campaign-history"] });
+          } catch (e) {
+            alert(`Erreur : ${e instanceof Error ? e.message : "inconnue"}`);
+          }
+        }}
+      />
 
       {/* Modal de double validation avant envoi */}
       {confirmOpen && template && (
@@ -714,8 +752,13 @@ function ConfirmSendModal({
   );
 }
 
-function CampaignHistory() {
+function CampaignHistory({
+  onResendCampaign,
+}: {
+  onResendCampaign: (campaign: CampaignSend, partnerIdsToRetry: string[]) => Promise<void> | void;
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
   const { data: history = [], isLoading } = useQuery<CampaignSend[]>({
     queryKey: ["campaign-history"],
     queryFn: async () => {
@@ -758,40 +801,81 @@ function CampaignHistory() {
                   key={h.id}
                   className="border border-gray-100 rounded-lg overflow-hidden"
                 >
-                  <button
-                    onClick={() => setExpandedId(isOpen ? null : h.id)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#E5EDF1]/30 transition-colors text-left"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">
-                        {h.subject}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {dt.toLocaleDateString("fr-FR", {
-                          day: "2-digit",
-                          month: "long",
-                          year: "numeric",
-                        })}{" "}
-                        à {dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                        {" • "}
-                        {h.sent_count} envoyé{h.sent_count > 1 ? "s" : ""}
-                        {h.failed_count > 0 && ` • ${h.failed_count} échec${h.failed_count > 1 ? "s" : ""}`}
-                      </p>
-                    </div>
-                    {h.template_id && (
-                      <Badge variant="secondary" className="bg-gray-50 text-gray-600 border border-gray-200 text-[10px] flex-shrink-0">
-                        {h.template_id}
-                      </Badge>
-                    )}
-                    <svg
-                      className={`size-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                  <div className="w-full flex items-stretch hover:bg-[#E5EDF1]/30 transition-colors">
+                    <button
+                      onClick={() => setExpandedId(isOpen ? null : h.id)}
+                      className="flex-1 flex items-center gap-3 px-4 py-3 text-left min-w-0"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {h.subject}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {dt.toLocaleDateString("fr-FR", {
+                            day: "2-digit",
+                            month: "long",
+                            year: "numeric",
+                          })}{" "}
+                          à {dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                          {" • "}
+                          <span className="text-emerald-700">{h.sent_count} envoyé{h.sent_count > 1 ? "s" : ""}</span>
+                          {h.failed_count > 0 && (
+                            <>
+                              {" • "}
+                              <span className="text-rose-700 font-semibold">{h.failed_count} échec{h.failed_count > 1 ? "s" : ""}</span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      {h.template_id && (
+                        <Badge variant="secondary" className="bg-gray-50 text-gray-600 border border-gray-200 text-[10px] flex-shrink-0">
+                          {h.template_id}
+                        </Badge>
+                      )}
+                    </button>
+                    {/* Bouton "Renvoyer aux échecs" — directement à côté du statut, plus besoin de chercher */}
+                    {h.failed_count > 0 && h.failed_recipients && h.failed_recipients.length > 0 && h.template_id && (
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          setRetrying(h.id);
+                          try {
+                            await onResendCampaign(
+                              h,
+                              h.failed_recipients!.map((f) => f.partner_id),
+                            );
+                          } finally {
+                            setRetrying(null);
+                          }
+                        }}
+                        disabled={retrying === h.id}
+                        className="self-stretch px-3 flex items-center gap-1.5 text-[11px] font-medium text-rose-700 hover:bg-rose-50 border-l border-gray-100 whitespace-nowrap"
+                        title={`Renvoyer ce mail aux ${h.failed_count} destinataire(s) qui ont échoué`}
+                      >
+                        {retrying === h.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Send className="size-3.5" />
+                        )}
+                        Renvoyer aux {h.failed_count} échec{h.failed_count > 1 ? "s" : ""}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setExpandedId(isOpen ? null : h.id)}
+                      className="px-4 flex items-center text-gray-400"
+                      aria-label="Déplier"
+                    >
+                      <svg
+                        className={`size-4 transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
 
                   {isOpen && (
                     <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-3 space-y-3">

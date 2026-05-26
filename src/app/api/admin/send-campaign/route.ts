@@ -208,6 +208,9 @@ export async function POST(request: NextRequest) {
     partner_count: recipientIds.length,
     sent_count: sent,
     failed_count: failed,
+    // Stocke les échoués → permet le bouton "Renvoyer aux N échecs" depuis
+    // l'historique, même après refresh / lendemain.
+    failed_recipients: failures.length > 0 ? failures : null,
   });
 
   // Si TOUS les envois ont échoué → on remonte un 500 explicite pour que la
