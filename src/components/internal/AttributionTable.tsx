@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, History, MessageSquare, Flag, Plus, Search } from "lucide-react";
+import { ChevronDown, History, MessageSquare, Flag, Plus, Search, Wallet } from "lucide-react";
 import EngagementPanel from "./EngagementPanel";
 import { hubspotSearchByEmailUrl } from "@/lib/hubspot-urls";
 
@@ -37,6 +37,12 @@ export interface RowData {
   amount_gross_eur?: number;
   amount_refunded_eur?: number;
   refunded_after_lock?: boolean;
+  // Override admin du montant commissionnable (ex: upsell où seul le delta
+  // compte, refund partiel, etc.). NULL = on commissionne sur amount_net_eur.
+  commissionable_amount_eur?: number | null;
+  commissionable_adjusted_reason?: string | null;
+  commissionable_adjusted_by_email?: string | null;
+  commissionable_adjusted_at?: string | null;
   family: string | null;
   newbiz_1m: string | null;
   newbiz_3m: string | null;
@@ -177,6 +183,8 @@ export default function AttributionTable({
   // - commercial_id → ses lignes
   // Charge dont on affiche le panel HubSpot timeline (null = panel fermé)
   const [panelChargeId, setPanelChargeId] = useState<string | null>(null);
+  // Charge dont on ajuste le montant commissionnable (null = modal fermé)
+  const [adjustingChargeId, setAdjustingChargeId] = useState<string | null>(null);
   // Tri des colonnes — par défaut : date la plus récente en haut
   type SortKey = "email" | "date" | "net" | "family" | "newbiz" | "attribution" | "reason";
   const [sortKey, setSortKey] = useState<SortKey>("date");
@@ -331,6 +339,58 @@ export default function AttributionTable({
     }
   }
 
+  // Ajuste le montant commissionnable d'une ligne (ex: upsell où seul le delta
+  // compte). amount=null → retire l'override (retour au net Stripe).
+  async function adjustCommissionable(
+    chargeId: string,
+    amount: number | null,
+    reason: string,
+  ) {
+    try {
+      const url = `/api/sales/commissionable/${encodeURIComponent(chargeId)}`;
+      const r = await fetch(url, {
+        method: amount === null ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: amount === null ? undefined : JSON.stringify({ amount, reason }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Erreur");
+      const data = await r.json();
+      const now = new Date().toISOString();
+      setRows((prev) =>
+        prev.map((rr) =>
+          rr.charge_id === chargeId
+            ? {
+                ...rr,
+                commissionable_amount_eur: amount,
+                commissionable_adjusted_reason: amount === null ? null : reason,
+                commissionable_adjusted_by_email: amount === null ? null : data.commissionable_adjusted_by_email || null,
+                commissionable_adjusted_at: amount === null ? null : now,
+                history: [
+                  {
+                    id: String(Date.now()),
+                    when_at: now,
+                    who_email: data.commissionable_adjusted_by_email || null,
+                    from_commercial: `Commissionable : ${Math.round(Number(rr.commissionable_amount_eur ?? rr.amount_net_eur))} €`,
+                    to_commercial:
+                      amount === null
+                        ? `Commissionable : ${Math.round(rr.amount_net_eur)} € (auto)`
+                        : `Commissionable : ${Math.round(amount)} €`,
+                    comment: amount === null ? "Override retiré" : reason,
+                  },
+                  ...rr.history,
+                ],
+              }
+            : rr,
+        ),
+      );
+      showToast(amount === null ? "Override retiré" : `Commissionable → ${Math.round(amount).toLocaleString("fr-FR")} €`);
+      startTransition(() => router.refresh());
+    } catch (e) {
+      console.error("[attribution] adjustCommissionable failed", e);
+      showToast(`Erreur : ${e instanceof Error ? e.message : "inconnue"}`, true);
+    }
+  }
+
   async function addNote(chargeId: string) {
     if (!noteText.trim()) return;
     try {
@@ -449,6 +509,7 @@ export default function AttributionTable({
                 onChangeNoteText={setNoteText}
                 onSubmitNote={() => addNote(r.charge_id)}
                 onChangeAttribution={(cid) => changeAttribution(r.charge_id, cid)}
+                onOpenAdjust={() => setAdjustingChargeId(r.charge_id)}
                 onToggleFlag={async () => {
                   try {
                     const newFlag = !r.flagged_for_review;
@@ -491,6 +552,185 @@ export default function AttributionTable({
 
       {/* Panel chronologie HubSpot */}
       <EngagementPanel chargeId={panelChargeId} onClose={() => setPanelChargeId(null)} />
+
+      {/* Modal d'ajustement du montant commissionnable */}
+      {adjustingChargeId && (() => {
+        const row = rows.find((r) => r.charge_id === adjustingChargeId);
+        if (!row) return null;
+        return (
+          <AdjustCommissionableModal
+            row={row}
+            onClose={() => setAdjustingChargeId(null)}
+            onSubmit={async (amount, reason) => {
+              await adjustCommissionable(adjustingChargeId, amount, reason);
+              setAdjustingChargeId(null);
+            }}
+            onRemove={async () => {
+              await adjustCommissionable(adjustingChargeId, null, "");
+              setAdjustingChargeId(null);
+            }}
+          />
+        );
+      })()}
+    </div>
+  );
+}
+
+// ─── Modal d'ajustement du montant commissionnable ─────────────────────────
+function AdjustCommissionableModal({
+  row,
+  onClose,
+  onSubmit,
+  onRemove,
+}: {
+  row: RowData;
+  onClose: () => void;
+  onSubmit: (amount: number, reason: string) => Promise<void> | void;
+  onRemove: () => Promise<void> | void;
+}) {
+  const current =
+    row.commissionable_amount_eur !== null && row.commissionable_amount_eur !== undefined
+      ? Number(row.commissionable_amount_eur)
+      : row.amount_net_eur;
+  const [amount, setAmount] = useState<string>(String(Math.round(current)));
+  const [reason, setReason] = useState(row.commissionable_adjusted_reason || "");
+  const [submitting, setSubmitting] = useState(false);
+
+  const presets: Array<{ label: string; reason: string; amountFn?: () => number }> = [
+    { label: "Upsell — delta seulement", reason: "Upsell : client déjà abonné, commission sur le delta" },
+    { label: "Refund partiel", reason: "Remboursement partiel sur cette charge" },
+    { label: "Décommissionnement", reason: "Décommissionnement (refund après paie versée)", amountFn: () => 0 },
+  ];
+
+  const hasOverride =
+    row.commissionable_amount_eur !== null && row.commissionable_amount_eur !== undefined;
+  const numericAmount = Number(amount);
+  const canSubmit =
+    !isNaN(numericAmount) && reason.trim().length > 0 && !submitting;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl shadow-xl max-w-md w-full p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-2 mb-3">
+          <Wallet className="size-5 text-amber-600 mt-0.5" />
+          <div>
+            <h2 className="text-base font-semibold text-[#0A3855]">
+              Ajuster le montant commissionnable
+            </h2>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              {row.email} · {fmtEur(row.amount_net_eur)} net Stripe
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+              Le commercial sera commissionné sur
+            </label>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="flex-1 rounded border border-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 font-mono"
+                placeholder="210"
+                autoFocus
+              />
+              <span className="text-sm text-gray-500">€</span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">
+              Au lieu de {fmtEur(row.amount_net_eur)} (net Stripe). Mets <strong>0</strong> pour
+              décommissionner totalement, ou un montant négatif pour clawback.
+            </p>
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+              Motif (obligatoire — pour audit)
+            </label>
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full rounded border border-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 mt-1"
+              placeholder="Ex: Upsell — contrat préexistant à 269€"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            <span className="text-[11px] text-gray-500 self-center">Raccourcis :</span>
+            {presets.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => {
+                  if (p.amountFn) setAmount(String(p.amountFn()));
+                  setReason(p.reason);
+                }}
+                className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-gray-100">
+          {hasOverride ? (
+            <button
+              type="button"
+              onClick={async () => {
+                if (!confirm("Retirer l'override ? La commission repassera sur le net Stripe.")) return;
+                setSubmitting(true);
+                try {
+                  await onRemove();
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              className="text-xs text-rose-600 hover:underline"
+              disabled={submitting}
+            >
+              Retirer l&apos;override
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 rounded"
+              disabled={submitting}
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!canSubmit) return;
+                setSubmitting(true);
+                try {
+                  await onSubmit(numericAmount, reason.trim());
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              disabled={!canSubmit}
+              className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
+            >
+              {submitting ? "Sauvegarde…" : "Appliquer"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -515,6 +755,7 @@ interface RowProps {
   onChangeAttribution: (commercialId: string | null) => void;
   onToggleFlag: () => void;
   onOpenPanel: () => void;
+  onOpenAdjust: () => void;
 }
 
 function RowComponent({
@@ -522,7 +763,7 @@ function RowComponent({
   openHistory, openNotes, noteForm, noteText,
   onToggleHistory, onToggleNotes, onOpenNoteForm, onCancelNoteForm,
   onChangeNoteText, onSubmitNote, onChangeAttribution, onToggleFlag,
-  onOpenPanel,
+  onOpenPanel, onOpenAdjust,
 }: RowProps) {
   // Highlight subtilement les lignes qui me concernent dans la vue équipe.
   const rowClass = isMine
@@ -557,25 +798,40 @@ function RowComponent({
         </td>
         <td className="px-2 py-2 whitespace-nowrap">{fmtDate(row.created_at)}</td>
         <td className="px-2 py-2 text-right font-mono tabular-nums">
-          {row.amount_refunded_eur && row.amount_refunded_eur > 0 ? (
-            <div className="flex flex-col items-end gap-0.5">
-              <span className={row.amount_net_eur === 0 ? "text-gray-400 line-through" : ""}>
-                {fmtEur(row.amount_net_eur)}
-              </span>
+          <div className="flex flex-col items-end gap-0.5">
+            {row.amount_refunded_eur && row.amount_refunded_eur > 0 ? (
+              <>
+                <span className={row.amount_net_eur === 0 ? "text-gray-400 line-through" : ""}>
+                  {fmtEur(row.amount_net_eur)}
+                </span>
+                <span
+                  className={`text-[10px] inline-flex items-center gap-0.5 ${row.refunded_after_lock ? "text-orange-600 font-semibold" : "text-red-600"}`}
+                  title={
+                    row.refunded_after_lock
+                      ? `⚠️ Remboursement post-clôture : ${fmtEur(row.amount_refunded_eur)} (commission probablement déjà versée, prévoir clawback)`
+                      : `Remboursé : ${fmtEur(row.amount_refunded_eur)} sur ${fmtEur(row.amount_gross_eur || 0)} brut`
+                  }
+                >
+                  {row.refunded_after_lock ? "⚠️" : "↩"} −{fmtEur(row.amount_refunded_eur)}
+                </span>
+              </>
+            ) : (
+              <span>{fmtEur(row.amount_net_eur)}</span>
+            )}
+            {/* Override admin du montant commissionnable (ex: upsell, refund partiel) */}
+            {row.commissionable_amount_eur !== null && row.commissionable_amount_eur !== undefined && (
               <span
-                className={`text-[10px] inline-flex items-center gap-0.5 ${row.refunded_after_lock ? "text-orange-600 font-semibold" : "text-red-600"}`}
+                className="text-[10px] inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold"
                 title={
-                  row.refunded_after_lock
-                    ? `⚠️ Remboursement post-clôture : ${fmtEur(row.amount_refunded_eur)} (commission probablement déjà versée, prévoir clawback)`
-                    : `Remboursé : ${fmtEur(row.amount_refunded_eur)} sur ${fmtEur(row.amount_gross_eur || 0)} brut`
+                  `Commissionné sur ${fmtEur(Number(row.commissionable_amount_eur))} (au lieu de ${fmtEur(row.amount_net_eur)})` +
+                  (row.commissionable_adjusted_reason ? ` — ${row.commissionable_adjusted_reason}` : "") +
+                  (row.commissionable_adjusted_by_email ? ` (par ${row.commissionable_adjusted_by_email})` : "")
                 }
               >
-                {row.refunded_after_lock ? "⚠️" : "↩"} −{fmtEur(row.amount_refunded_eur)}
+                💰 {fmtEur(Number(row.commissionable_amount_eur))}
               </span>
-            </div>
-          ) : (
-            fmtEur(row.amount_net_eur)
-          )}
+            )}
+          </div>
         </td>
         <td className="px-2 py-2">{row.family || "—"}</td>
         <td className="px-2 py-2 text-[11px] text-gray-500">
@@ -689,6 +945,23 @@ function RowComponent({
               }
             >
               <Flag className="w-3 h-3" />
+            </button>
+          )}
+          {editable && (
+            <button
+              onClick={onOpenAdjust}
+              className={`inline-flex items-center gap-0.5 text-[10px] ml-1 hover:text-amber-700 ${
+                row.commissionable_amount_eur !== null && row.commissionable_amount_eur !== undefined
+                  ? "text-amber-600"
+                  : "text-gray-400"
+              }`}
+              title={
+                row.commissionable_amount_eur !== null && row.commissionable_amount_eur !== undefined
+                  ? `Modifier le montant commissionnable (actuel : ${Math.round(Number(row.commissionable_amount_eur)).toLocaleString("fr-FR")} €)`
+                  : "Ajuster le montant commissionnable (ex: upsell)"
+              }
+            >
+              <Wallet className="w-3 h-3" />
             </button>
           )}
         </td>

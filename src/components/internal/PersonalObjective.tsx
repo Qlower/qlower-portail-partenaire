@@ -84,7 +84,7 @@ async function getPersonalStats(
 
   const { data: rows } = await sb
     .from("attribution_rows")
-    .select("amount_net_eur, auto_commercial_id, override_commercial_id, created_at")
+    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, created_at")
     .eq("run_id", run.id);
 
   const mine = (rows || []).filter((r) => {
@@ -93,13 +93,20 @@ async function getPersonalStats(
     return cid === filter.commercialId;
   });
 
-  const monthReal = mine.reduce((s, r) => s + (r.amount_net_eur || 0), 0);
+  // On commissionne sur commissionable_amount_eur s'il est set (override
+  // admin pour upsell ou ajustement), sinon sur amount_net_eur.
+  const commish = (r: { amount_net_eur: number | null; commissionable_amount_eur: number | null }) =>
+    (r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+      ? Number(r.commissionable_amount_eur)
+      : Number(r.amount_net_eur)) || 0;
+
+  const monthReal = mine.reduce((s, r) => s + commish(r), 0);
   const todayReal = mine
     .filter((r) => (r.created_at || "").slice(0, 10) === todayIso)
-    .reduce((s, r) => s + (r.amount_net_eur || 0), 0);
+    .reduce((s, r) => s + commish(r), 0);
   const weekReal = mine
     .filter((r) => (r.created_at || "").slice(0, 10) >= weekStartIso)
-    .reduce((s, r) => s + (r.amount_net_eur || 0), 0);
+    .reduce((s, r) => s + commish(r), 0);
 
   const totalWorkingDays = workingDaysInMonth(yearMonth);
   const workingDaysInThisWeek = workingDaysInWeek(today);

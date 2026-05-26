@@ -27,6 +27,10 @@ interface DbRow {
   client_name: string | null;
   created_at: string;
   amount_net_eur: number;
+  commissionable_amount_eur: number | null;
+  commissionable_adjusted_reason: string | null;
+  commissionable_adjusted_by_email: string | null;
+  commissionable_adjusted_at: string | null;
   family: string | null;
   newbiz_1m: string | null;
   newbiz_3m: string | null;
@@ -53,7 +57,7 @@ async function loadAttributionData(yearMonth: string) {
   const { data: rawRows } = await sb
     .from("attribution_rows")
     .select(
-      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason",
+      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, commissionable_amount_eur, commissionable_adjusted_reason, commissionable_adjusted_by_email, commissionable_adjusted_at, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
@@ -121,6 +125,10 @@ async function loadAttributionData(yearMonth: string) {
       amount_gross_eur: (r as DbRow & { amount_gross_eur?: number }).amount_gross_eur,
       amount_refunded_eur: (r as DbRow & { amount_refunded_eur?: number }).amount_refunded_eur,
       refunded_after_lock: (r as DbRow & { refunded_after_lock?: boolean }).refunded_after_lock,
+      commissionable_amount_eur: r.commissionable_amount_eur,
+      commissionable_adjusted_reason: r.commissionable_adjusted_reason,
+      commissionable_adjusted_by_email: r.commissionable_adjusted_by_email,
+      commissionable_adjusted_at: r.commissionable_adjusted_at,
       family: r.family,
       newbiz_1m: r.newbiz_1m,
       newbiz_3m: r.newbiz_3m,
@@ -185,8 +193,16 @@ export default async function AttributionAdminPage({
   const tableView = resolved?.tableView;
   const speedometerView = resolved?.speedometerView;
 
-  // Total CA du mois — utile pour visualiser l'atteinte d'objectif
-  const totalCA = rows.reduce((s, r) => s + (r.amount_net_eur || 0), 0);
+  // Total CA du mois — utile pour visualiser l'atteinte d'objectif.
+  // On utilise le montant commissionnable s'il est override (ex: upsell),
+  // sinon le net Stripe. Aligné avec la paie effective.
+  const totalCA = rows.reduce((s, r) => {
+    const amt =
+      r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+        ? Number(r.commissionable_amount_eur)
+        : Number(r.amount_net_eur);
+    return s + (amt || 0);
+  }, 0);
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">

@@ -15,7 +15,7 @@ async function loadTeamData(yearMonth: string) {
 
   const { data: rows } = await sb
     .from("attribution_rows")
-    .select("amount_net_eur, auto_commercial_id, override_commercial_id, flagged_for_review")
+    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, flagged_for_review")
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
   const { data: commercials } = await sb
@@ -49,14 +49,21 @@ async function loadTeamData(yearMonth: string) {
   const byId = new Map<string, Agg>();
   let autonomeNet = 0;
   let autonomeRows = 0;
+  // On commissionne sur commissionable_amount_eur si défini (override admin),
+  // sinon amount_net_eur. Le classement reflète donc le vrai dû paie.
+  const commish = (r: { amount_net_eur: number; commissionable_amount_eur: number | null }) =>
+    r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+      ? Number(r.commissionable_amount_eur)
+      : Number(r.amount_net_eur);
   for (const r of rows || []) {
     const cid = (r.override_commercial_id || r.auto_commercial_id) as string | null;
     if (!cid) continue;
     const c = commercials?.find((x) => x.id === cid);
     if (!c) continue;
+    const amount = commish(r);
     // Achats autonomes : compté dans le total mais pas dans le classement.
     if (c.role === "system_none") {
-      autonomeNet += r.amount_net_eur;
+      autonomeNet += amount;
       autonomeRows++;
       continue;
     }
@@ -70,7 +77,7 @@ async function loadTeamData(yearMonth: string) {
       target: targetById.get(cid) || 0,
     };
     cur.rows++;
-    cur.net += r.amount_net_eur;
+    cur.net += amount;
     if (r.flagged_for_review) cur.flagged++;
     byId.set(cid, cur);
   }
