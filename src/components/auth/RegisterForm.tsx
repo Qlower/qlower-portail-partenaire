@@ -146,50 +146,43 @@ export default function RegisterForm() {
 
       await supabase.auth.updateUser({ data: { partner_id: partnerId } });
 
-      // Upload KBIS, save URL to partner, and notify Coline with all info
-      let kbisPublicUrl = "";
+      // ✉️ La notif Coline + contrat est désormais déclenchée CÔTÉ SERVEUR
+      // par /api/register (cf. createPartner.mutateAsync ci-dessus) — pas de
+      // fetch fire-and-forget client qui pourrait être annulé par la
+      // navigation `router.push("/dashboard")` derrière.
+
+      // Upload du KBIS APRÈS création du partenaire (puisque le storage
+      // est indexé par partnerId). On AWAIT pour que la notif Kbis parte.
       if (form.kbisFile) {
-        const { data: kbisData } = await supabase.storage
-          .from("kbis")
-          .upload(`${partnerId}/${form.kbisFile.name}`, form.kbisFile, { upsert: true });
-        if (kbisData?.path) {
-          const { data: urlData } = supabase.storage.from("kbis").getPublicUrl(kbisData.path);
-          kbisPublicUrl = urlData.publicUrl;
-          // Save kbis_url to partner record (via Supabase directly)
-          supabase.from("partners").update({ kbis_url: kbisPublicUrl }).eq("id", partnerId).then(() => {});
+        try {
+          const { data: kbisData } = await supabase.storage
+            .from("kbis")
+            .upload(`${partnerId}/${form.kbisFile.name}`, form.kbisFile, { upsert: true });
+          if (kbisData?.path) {
+            const { data: urlData } = supabase.storage.from("kbis").getPublicUrl(kbisData.path);
+            const kbisPublicUrl = urlData.publicUrl;
+            // Notif courte à Coline avec le lien Kbis. AWAIT + keepalive pour
+            // survivre à une navigation prématurée.
+            await fetch("/api/register/kbis-uploaded", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ partnerId, kbisUrl: kbisPublicUrl }),
+              keepalive: true,
+            });
+          }
+        } catch (e) {
+          // Non bloquant — le partenaire est créé, le Kbis peut être uploadé
+          // plus tard via les paramètres du compte.
+          console.warn("[register] kbis upload failed:", e);
         }
       }
 
-      // Notify Coline with full partner info + contract draft attached
-      fetch("/api/register/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          partnerId,
-          partnerName: form.company,
-          partnerEmail: form.email,
-          kbisUrl: kbisPublicUrl || null,
-          prenom: form.prenom,
-          nom: form.nom,
-          metier: form.metier,
-          siret: form.siret,
-          tva: form.tva || null,
-          adresse: form.address,
-          ville: form.city,
-          codePostal: form.postalCode,
-          telephone: form.contactPhone || null,
-          iban: form.iban,
-          bic: form.bic,
-          // Champs juridiques pour le contrat
-          formeJuridique: form.formeJuridique || null,
-          capital: form.capital || null,
-          rcs: form.rcs || null,
-          contactCivilite: form.contactCivilite || null,
-          contactPosition: form.contactPosition || null,
-        }),
-      }).catch(() => {});
-
-      onboard.mutateAsync({ partnerName: form.company, utmValue: utm }).catch(() => {});
+      // Onboard HubSpot — best-effort, on await pour fiabilité
+      try {
+        await onboard.mutateAsync({ partnerName: form.company, utmValue: utm });
+      } catch (e) {
+        console.warn("[register] hubspot onboard failed:", e);
+      }
       router.push("/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur lors de la création du compte.");

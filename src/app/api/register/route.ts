@@ -80,5 +80,50 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // 📧 Notify Coline + welcome partner — DÉCLENCHÉ CÔTÉ SERVEUR pour garantir
+  // l'envoi (avant, c'était un fetch fire-and-forget côté client qui était
+  // souvent annulé par la navigation `router.push("/dashboard")` juste après).
+  //
+  // Le Kbis est uploadé APRÈS cet appel côté client (via Supabase Storage),
+  // donc kbis_url sera null à ce stade. On enverra une mise à jour quand le
+  // client appellera /api/register/kbis-uploaded après son upload réussi.
+  //
+  // Best-effort : si le notify fail, on log mais on continue (le partenaire
+  // est créé OK, c'est l'essentiel pour le client).
+  try {
+    const origin = request.nextUrl.origin;
+    const notifyRes = await fetch(`${origin}/api/register/notify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        partnerId: id,
+        partnerName: nom,
+        partnerEmail: email || user.email,
+        prenom: contact_prenom || "",
+        nom: contact_nom || "",
+        metier: metier || "",
+        siret: siret || "",
+        tva: tva || "",
+        adresse: adresse || "",
+        ville: ville || "",
+        codePostal: code_postal || "",
+        telephone: telephone || "",
+        iban: iban || "",
+        bic: bic || "",
+        formeJuridique: forme_juridique || null,
+        capital: capital || null,
+        rcs: rcs || null,
+        contactCivilite: contact_civilite || null,
+        contactPosition: contact_position || null,
+        kbisUrl: null, // sera enrichi via /kbis-uploaded
+      }),
+    });
+    if (!notifyRes.ok) {
+      console.error("[register] notify failed:", await notifyRes.text());
+    }
+  } catch (e) {
+    console.error("[register] notify error:", e);
+  }
+
   return NextResponse.json(data, { status: 201 });
 }
