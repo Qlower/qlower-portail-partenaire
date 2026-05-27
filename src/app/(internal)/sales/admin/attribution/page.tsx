@@ -43,6 +43,8 @@ interface DbRow {
   override_set_at: string | null;
   flagged_for_review: boolean | null;
   flagged_reason: string | null;
+  flagged_by: string | null;
+  flagged_at: string | null;
 }
 
 async function loadAttributionData(yearMonth: string) {
@@ -57,7 +59,7 @@ async function loadAttributionData(yearMonth: string) {
   const { data: rawRows } = await sb
     .from("attribution_rows")
     .select(
-      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, commissionable_amount_eur, commissionable_adjusted_reason, commissionable_adjusted_by_email, commissionable_adjusted_at, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason",
+      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, commissionable_amount_eur, commissionable_adjusted_reason, commissionable_adjusted_by_email, commissionable_adjusted_at, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason, flagged_by, flagged_at",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
@@ -113,9 +115,22 @@ async function loadAttributionData(yearMonth: string) {
 
   const commById = new Map((commercials || []).map((c) => [c.id, c]));
 
+  // Index user_id → commercial pour résoudre les flaggers / overrideurs
+  // (les colonnes flagged_by et override_set_by stockent l'auth user_id,
+  // pas le commercial.id).
+  const { data: commercialsWithUid } = await sb
+    .from("commercials")
+    .select("user_id, name, email");
+  const commByUserId = new Map(
+    (commercialsWithUid || [])
+      .filter((c) => !!c.user_id)
+      .map((c) => [c.user_id as string, { name: c.name as string, email: c.email as string | null }]),
+  );
+
   const rows: RowData[] = dbRows.map((r) => {
     const effectiveId = r.override_commercial_id || r.auto_commercial_id;
     const effectiveCommercial = effectiveId ? commById.get(effectiveId) : null;
+    const flagger = r.flagged_by ? commByUserId.get(r.flagged_by) : null;
     return {
       charge_id: r.charge_id,
       email: r.email,
@@ -144,6 +159,10 @@ async function loadAttributionData(yearMonth: string) {
       is_override: !!r.override_commercial_id,
       flagged_for_review: !!r.flagged_for_review,
       flagged_reason: r.flagged_reason,
+      flagged_by_user_id: r.flagged_by,
+      flagged_by_name: flagger?.name || null,
+      flagged_by_email: flagger?.email || null,
+      flagged_at: r.flagged_at,
       history: historyByCharge.get(r.charge_id) || [],
       notes: notesByCharge.get(r.charge_id) || [],
     };
@@ -175,6 +194,7 @@ async function getAuthedUserMeta() {
   return {
     internalRole: (meta.internal_role as string | undefined) || null,
     myCommercialId: (meta.commercial_id as string | undefined) || null,
+    myUserId: user?.id || null,
   };
 }
 
@@ -188,7 +208,8 @@ export default async function AttributionAdminPage({
   const { rows, commercials, run } = await loadAttributionData(yearMonth);
   const monthLabel = formatYearMonthFull(yearMonth);
   const editable = !run?.locked;
-  const { internalRole, myCommercialId } = await getAuthedUserMeta();
+  const { internalRole, myCommercialId, myUserId } = await getAuthedUserMeta();
+  const isSalesAdmin = internalRole === "sales_admin";
   const resolved = resolveSalesView({ viewParam: params.view, internalRole, myCommercialId });
   const tableView = resolved?.tableView;
   const speedometerView = resolved?.speedometerView;
@@ -266,6 +287,9 @@ export default async function AttributionAdminPage({
         editable={editable}
         yearMonth={yearMonth}
         view={tableView || undefined}
+        myUserId={myUserId}
+        myCommercialId={myCommercialId}
+        isSalesAdmin={isSalesAdmin}
       />
     </div>
   );

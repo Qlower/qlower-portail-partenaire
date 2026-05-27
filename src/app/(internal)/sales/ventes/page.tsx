@@ -47,7 +47,7 @@ async function loadVentesData(yearMonth: string) {
   const { data: rawRows } = await sb
     .from("attribution_rows")
     .select(
-      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_at, flagged_for_review, flagged_reason",
+      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, commissionable_amount_eur, commissionable_adjusted_reason, commissionable_adjusted_by_email, commissionable_adjusted_at, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_at, flagged_for_review, flagged_reason, flagged_by, flagged_at",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
   const dbRows = rawRows || [];
@@ -88,9 +88,22 @@ async function loadVentesData(yearMonth: string) {
   }
 
   const commById = new Map((commercials || []).map((c) => [c.id, c]));
+
+  // Index user_id → commercial pour résoudre le flagger (auth.user_id, pas commercial.id)
+  const { data: commercialsWithUid } = await sb
+    .from("commercials")
+    .select("user_id, name, email");
+  const commByUserId = new Map(
+    (commercialsWithUid || [])
+      .filter((c) => !!c.user_id)
+      .map((c) => [c.user_id as string, { name: c.name as string, email: c.email as string | null }]),
+  );
+
   const rows: RowData[] = dbRows.map((r) => {
     const effectiveId = r.override_commercial_id || r.auto_commercial_id;
     const effectiveCommercial = effectiveId ? commById.get(effectiveId) : null;
+    const flagBy = (r as { flagged_by?: string | null }).flagged_by || null;
+    const flagger = flagBy ? commByUserId.get(flagBy) : null;
     return {
       charge_id: r.charge_id,
       email: r.email,
@@ -100,6 +113,10 @@ async function loadVentesData(yearMonth: string) {
       amount_gross_eur: (r as { amount_gross_eur?: number }).amount_gross_eur,
       amount_refunded_eur: (r as { amount_refunded_eur?: number }).amount_refunded_eur,
       refunded_after_lock: (r as { refunded_after_lock?: boolean }).refunded_after_lock,
+      commissionable_amount_eur: (r as { commissionable_amount_eur?: number | null }).commissionable_amount_eur ?? null,
+      commissionable_adjusted_reason: (r as { commissionable_adjusted_reason?: string | null }).commissionable_adjusted_reason ?? null,
+      commissionable_adjusted_by_email: (r as { commissionable_adjusted_by_email?: string | null }).commissionable_adjusted_by_email ?? null,
+      commissionable_adjusted_at: (r as { commissionable_adjusted_at?: string | null }).commissionable_adjusted_at ?? null,
       family: r.family,
       newbiz_1m: r.newbiz_1m,
       newbiz_3m: r.newbiz_3m,
@@ -115,6 +132,10 @@ async function loadVentesData(yearMonth: string) {
       is_override: !!r.override_commercial_id,
       flagged_for_review: !!r.flagged_for_review,
       flagged_reason: r.flagged_reason,
+      flagged_by_user_id: flagBy,
+      flagged_by_name: flagger?.name || null,
+      flagged_by_email: flagger?.email || null,
+      flagged_at: (r as { flagged_at?: string | null }).flagged_at ?? null,
       history: historyByCharge.get(r.charge_id) || [],
       notes: notesByCharge.get(r.charge_id) || [],
     };
@@ -179,6 +200,8 @@ export default async function VentesPage({
         commercials={commercials}
         mode="sales-team"
         myCommercialId={myCommercialId}
+        myUserId={user?.id || null}
+        isSalesAdmin={internalRole === "sales_admin"}
         defaultFilterMine={false}
         yearMonth={yearMonth}
         view={tableView || undefined}

@@ -58,6 +58,12 @@ export interface RowData {
   is_override: boolean;
   flagged_for_review: boolean;
   flagged_reason: string | null;
+  // Auteur de la contestation : user_id Supabase Auth (pour le check
+  // d'ownership) + nom + email résolus serveur-side via la table commercials.
+  flagged_by_user_id?: string | null;
+  flagged_by_name?: string | null;
+  flagged_by_email?: string | null;
+  flagged_at?: string | null;
   history: HistoryEntry[];
   notes: NoteEntry[];
 }
@@ -85,6 +91,10 @@ interface Props {
   showFlagButton?: boolean;
   /** Commercial id of the current user — used to highlight own rows + restrict flag */
   myCommercialId?: string | null;
+  /** Supabase Auth user_id du user courant — pour le check "puis-je retirer cette contestation ?" */
+  myUserId?: string | null;
+  /** True si le user courant est sales_admin (peut retirer toute contestation) */
+  isSalesAdmin?: boolean;
   /** If true, the "Mes ventes" filter is preselected on mount */
   defaultFilterMine?: boolean;
   /** Vue active (depuis le dropdown unifié VUE) : "team" | commercial_id |
@@ -153,6 +163,8 @@ export default function AttributionTable({
   yearMonth,
   showFlagButton,
   myCommercialId,
+  myUserId,
+  isSalesAdmin,
   defaultFilterMine,
   view,
 }: Props) {
@@ -497,6 +509,8 @@ export default function AttributionTable({
                 canAddNote={canAddNote}
                 canFlag={canFlagThisRow}
                 isMine={isMine}
+                myUserId={myUserId}
+                isSalesAdmin={isSalesAdmin}
                 onOpenPanel={() => setPanelChargeId(r.charge_id)}
                 openHistory={openHistoryId === r.charge_id}
                 openNotes={openNotesId === r.charge_id}
@@ -511,18 +525,61 @@ export default function AttributionTable({
                 onChangeAttribution={(cid) => changeAttribution(r.charge_id, cid)}
                 onOpenAdjust={() => setAdjustingChargeId(r.charge_id)}
                 onToggleFlag={async () => {
+                  const newFlag = !r.flagged_for_review;
+
+                  // Cas DÉFLAGGER : vérif ownership côté client (UX rapide).
+                  // L'API revérifiera de toute façon (défense en profondeur).
+                  if (!newFlag) {
+                    const isOriginalFlagger = !!myUserId && r.flagged_by_user_id === myUserId;
+                    if (!isOriginalFlagger && !isSalesAdmin) {
+                      const by = r.flagged_by_name || "l'auteur";
+                      showToast(`Seul ${by} ou un manager peut retirer cette contestation`, true);
+                      return;
+                    }
+                  }
+
+                  // Cas FLAGGER : motif obligatoire
+                  let reason: string | null = null;
+                  if (newFlag) {
+                    const input = window.prompt(
+                      "Pourquoi contester cette attribution ?\n\n" +
+                        "(5 caractères minimum — soit pour la revendiquer si tu penses qu'elle devrait t'être attribuée, soit pour la rejeter si tu penses qu'elle ne devrait pas l'être)",
+                      "",
+                    );
+                    if (input === null) return; // annulé
+                    reason = input.trim();
+                    if (reason.length < 5) {
+                      showToast("Le motif doit faire au moins 5 caractères", true);
+                      return;
+                    }
+                  }
+
                   try {
-                    const newFlag = !r.flagged_for_review;
                     const resp = await fetch(`/api/sales/flag/${encodeURIComponent(r.charge_id)}`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ flag: newFlag }),
+                      body: JSON.stringify({ flag: newFlag, reason }),
                     });
                     if (!resp.ok) {
                       const err = await resp.json().catch(() => ({}));
                       throw new Error(err.error || `HTTP ${resp.status}`);
                     }
-                    setRows((prev) => prev.map((rr) => rr.charge_id === r.charge_id ? { ...rr, flagged_for_review: newFlag } : rr));
+                    const data = await resp.json().catch(() => ({}));
+                    setRows((prev) =>
+                      prev.map((rr) =>
+                        rr.charge_id === r.charge_id
+                          ? {
+                              ...rr,
+                              flagged_for_review: newFlag,
+                              flagged_reason: newFlag ? reason : null,
+                              flagged_by_user_id: newFlag ? (data.flagged_by ?? myUserId ?? null) : null,
+                              flagged_by_name: newFlag ? (data.flagged_by_name ?? null) : null,
+                              flagged_by_email: newFlag ? (data.flagged_by_email ?? null) : null,
+                              flagged_at: newFlag ? (data.flagged_at ?? new Date().toISOString()) : null,
+                            }
+                          : rr,
+                      ),
+                    );
                     showToast(newFlag ? "🚩 Attribution contestée" : "Contestation retirée");
                   } catch (e) {
                     showToast(`Erreur : ${e instanceof Error ? e.message : "inconnue"}`, true);
@@ -742,6 +799,10 @@ interface RowProps {
   canAddNote: boolean;
   canFlag: boolean;
   isMine?: boolean;
+  // Pour vérifier si le user courant peut RETIRER la contestation en cours :
+  // il faut être l'auteur OU être sales_admin.
+  myUserId?: string | null;
+  isSalesAdmin?: boolean;
   openHistory: boolean;
   openNotes: boolean;
   noteForm: boolean;
@@ -759,7 +820,7 @@ interface RowProps {
 }
 
 function RowComponent({
-  row, commercials, editable, canAddNote, canFlag, isMine,
+  row, commercials, editable, canAddNote, canFlag, isMine, myUserId, isSalesAdmin,
   openHistory, openNotes, noteForm, noteText,
   onToggleHistory, onToggleNotes, onOpenNoteForm, onCancelNoteForm,
   onChangeNoteText, onSubmitNote, onChangeAttribution, onToggleFlag,
@@ -890,7 +951,24 @@ function RowComponent({
             </div>
           )}
           {row.flagged_for_review && (
-            <span className="ml-1 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700">🚩</span>
+            <span
+              className="ml-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700 cursor-help"
+              title={
+                `🚩 Contestation en cours` +
+                (row.flagged_by_name ? `\n— par : ${row.flagged_by_name}` : "") +
+                (row.flagged_at
+                  ? `\n— le ${new Date(row.flagged_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}`
+                  : "") +
+                (row.flagged_reason ? `\n\nMotif : ${row.flagged_reason}` : "")
+              }
+            >
+              🚩
+              {row.flagged_by_name && (
+                <span className="font-normal opacity-80 max-w-[80px] truncate hidden sm:inline">
+                  {row.flagged_by_name.split(" ")[0]}
+                </span>
+              )}
+            </span>
           )}
         </td>
         <td className="px-2 py-2 text-[11px]">
@@ -932,21 +1010,49 @@ function RowComponent({
               <Plus className="w-3 h-3" />
             </button>
           )}
-          {canFlag && (
-            <button
-              onClick={onToggleFlag}
-              className={`inline-flex items-center gap-0.5 text-[10px] ml-1 hover:text-orange-700 ${row.flagged_for_review ? "text-orange-600" : "text-gray-400"}`}
-              title={
-                row.flagged_for_review
-                  ? "Retirer la contestation"
-                  : isMine
-                    ? "Cette vente ne devrait pas m'être attribuée (contester)"
-                    : "Cette vente devrait m'être attribuée (revendiquer)"
-              }
-            >
-              <Flag className="w-3 h-3" />
-            </button>
-          )}
+          {canFlag && (() => {
+            // Si une contestation est déjà active, seul son auteur ou un admin
+            // peut la retirer. Pour les autres on désactive le bouton mais on
+            // affiche un tooltip explicite.
+            const canRemoveFlag =
+              !row.flagged_for_review ||
+              !!isSalesAdmin ||
+              (!!myUserId && row.flagged_by_user_id === myUserId);
+
+            const tooltipFlagged =
+              `🚩 Contestation en cours` +
+              (row.flagged_by_name ? `\nPar : ${row.flagged_by_name}` : "") +
+              (row.flagged_at
+                ? `\nLe ${new Date(row.flagged_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}`
+                : "") +
+              (row.flagged_reason ? `\n\nMotif : ${row.flagged_reason}` : "") +
+              (canRemoveFlag
+                ? `\n\nClique pour retirer la contestation.`
+                : `\n\n⚠️ Tu ne peux pas retirer la contestation d'un autre — seul ${row.flagged_by_name || "l'auteur"} ou un manager peut le faire.`);
+
+            return (
+              <button
+                onClick={onToggleFlag}
+                disabled={row.flagged_for_review && !canRemoveFlag}
+                className={`inline-flex items-center gap-0.5 text-[10px] ml-1 transition-colors ${
+                  row.flagged_for_review
+                    ? canRemoveFlag
+                      ? "text-orange-600 hover:text-orange-700"
+                      : "text-orange-300 cursor-not-allowed"
+                    : "text-gray-400 hover:text-orange-700"
+                }`}
+                title={
+                  row.flagged_for_review
+                    ? tooltipFlagged
+                    : isMine
+                      ? "Cette vente ne devrait pas m'être attribuée — clique pour contester (motif obligatoire)"
+                      : "Cette vente devrait m'être attribuée — clique pour la revendiquer (motif obligatoire)"
+                }
+              >
+                <Flag className="w-3 h-3" />
+              </button>
+            );
+          })()}
           {editable && (
             <button
               onClick={onOpenAdjust}
