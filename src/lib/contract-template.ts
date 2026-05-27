@@ -36,6 +36,25 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * Encode tous les caractères non-ASCII (au-delà de 0x7F) en entités HTML
+ * numériques (`&#NNN;`). Garantit un rendu correct des accents et caractères
+ * spéciaux peu importe le charset assumé par le viewer (Gmail preview, Word,
+ * vieux clients mail...) — même si le <meta charset="utf-8"> est ignoré.
+ *
+ * Sans ça : `Orléans` (UTF-8 = 0xC3 0xA9) interprété en Latin-1 affiche "Ã©".
+ * Avec ça : `Orl&#233;ans` qui rend toujours "Orléans".
+ */
+function encodeNonAscii(s: string): string {
+  // Convertit chaque char > 0x7F en entité numérique `&#NNN;`.
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    const code = s.charCodeAt(i);
+    out += code < 128 ? s[i] : `&#${code};`;
+  }
+  return out;
+}
+
 function getContractData(partner: Partner): ContractData {
   // Fallback "_____" pour les champs manquants → l'admin voit ce qui doit être complété
   const blank = "_____________";
@@ -65,7 +84,7 @@ export function renderContractHtml(partner: Partner): string {
   const d = getContractData(partner);
   const e = escapeHtml; // local alias
 
-  return `<!doctype html>
+  const html = `<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8" />
@@ -912,4 +931,7 @@ export function renderContractHtml(partner: Partner): string {
 </div>
 </body>
 </html>`;
+  // Encode toutes les accents en entités numériques → rendu garanti quel que
+  // soit le charset assumé par le viewer mail (Gmail, Outlook, Word, etc.)
+  return encodeNonAscii(html);
 }
