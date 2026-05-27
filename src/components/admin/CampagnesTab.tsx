@@ -833,7 +833,7 @@ function CampaignHistory({
                         </Badge>
                       )}
                     </button>
-                    {/* Bouton "Renvoyer aux échecs" — directement à côté du statut, plus besoin de chercher */}
+                    {/* Bouton "Renvoyer aux échecs" — précis si on a failed_recipients */}
                     {h.failed_count > 0 && h.failed_recipients && h.failed_recipients.length > 0 && h.template_id && (
                       <button
                         type="button"
@@ -859,6 +859,42 @@ function CampaignHistory({
                           <Send className="size-3.5" />
                         )}
                         Renvoyer aux {h.failed_count} échec{h.failed_count > 1 ? "s" : ""}
+                      </button>
+                    )}
+                    {/* Fallback : campagne antérieure au tracking précis des échoués.
+                       On ne connait pas QUI a échoué → bouton "Renvoyer à TOUS" avec
+                       gros warning sur les doublons. */}
+                    {h.failed_count > 0 && (!h.failed_recipients || h.failed_recipients.length === 0) && h.template_id && (
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (
+                            !confirm(
+                              `Cette campagne a ${h.failed_count} échec(s) MAIS le détail des destinataires en échec n'a pas été enregistré (campagne envoyée avant l'ajout du tracking détaillé).\n\n` +
+                                `Renvoyer le mail aux ${h.partner_count} destinataires d'origine ?\n\n` +
+                                `⚠️ Les ${h.sent_count} destinataire(s) qui ont déjà reçu le mail vont en recevoir un DOUBLON.\n\n` +
+                                `(Pour les futures campagnes, le système ne ciblera QUE les échecs.)`,
+                            )
+                          )
+                            return;
+                          setRetrying(h.id);
+                          try {
+                            await onResendCampaign(h, h.partner_ids);
+                          } finally {
+                            setRetrying(null);
+                          }
+                        }}
+                        disabled={retrying === h.id}
+                        className="self-stretch px-3 flex items-center gap-1.5 text-[11px] font-medium text-amber-700 hover:bg-amber-50 border-l border-gray-100 whitespace-nowrap"
+                        title={`⚠️ Renvoyer à TOUS les ${h.partner_count} destinataires (les ${h.sent_count} déjà OK recevront un doublon — pas d'autre solution sur cette ancienne campagne)`}
+                      >
+                        {retrying === h.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Send className="size-3.5" />
+                        )}
+                        Renvoyer à tous ({h.partner_count})
                       </button>
                     )}
                     <button
