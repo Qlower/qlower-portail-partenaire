@@ -8,6 +8,7 @@ import AttributionTable, {
 import LockMonthButton from "@/components/internal/LockMonthButton";
 import RescoreMonthButton from "@/components/internal/RescoreMonthButton";
 import ManualChargeButton from "@/components/internal/ManualChargeButton";
+import RefundAfterLockBanner, { type RefundRow as ClawbackRefundRow } from "@/components/internal/RefundAfterLockBanner";
 import MonthSelector from "@/components/internal/MonthSelector";
 import PersonalObjective from "@/components/internal/PersonalObjective";
 import { cookies } from "next/headers";
@@ -45,6 +46,11 @@ interface DbRow {
   flagged_reason: string | null;
   flagged_by: string | null;
   flagged_at: string | null;
+  clawback_status: string | null;
+  clawback_amount_eur: number | null;
+  clawback_decided_by_email: string | null;
+  clawback_applied_at: string | null;
+  clawback_reason: string | null;
 }
 
 async function loadAttributionData(yearMonth: string) {
@@ -59,7 +65,7 @@ async function loadAttributionData(yearMonth: string) {
   const { data: rawRows } = await sb
     .from("attribution_rows")
     .select(
-      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, commissionable_amount_eur, commissionable_adjusted_reason, commissionable_adjusted_by_email, commissionable_adjusted_at, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason, flagged_by, flagged_at",
+      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, commissionable_amount_eur, commissionable_adjusted_reason, commissionable_adjusted_by_email, commissionable_adjusted_at, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason, flagged_by, flagged_at, clawback_status, clawback_amount_eur, clawback_decided_by_email, clawback_applied_at, clawback_reason",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
@@ -163,6 +169,11 @@ async function loadAttributionData(yearMonth: string) {
       flagged_by_name: flagger?.name || null,
       flagged_by_email: flagger?.email || null,
       flagged_at: r.flagged_at,
+      clawback_status: r.clawback_status,
+      clawback_amount_eur: r.clawback_amount_eur,
+      clawback_decided_by_email: r.clawback_decided_by_email,
+      clawback_applied_at: r.clawback_applied_at,
+      clawback_reason: r.clawback_reason,
       history: historyByCharge.get(r.charge_id) || [],
       notes: notesByCharge.get(r.charge_id) || [],
     };
@@ -251,33 +262,24 @@ export default async function AttributionAdminPage({
 
       <PersonalObjective yearMonth={yearMonth} view={speedometerView || undefined} />
 
-      {/* Alerte refund-after-lock : remboursements arrivés après verrouillage du mois */}
+      {/* Alerte refund-after-lock : remboursements arrivés après verrouillage du mois.
+         Composant client interactif avec 3 actions par ligne (assume/clawback/cancel) */}
       {(() => {
-        const refundedAfterLock = rows.filter((r) => r.refunded_after_lock);
-        if (refundedAfterLock.length === 0) return null;
-        const totalClawback = refundedAfterLock.reduce(
-          (s, r) => s + (r.amount_refunded_eur || 0),
-          0,
-        );
-        return (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="text-2xl shrink-0">⚠️</div>
-              <div className="flex-1">
-                <div className="text-sm font-semibold text-orange-900">
-                  Remboursements post-clôture détectés : {refundedAfterLock.length} ligne{refundedAfterLock.length > 1 ? "s" : ""}
-                </div>
-                <div className="text-xs text-orange-800 mt-1 leading-relaxed">
-                  Le mois est verrouillé mais des refunds sont arrivés depuis pour un total de{" "}
-                  <strong>{Math.round(totalClawback).toLocaleString("fr-FR")} € remboursés</strong>.
-                  Les commissions correspondantes ont probablement déjà été versées —
-                  pense au <strong>clawback</strong> sur la paie suivante des négos concernés.
-                  Filtre la liste avec le bouton <strong>"↩ Remboursées"</strong> pour voir le détail.
-                </div>
-              </div>
-            </div>
-          </div>
-        );
+        const refundedAfterLock = rows
+          .filter((r) => r.refunded_after_lock)
+          .map<ClawbackRefundRow>((r) => ({
+            charge_id: r.charge_id,
+            email: r.email,
+            amount_refunded_eur: r.amount_refunded_eur || 0,
+            effective_commercial_name: r.effective_commercial_name,
+            refund_month: r.created_at.slice(0, 7), // ex: 2026-04
+            clawback_status: r.clawback_status ?? null,
+            clawback_amount_eur: r.clawback_amount_eur ?? null,
+            clawback_decided_by_email: r.clawback_decided_by_email ?? null,
+            clawback_applied_at: r.clawback_applied_at ?? null,
+            clawback_reason: r.clawback_reason ?? null,
+          }));
+        return <RefundAfterLockBanner refunds={refundedAfterLock} />;
       })()}
 
       <AttributionTable

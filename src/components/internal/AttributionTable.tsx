@@ -64,6 +64,12 @@ export interface RowData {
   flagged_by_name?: string | null;
   flagged_by_email?: string | null;
   flagged_at?: string | null;
+  // Refund-after-lock : décision admin (NULL=pending | acknowledged_no_clawback | applied)
+  clawback_status?: string | null;
+  clawback_amount_eur?: number | null;
+  clawback_decided_by_email?: string | null;
+  clawback_applied_at?: string | null;
+  clawback_reason?: string | null;
   history: HistoryEntry[];
   notes: NoteEntry[];
 }
