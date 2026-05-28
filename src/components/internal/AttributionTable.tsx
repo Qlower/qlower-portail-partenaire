@@ -659,11 +659,31 @@ function AdjustCommissionableModal({
   const [reason, setReason] = useState(row.commissionable_adjusted_reason || "");
   const [submitting, setSubmitting] = useState(false);
 
-  const presets: Array<{ label: string; reason: string; amountFn?: () => number }> = [
-    { label: "Upsell — delta seulement", reason: "Upsell : client déjà abonné, commission sur le delta" },
-    { label: "Refund partiel", reason: "Remboursement partiel sur cette charge" },
-    { label: "Décommissionnement", reason: "Décommissionnement (refund après paie versée)", amountFn: () => 0 },
-  ];
+  // Une ligne refund est une ligne ledger NÉGATIVE (auto_source =
+  // stripe_refund_ledger ou manual_refund_ledger). Le contexte d'override
+  // est inversé : amount=0 signifie "ne pas décommissionner" (la boîte
+  // assume le refund), pas "décommissionner totalement".
+  const isRefundLine =
+    row.auto_source === "stripe_refund_ledger" ||
+    row.auto_source === "manual_refund_ledger";
+
+  const presets: Array<{ label: string; reason: string; amountFn?: () => number }> = isRefundLine
+    ? [
+        {
+          label: "Ne pas décommissionner — la boîte assume",
+          reason: "Refund assumé par la boîte : le commercial garde son commissionnement",
+          amountFn: () => 0,
+        },
+        {
+          label: "Décompte partiel",
+          reason: "Refund partiellement décompté du commercial",
+        },
+      ]
+    : [
+        { label: "Upsell — delta seulement", reason: "Upsell : client déjà abonné, commission sur le delta" },
+        { label: "Refund partiel", reason: "Remboursement partiel sur cette charge" },
+        { label: "Décommissionnement", reason: "Décommissionnement (refund après paie versée)", amountFn: () => 0 },
+      ];
 
   const hasOverride =
     row.commissionable_amount_eur !== null && row.commissionable_amount_eur !== undefined;
@@ -709,8 +729,18 @@ function AdjustCommissionableModal({
               <span className="text-sm text-gray-500">€</span>
             </div>
             <p className="text-[10px] text-gray-400 mt-1">
-              Au lieu de {fmtEur(row.amount_net_eur)} (net Stripe). Mets <strong>0</strong> pour
-              décommissionner totalement, ou un montant négatif pour clawback.
+              {isRefundLine ? (
+                <>
+                  Ligne <strong>refund</strong> (montant négatif). Mets <strong>0</strong> pour
+                  ne <strong>pas</strong> décommissionner le commercial (la boîte assume le refund),
+                  ou garde le montant pour décompter normalement.
+                </>
+              ) : (
+                <>
+                  Au lieu de {fmtEur(row.amount_net_eur)} (net Stripe). Mets <strong>0</strong> pour
+                  décommissionner totalement, ou un montant négatif pour clawback.
+                </>
+              )}
             </p>
           </div>
 
@@ -723,7 +753,7 @@ function AdjustCommissionableModal({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               className="w-full rounded border border-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 mt-1"
-              placeholder="Ex: Upsell — contrat préexistant à 269€"
+              placeholder={isRefundLine ? "Ex: Refund assumé par Qlower — erreur de notre part" : "Ex: Upsell — contrat préexistant à 269€"}
             />
           </div>
 
