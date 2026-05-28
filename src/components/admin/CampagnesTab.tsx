@@ -239,8 +239,12 @@ export default function CampagnesTab() {
   // par le bouton "Renvoyer aux échoués" pour ne pas re-spammer les ok).
   const handleSendAll = async (partnerIdsOverride?: string[]) => {
     if (!selectedTemplateId) return;
-    const targets = partnerIdsOverride
-      ? selected.filter((p) => partnerIdsOverride.includes(p.id))
+    // Garde-fou : si appelé via onClick, le 1er arg est l'événement React,
+    // pas un tableau. On vérifie explicitement Array.isArray pour éviter de
+    // crasher silencieusement dans .includes() sur un MouseEvent.
+    const validOverride = Array.isArray(partnerIdsOverride) ? partnerIdsOverride : null;
+    const targets = validOverride
+      ? selected.filter((p) => validOverride.includes(p.id))
       : selected;
     if (targets.length === 0) return;
     setConfirmOpen(false);
@@ -739,7 +743,7 @@ function ConfirmSendModal({
             Annuler
           </Button>
           <Button
-            onClick={onConfirm}
+            onClick={() => onConfirm()}
             disabled={!canConfirm}
             className="bg-[#0A3855] text-white hover:bg-[#0d4f78] disabled:opacity-50"
           >
