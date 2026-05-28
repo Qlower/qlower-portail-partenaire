@@ -170,6 +170,19 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     }
   }
 
+  // 1er passage : compter combien de sales (Hasan/Driss) ont atteint
+  // leur obj perso ce mois. Utilisé pour la prime manager d'Alex.
+  const HT_FACTOR = 1 / 1.20;
+  let reachedSalesCount = 0;
+  for (const a of byId.values()) {
+    if (a.role !== "sales") continue;
+    const obj = targetById.get(a.id) || 0;
+    if (obj <= 0) continue;
+    const myCA_HT = a.ca_ttc * HT_FACTOR;
+    const myObj_HT = obj * HT_FACTOR;
+    if (myCA_HT >= myObj_HT) reachedSalesCount++;
+  }
+
   const negos: NegoLine[] = [...byId.values()]
     .filter((a) => a.role !== "system_none" && a.role !== "former")
     .map((a) => {
@@ -182,6 +195,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
         myObj: obj,
         teamCA_TTC: totalCA_TTC,
         teamObj,
+        reachedSalesCount,
       });
       const retenue = retenueById.get(a.id) || 0;
       return {

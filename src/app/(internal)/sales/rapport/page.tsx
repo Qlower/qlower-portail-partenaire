@@ -337,7 +337,16 @@ export default async function RapportPage({
         <summary className="cursor-pointer font-semibold text-[#0A3855]">Barème commissions appliqué</summary>
         <div className="mt-3 space-y-2">
           <div><strong>Hasan, Driss</strong> : 3% du CA HT si obj perso non atteint · 5% si obj perso atteint · 10% si obj équipe atteint (priorité absolue)</div>
-          <div><strong>Alex</strong> : 5% de son CA HT toujours · + 10% sur le DÉPASSEMENT de l&apos;objectif ÉQUIPE (ex : équipe 125k€ / obj 110k€ → bonus = 10% × 15k€ HT)</div>
+          <div>
+            <strong>Alex (manager)</strong> :{" "}
+            <span className="block ml-3 mt-0.5">
+              · <strong>100 €</strong> × nombre de sales qui ont atteint leur obj perso (prime manager)
+              <br />
+              · <strong>+ si obj équipe atteint</strong> : 10% × son CA HT + 5% × dépassement équipe HT
+              <br />
+              · Sinon : seule la prime manager s&apos;applique
+            </span>
+          </div>
           <div><strong>Jennyfer (upsell)</strong> : 2% du CA HT toujours</div>
           <div><strong>Rudo, Coline, anciens</strong> : pas de commission au barème actuel</div>
           <div className="text-gray-500 mt-2">CA HT = CA TTC ÷ 1.20 (TVA 20%). Centimes affichés pour le calcul de paie. Si tu réattribues une vente manuellement, la commission suit la nouvelle attribution.</div>

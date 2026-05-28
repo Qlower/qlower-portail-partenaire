@@ -9,10 +9,12 @@
 //   - 10% du CA HT généré     si objectif équipe atteint
 //
 // ALEX (sales_admin) :
-//   - 5% du CA HT toujours, sur tout son CA généré
-//   - + 10% sur le DÉPASSEMENT de l'objectif ÉQUIPE (pas perso)
-//   - Exemple : équipe fait 125k€, obj équipe 110k€ → bonus = 10% × 15k€
-//     du dépassement = 1 500 €, plus ses 5% sur ses propres ventes
+//   - 100 € brut × nombre de sales qui ont atteint leur objectif perso
+//     (manager bonus — la prime tombe dès qu'au moins un sales atteint son obj)
+//   - SI objectif ÉQUIPE atteint, EN PLUS :
+//       - 10% du CA HT généré par Alex lui-même
+//       - 5% sur le DÉPASSEMENT de l'objectif équipe HT
+//   - SI obj équipe non atteint : seule la prime 100€/sales s'applique
 //
 // JENNYFER (upsell) :
 //   - 2% du CA HT généré (toujours)
@@ -40,6 +42,12 @@ export interface CommissionInput {
   teamCA_TTC: number;
   /** Objectif équipe pour le mois */
   teamObj: number;
+  /**
+   * Nombre de sales (role = "sales") qui ont atteint leur objectif perso ce mois.
+   * Utilisé pour la prime manager d'Alex (100 € × cette valeur).
+   * Pas nécessaire pour les autres règles.
+   */
+  reachedSalesCount?: number;
 }
 
 export interface CommissionResult {
@@ -97,26 +105,57 @@ export function computeCommission(input: CommissionInput): CommissionResult {
     };
   }
 
-  // Règle Alex : 5% de son CA HT + 10% sur le DÉPASSEMENT ÉQUIPE
+  // Règle Alex (sales_admin / manager) :
+  //   - 100 € × nombre de sales qui ont atteint leur obj perso (prime manager)
+  //   - SI obj équipe atteint : + 10% × son CA HT + 5% × dépassement équipe HT
+  //   - SI obj équipe NON atteint : seule la prime manager s'applique
   if (name === "alexandre" || input.commercialRole === "sales_admin") {
-    const base = myCA_HT * 0.05;
-    let bonus = 0;
-    let breakdown = `5% × ${fmtEurCents(myCA_HT)} = ${fmtEurCents(base)}`;
-    if (teamObj_HT > 0 && teamCA_HT > teamObj_HT) {
-      const teamSurplus = teamCA_HT - teamObj_HT;
-      bonus = teamSurplus * 0.10;
-      breakdown += `  +  10% × dépassement équipe ${fmtEurCents(teamSurplus)} = ${fmtEurCents(bonus)}`;
-    } else if (teamObj_HT > 0) {
-      breakdown += `  ·  équipe ${fmtEurCents(teamCA_HT)} / obj ${fmtEurCents(teamObj_HT)} (pas de dépassement → pas de bonus)`;
+    const reachedSales = input.reachedSalesCount || 0;
+    const managerBonus = reachedSales * 100;
+
+    const parts: string[] = [];
+    let total = managerBonus;
+
+    if (reachedSales > 0) {
+      parts.push(`100 € × ${reachedSales} sales avec obj atteint = ${fmtEurCents(managerBonus)}`);
+    } else {
+      parts.push(`Aucun sales n'a atteint son obj perso → prime manager 0 €`);
     }
+
+    let teamBonusOwn = 0;
+    let teamBonusOverage = 0;
+    if (teamObjReached) {
+      teamBonusOwn = myCA_HT * 0.10;
+      parts.push(`10% × ${fmtEurCents(myCA_HT)} (mes ventes) = ${fmtEurCents(teamBonusOwn)}`);
+      if (teamCA_HT > teamObj_HT) {
+        const teamSurplus = teamCA_HT - teamObj_HT;
+        teamBonusOverage = teamSurplus * 0.05;
+        parts.push(`5% × ${fmtEurCents(teamSurplus)} (dépassement équipe) = ${fmtEurCents(teamBonusOverage)}`);
+      }
+      total += teamBonusOwn + teamBonusOverage;
+    } else if (teamObj_HT > 0) {
+      parts.push(`Équipe ${fmtEurCents(teamCA_HT)} / obj ${fmtEurCents(teamObj_HT)} non atteint → pas de bonus %`);
+    }
+
+    let label: string;
+    if (teamObjReached && reachedSales > 0) {
+      label = `${reachedSales} × 100€ + 10% perso${teamCA_HT > teamObj_HT ? " + 5% dépassement" : ""}`;
+    } else if (teamObjReached) {
+      label = `10% perso${teamCA_HT > teamObj_HT ? " + 5% dépassement" : ""}`;
+    } else if (reachedSales > 0) {
+      label = `Prime manager ${reachedSales} × 100€`;
+    } else {
+      label = "—";
+    }
+
     return {
-      amount_eur: round2(base + bonus),
-      rate_label: bonus > 0 ? "5% + 10% dépassement équipe" : "5%",
+      amount_eur: round2(total),
+      rate_label: label,
       ca_ht: myCA_HT,
       obj_reached: objReached,
       team_obj_reached: teamObjReached,
-      rule_used: "alex_5plus10_team",
-      breakdown,
+      rule_used: "alex_manager_plus_team",
+      breakdown: parts.join("  ·  "),
     };
   }
 
