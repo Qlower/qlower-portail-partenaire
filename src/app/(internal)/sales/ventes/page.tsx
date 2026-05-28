@@ -171,7 +171,16 @@ export default async function VentesPage({
   const { rows, commercials } = await loadVentesData(yearMonth);
 
   const monthLabel = formatYearMonthFull(yearMonth);
-  const total = rows.reduce((sum, r) => sum + r.amount_net_eur, 0);
+  // Aligné sur PersonalObjective et /sales : on totalise sur le montant
+  // commissionnable (override admin = upsell, refund assumé, etc.), pas sur
+  // le brut Stripe — pour que tous les CA affichés soient cohérents.
+  const total = rows.reduce((sum, r) => {
+    const amt =
+      r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+        ? Number(r.commissionable_amount_eur)
+        : Number(r.amount_net_eur);
+    return sum + (amt || 0);
+  }, 0);
   const myRowsCount = myCommercialId
     ? rows.filter((r) => r.effective_commercial_id === myCommercialId).length
     : 0;

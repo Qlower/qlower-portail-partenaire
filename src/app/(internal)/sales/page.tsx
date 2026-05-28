@@ -35,7 +35,7 @@ async function getDashboardData(yearMonth: string) {
   // Per-commercial totals (joins commercials for name).
   const { data: rows } = await sb
     .from("attribution_rows")
-    .select("amount_net_eur, auto_commercial_id, override_commercial_id, auto_score, flagged_for_review")
+    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, auto_score, flagged_for_review")
     .eq("run_id", runRow?.id || "00000000-0000-0000-0000-000000000000");
 
   const { data: commercials } = await sb
@@ -44,6 +44,15 @@ async function getDashboardData(yearMonth: string) {
     .order("name");
 
   // Aggregate by effective commercial.
+  // Aligné avec PersonalObjective : on commissionne sur commissionable_amount_eur
+  // s'il est set (override admin : upsell, refund assumé, etc.), sinon sur
+  // amount_net_eur (brut Stripe). C'est le "CA réellement commissionable" qui
+  // sert au calcul d'atteinte d'objectif et de commission.
+  const commish = (r: { amount_net_eur: number | null; commissionable_amount_eur: number | null }) =>
+    (r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+      ? Number(r.commissionable_amount_eur)
+      : Number(r.amount_net_eur)) || 0;
+
   type Agg = { name: string; role: string; rows: number; net: number; flagged: number };
   const byId = new Map<string, Agg>();
   let totalNet = 0;
@@ -53,12 +62,13 @@ async function getDashboardData(yearMonth: string) {
   let autonomeNet = 0;
   let autonomeRows = 0;
   for (const r of rows || []) {
+    const amt = commish(r);
     const cid = (r.override_commercial_id || r.auto_commercial_id) as string | null;
     const c = commercials?.find((x) => x.id === cid);
     if (c?.role === "system_none") {
-      autonomeNet += r.amount_net_eur;
+      autonomeNet += amt;
       autonomeRows++;
-      totalNet += r.amount_net_eur;
+      totalNet += amt;
       if (r.flagged_for_review) flaggedCount++;
       continue;
     }
@@ -69,10 +79,10 @@ async function getDashboardData(yearMonth: string) {
       rows: 0, net: 0, flagged: 0,
     };
     cur.rows++;
-    cur.net += r.amount_net_eur;
+    cur.net += amt;
     if (r.flagged_for_review) cur.flagged++;
     byId.set(key, cur);
-    totalNet += r.amount_net_eur;
+    totalNet += amt;
     if (r.flagged_for_review) flaggedCount++;
   }
 
