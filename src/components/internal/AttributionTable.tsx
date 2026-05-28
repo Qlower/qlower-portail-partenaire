@@ -690,6 +690,15 @@ function AdjustCommissionableModal({
   const numericAmount = Number(amount);
   const canSubmit =
     !isNaN(numericAmount) && reason.trim().length > 0 && !submitting;
+  // Hint visible sous le bouton désactivé — explique pourquoi on ne peut
+  // pas valider, sinon l'utilisateur reste bloqué sans comprendre.
+  const disabledHint = submitting
+    ? null
+    : isNaN(numericAmount)
+      ? "Montant invalide"
+      : reason.trim().length === 0
+        ? "Renseigne le motif pour activer le bouton"
+        : null;
 
   return (
     <div
@@ -805,22 +814,27 @@ function AdjustCommissionableModal({
             >
               Annuler
             </button>
-            <button
-              type="button"
-              onClick={async () => {
-                if (!canSubmit) return;
-                setSubmitting(true);
-                try {
-                  await onSubmit(numericAmount, reason.trim());
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
-              disabled={!canSubmit}
-              className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
-            >
-              {submitting ? "Sauvegarde…" : "Appliquer"}
-            </button>
+            <div className="flex flex-col items-end gap-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!canSubmit) return;
+                  setSubmitting(true);
+                  try {
+                    await onSubmit(numericAmount, reason.trim());
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                disabled={!canSubmit}
+                className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
+              >
+                {submitting ? "Sauvegarde…" : "Appliquer"}
+              </button>
+              {disabledHint && (
+                <span className="text-[10px] text-amber-700">{disabledHint}</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
