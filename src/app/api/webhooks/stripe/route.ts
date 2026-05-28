@@ -159,7 +159,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let result: { created?: boolean; updated?: boolean; skipped?: string } = {};
+  let result: {
+    created?: boolean;
+    updated?: boolean;
+    skipped?: string;
+    ledger_created?: number;
+    ledger_skipped?: number;
+  } = {};
 
   try {
     switch (event.type) {
@@ -255,18 +261,29 @@ export async function POST(request: NextRequest) {
         const refunded = Math.round((charge.amount_refunded || 0) / 100);
         const net = Math.round((charge.amount - (charge.amount_refunded || 0)) / 100);
 
-        // Check si le mois de la charge originale est verrouillé.
-        // Si oui, on flag `refunded_after_lock=true` pour que l'admin voie
-        // le clawback potentiel sur la paie suivante du négo (commission
-        // déjà versée à l'époque mais le client a été remboursé depuis).
+        // Fetch la ligne d'origine + son mois (pour décider si on doit
+        // créer des lignes ledger dans un mois ultérieur).
         const { data: rowInfo } = await sb
           .from("attribution_rows")
-          .select("run_id, monthly_runs!inner(locked, year_month)")
+          .select(
+            "run_id, email, customer_id, description, auto_commercial_id, override_commercial_id, monthly_runs!inner(locked, year_month)",
+          )
           .eq("charge_id", charge.id)
           .maybeSingle();
         type RunInfo = { locked: boolean; year_month: string };
-        const runInfo = (rowInfo as unknown as { monthly_runs?: RunInfo } | null)?.monthly_runs;
+        type OriginalRow = {
+          run_id: string;
+          email: string | null;
+          customer_id: string | null;
+          description: string | null;
+          auto_commercial_id: string | null;
+          override_commercial_id: string | null;
+          monthly_runs?: RunInfo;
+        };
+        const orig = (rowInfo as unknown as OriginalRow | null);
+        const runInfo = orig?.monthly_runs;
         const isMonthLocked = !!runInfo?.locked;
+        const originalYearMonth = runInfo?.year_month;
 
         const updateFields: Record<string, unknown> = {
           amount_refunded_eur: refunded,
@@ -282,12 +299,132 @@ export async function POST(request: NextRequest) {
           .update(updateFields)
           .eq("charge_id", charge.id);
 
+        // ───────────────────────────────────────────────────────────
+        // LEDGER : pour chaque refund Stripe individuel, si le refund
+        // tombe dans un mois différent du mois de la vente d'origine,
+        // créer une ligne NÉGATIVE dans le mois du refund attribuée
+        // au même négo. Ainsi le CA du mois en cours est diminué au
+        // fil de l'eau, et la commission/atteinte d'obj suit.
+        //
+        // Anti-doublon : charge_id = `refund_<stripe_refund_id>`.
+        // Cas même mois : on ne crée pas de ligne (déjà capté via
+        //                 amount_net_eur sur la ligne d'origine).
+        // ───────────────────────────────────────────────────────────
+        let ledgerCreated = 0;
+        let ledgerSkipped = 0;
+        if (orig && originalYearMonth && stripe) {
+          let refunds: Stripe.Refund[] = charge.refunds?.data || [];
+          // Fallback : si refunds pas expansé sur l'event, on fetch.
+          if (refunds.length === 0 && refunded > 0) {
+            try {
+              const refundsList = await stripe.refunds.list({
+                charge: charge.id,
+                limit: 100,
+              });
+              refunds = refundsList.data;
+            } catch (e) {
+              console.warn(
+                `[stripe-webhook] Failed to fetch refunds for ${charge.id}:`,
+                e instanceof Error ? e.message : e,
+              );
+            }
+          }
+
+          const effectiveCommercialId =
+            orig.override_commercial_id || orig.auto_commercial_id;
+
+          for (const refund of refunds) {
+            if (!refund.id || refund.status !== "succeeded") continue;
+            const refundIso = new Date(refund.created * 1000).toISOString();
+            const refundYearMonth = yearMonthFromDate(refundIso);
+
+            // Skip si même mois — la vente et son refund se compensent déjà
+            if (refundYearMonth === originalYearMonth) {
+              ledgerSkipped++;
+              continue;
+            }
+
+            const ledgerChargeId = `refund_${refund.id}`;
+            const { data: existing } = await sb
+              .from("attribution_rows")
+              .select("charge_id")
+              .eq("charge_id", ledgerChargeId)
+              .maybeSingle();
+            if (existing) {
+              ledgerSkipped++;
+              continue;
+            }
+
+            const refundRunId = await ensureMonthlyRun(refundYearMonth);
+            if (!refundRunId) {
+              ledgerSkipped++;
+              continue;
+            }
+            const { data: refundRun } = await sb
+              .from("monthly_runs")
+              .select("locked")
+              .eq("id", refundRunId)
+              .maybeSingle();
+            if (refundRun?.locked) {
+              console.warn(
+                `[stripe-webhook] REFUND-LEDGER : refund ${refund.id} cible un mois verrouillé (${refundYearMonth}), création ledger annulée.`,
+              );
+              ledgerSkipped++;
+              continue;
+            }
+
+            const amount = Math.round(refund.amount / 100);
+            if (amount < 1) {
+              ledgerSkipped++;
+              continue;
+            }
+
+            const insertRes = await sb.from("attribution_rows").insert({
+              charge_id: ledgerChargeId,
+              email: `(refund) ${orig.email || ""}`,
+              customer_id: orig.customer_id,
+              phone: null,
+              client_name: "Refund Stripe",
+              created_at: refundIso,
+              amount_gross_eur: -Math.abs(amount),
+              amount_refunded_eur: 0,
+              amount_net_eur: -Math.abs(amount),
+              description: `Refund Stripe sur vente ${charge.id} (mois d'origine ${originalYearMonth}) — ${(orig.description || "").slice(0, 200)}`,
+              family: "Refund",
+              product_name: null,
+              newbiz_1m: null,
+              newbiz_3m: null,
+              auto_commercial_id: effectiveCommercialId,
+              override_commercial_id: null,
+              auto_score: null,
+              auto_source: "stripe_refund_ledger",
+              auto_reason: `Refund auto-décompté depuis vente ${charge.id} (originellement attribuée en ${originalYearMonth})`,
+              run_id: refundRunId,
+            });
+
+            if (insertRes.error) {
+              console.error(
+                `[stripe-webhook] REFUND-LEDGER insert failed for refund ${refund.id}:`,
+                insertRes.error.message,
+              );
+              ledgerSkipped++;
+            } else {
+              ledgerCreated++;
+              console.log(
+                `[stripe-webhook] REFUND-LEDGER : ${amount} € décompté sur ${refundYearMonth} (vente ${charge.id} de ${originalYearMonth}, négo ${effectiveCommercialId}, refund ${refund.id}).`,
+              );
+            }
+          }
+        }
+
         if (!error && isMonthLocked) {
           console.warn(
             `[stripe-webhook] REFUND-AFTER-LOCK : charge ${charge.id} (mois ${runInfo?.year_month}) — ${refunded} € remboursé sur mois locked. Le négo a probablement déjà été commissionné, prévoir un clawback.`,
           );
         }
-        result = error ? { skipped: error.message } : { updated: true };
+        result = error
+          ? { skipped: error.message }
+          : { updated: true, ledger_created: ledgerCreated, ledger_skipped: ledgerSkipped };
         break;
       }
       default:

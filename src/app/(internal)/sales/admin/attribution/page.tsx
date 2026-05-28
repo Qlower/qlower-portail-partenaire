@@ -9,6 +9,8 @@ import LockMonthButton from "@/components/internal/LockMonthButton";
 import RescoreMonthButton from "@/components/internal/RescoreMonthButton";
 import ManualChargeButton from "@/components/internal/ManualChargeButton";
 import RefundAfterLockBanner, { type RefundRow as ClawbackRefundRow } from "@/components/internal/RefundAfterLockBanner";
+import RefundLedgerWidget, { type LedgerEntry } from "@/components/internal/RefundLedgerWidget";
+import ManualRefundLedgerButton from "@/components/internal/ManualRefundLedgerButton";
 import MonthSelector from "@/components/internal/MonthSelector";
 import PersonalObjective from "@/components/internal/PersonalObjective";
 import { cookies } from "next/headers";
@@ -28,6 +30,7 @@ interface DbRow {
   client_name: string | null;
   created_at: string;
   amount_net_eur: number;
+  description: string | null;
   commissionable_amount_eur: number | null;
   commissionable_adjusted_reason: string | null;
   commissionable_adjusted_by_email: string | null;
@@ -65,7 +68,7 @@ async function loadAttributionData(yearMonth: string) {
   const { data: rawRows } = await sb
     .from("attribution_rows")
     .select(
-      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, commissionable_amount_eur, commissionable_adjusted_reason, commissionable_adjusted_by_email, commissionable_adjusted_at, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason, flagged_by, flagged_at, clawback_status, clawback_amount_eur, clawback_decided_by_email, clawback_applied_at, clawback_reason",
+      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, description, commissionable_amount_eur, commissionable_adjusted_reason, commissionable_adjusted_by_email, commissionable_adjusted_at, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason, flagged_by, flagged_at, clawback_status, clawback_amount_eur, clawback_decided_by_email, clawback_applied_at, clawback_reason",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
@@ -185,7 +188,12 @@ async function loadAttributionData(yearMonth: string) {
     role: c.role,
   }));
 
-  return { rows, commercials: commercialOptions, run };
+  // Map charge_id → description (utilisé par le widget ledger pour afficher
+  // le contexte de chaque ligne de refund — RowData n'expose pas description).
+  const descriptionByCharge = new Map<string, string | null>();
+  for (const r of dbRows) descriptionByCharge.set(r.charge_id, r.description);
+
+  return { rows, commercials: commercialOptions, run, descriptionByCharge };
 }
 
 async function getAuthedUserMeta() {
@@ -216,7 +224,7 @@ export default async function AttributionAdminPage({
 }) {
   const params = await searchParams;
   const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
-  const { rows, commercials, run } = await loadAttributionData(yearMonth);
+  const { rows, commercials, run, descriptionByCharge } = await loadAttributionData(yearMonth);
   const monthLabel = formatYearMonthFull(yearMonth);
   const editable = !run?.locked;
   const { internalRole, myCommercialId, myUserId } = await getAuthedUserMeta();
@@ -249,6 +257,7 @@ export default async function AttributionAdminPage({
         <div className="flex flex-wrap gap-2 items-center">
           <MonthSelector current={yearMonth} available={availableMonths} />
           <ManualChargeButton />
+          <ManualRefundLedgerButton />
           <RescoreMonthButton yearMonth={yearMonth} isLocked={!!run?.locked} />
           <LockMonthButton yearMonth={yearMonth} isLocked={!!run?.locked} />
           <a
@@ -261,6 +270,28 @@ export default async function AttributionAdminPage({
       </div>
 
       <PersonalObjective yearMonth={yearMonth} view={speedometerView || undefined} />
+
+      {/* Widget refunds-ledger : lignes négatives auto-créées sur ce mois
+          par le webhook Stripe (auto_source = stripe_refund_ledger) ou par
+          l'admin via "Acter un refund passé" (manual_refund_ledger). */}
+      {(() => {
+        const ledger = rows
+          .filter(
+            (r) =>
+              r.auto_source === "stripe_refund_ledger" ||
+              r.auto_source === "manual_refund_ledger",
+          )
+          .map<LedgerEntry>((r) => ({
+            charge_id: r.charge_id,
+            email: r.email,
+            amount_net_eur: r.amount_net_eur,
+            created_at: r.created_at,
+            effective_commercial_name: r.effective_commercial_name,
+            auto_source: r.auto_source,
+            description: descriptionByCharge.get(r.charge_id) ?? null,
+          }));
+        return <RefundLedgerWidget entries={ledger} />;
+      })()}
 
       {/* Alerte refund-after-lock : remboursements arrivés après verrouillage du mois.
          Composant client interactif avec 3 actions par ligne (assume/clawback/cancel) */}
