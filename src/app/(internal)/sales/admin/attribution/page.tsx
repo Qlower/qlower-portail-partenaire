@@ -54,6 +54,11 @@ interface DbRow {
   clawback_decided_by_email: string | null;
   clawback_applied_at: string | null;
   clawback_reason: string | null;
+  decommission_commercial_id: string | null;
+  decommission_amount_eur: number | null;
+  decommission_reason: string | null;
+  decommission_set_by_email: string | null;
+  decommission_set_at: string | null;
 }
 
 async function loadAttributionData(yearMonth: string) {
@@ -68,7 +73,7 @@ async function loadAttributionData(yearMonth: string) {
   const { data: rawRows } = await sb
     .from("attribution_rows")
     .select(
-      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, description, commissionable_amount_eur, commissionable_adjusted_reason, commissionable_adjusted_by_email, commissionable_adjusted_at, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason, flagged_by, flagged_at, clawback_status, clawback_amount_eur, clawback_decided_by_email, clawback_applied_at, clawback_reason",
+      "charge_id, email, client_name, created_at, amount_net_eur, amount_gross_eur, amount_refunded_eur, refunded_after_lock, description, commissionable_amount_eur, commissionable_adjusted_reason, commissionable_adjusted_by_email, commissionable_adjusted_at, family, newbiz_1m, newbiz_3m, auto_commercial_id, auto_score, auto_source, auto_reason, override_commercial_id, override_set_by, override_set_at, flagged_for_review, flagged_reason, flagged_by, flagged_at, clawback_status, clawback_amount_eur, clawback_decided_by_email, clawback_applied_at, clawback_reason, decommission_commercial_id, decommission_amount_eur, decommission_reason, decommission_set_by_email, decommission_set_at",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
@@ -177,6 +182,27 @@ async function loadAttributionData(yearMonth: string) {
       clawback_decided_by_email: r.clawback_decided_by_email,
       clawback_applied_at: r.clawback_applied_at,
       clawback_reason: r.clawback_reason,
+      decommission_commercial_id: r.decommission_commercial_id,
+      decommission_commercial_name: r.decommission_commercial_id
+        ? commById.get(r.decommission_commercial_id)?.name || null
+        : null,
+      decommission_amount_eur: r.decommission_amount_eur,
+      decommission_reason: r.decommission_reason,
+      decommission_set_by_email: r.decommission_set_by_email,
+      decommission_set_at: r.decommission_set_at,
+      // Le négo de la vente d'origine est référencé dans auto_reason (depuis Phase A) :
+      // "...originellement attribuée en YYYY-MM au négo <commercial_id>".
+      // On l'extrait pour aider l'admin à pré-remplir le dropdown décommissionnement.
+      original_commercial_id: (() => {
+        const match = r.auto_reason?.match(/au n[ée]go ([a-f0-9-]{36})/i);
+        return match ? match[1] : null;
+      })(),
+      original_commercial_name: (() => {
+        const match = r.auto_reason?.match(/au n[ée]go ([a-f0-9-]{36})/i);
+        const id = match ? match[1] : null;
+        return id ? commById.get(id)?.name || null : null;
+      })(),
+      description: (r as DbRow & { description?: string | null }).description ?? null,
       history: historyByCharge.get(r.charge_id) || [],
       notes: notesByCharge.get(r.charge_id) || [],
     };

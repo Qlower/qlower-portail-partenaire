@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, History, MessageSquare, Flag, Plus, Search, Wallet } from "lucide-react";
+import { ChevronDown, History, MessageSquare, Flag, Plus, Search, Wallet, Scale } from "lucide-react";
 import EngagementPanel from "./EngagementPanel";
+import DecommissionDecisionModal, { type DecommissionRowData } from "./DecommissionDecisionModal";
 import { hubspotSearchByEmailUrl } from "@/lib/hubspot-urls";
 
 export interface CommercialOption {
@@ -70,6 +71,20 @@ export interface RowData {
   clawback_decided_by_email?: string | null;
   clawback_applied_at?: string | null;
   clawback_reason?: string | null;
+  // Décommissionnement sur ligne refund ledger : montant à retenir sur la
+  // paie commission d'un négo. Le CA du négo ne baisse pas (la ligne ledger
+  // reste non attribuée), c'est juste un tracker pour la paie fin de mois.
+  decommission_commercial_id?: string | null;
+  decommission_commercial_name?: string | null;
+  decommission_amount_eur?: number | null;
+  decommission_reason?: string | null;
+  decommission_set_by_email?: string | null;
+  decommission_set_at?: string | null;
+  // Négo de la vente d'origine (pour aider l'admin à pré-remplir le dropdown)
+  original_commercial_id?: string | null;
+  original_commercial_name?: string | null;
+  // Description (pour la modale décommissionnement)
+  description?: string | null;
   history: HistoryEntry[];
   notes: NoteEntry[];
 }
@@ -203,6 +218,8 @@ export default function AttributionTable({
   const [panelChargeId, setPanelChargeId] = useState<string | null>(null);
   // Charge dont on ajuste le montant commissionnable (null = modal fermé)
   const [adjustingChargeId, setAdjustingChargeId] = useState<string | null>(null);
+  // Modal "Décider du décommissionnement" pour les lignes refund ledger
+  const [decommissioningChargeId, setDecommissioningChargeId] = useState<string | null>(null);
   // Tri des colonnes — par défaut : date la plus récente en haut
   type SortKey = "email" | "date" | "net" | "family" | "newbiz" | "attribution" | "reason";
   const [sortKey, setSortKey] = useState<SortKey>("date");
@@ -530,6 +547,7 @@ export default function AttributionTable({
                 onSubmitNote={() => addNote(r.charge_id)}
                 onChangeAttribution={(cid) => changeAttribution(r.charge_id, cid)}
                 onOpenAdjust={() => setAdjustingChargeId(r.charge_id)}
+                onOpenDecommission={() => setDecommissioningChargeId(r.charge_id)}
                 onToggleFlag={async () => {
                   const newFlag = !r.flagged_for_review;
 
@@ -632,6 +650,32 @@ export default function AttributionTable({
               await adjustCommissionable(adjustingChargeId, null, "");
               setAdjustingChargeId(null);
             }}
+          />
+        );
+      })()}
+
+      {/* Modal de décision de décommissionnement (lignes refund ledger) */}
+      {decommissioningChargeId && (() => {
+        const row = rows.find((r) => r.charge_id === decommissioningChargeId);
+        if (!row) return null;
+        const modalRow: DecommissionRowData = {
+          charge_id: row.charge_id,
+          amount_net_eur: row.amount_net_eur,
+          email: row.email,
+          description: row.description ?? null,
+          decommission_commercial_id: row.decommission_commercial_id ?? null,
+          decommission_amount_eur: row.decommission_amount_eur ?? null,
+          decommission_reason: row.decommission_reason ?? null,
+          decommission_set_by_email: row.decommission_set_by_email ?? null,
+          decommission_set_at: row.decommission_set_at ?? null,
+          original_commercial_id: row.original_commercial_id ?? null,
+          original_commercial_name: row.original_commercial_name ?? null,
+        };
+        return (
+          <DecommissionDecisionModal
+            row={modalRow}
+            commercials={commercials}
+            onClose={() => setDecommissioningChargeId(null)}
           />
         );
       })()}
@@ -867,6 +911,7 @@ interface RowProps {
   onToggleFlag: () => void;
   onOpenPanel: () => void;
   onOpenAdjust: () => void;
+  onOpenDecommission: () => void;
 }
 
 function RowComponent({
@@ -874,8 +919,13 @@ function RowComponent({
   openHistory, openNotes, noteForm, noteText,
   onToggleHistory, onToggleNotes, onOpenNoteForm, onCancelNoteForm,
   onChangeNoteText, onSubmitNote, onChangeAttribution, onToggleFlag,
-  onOpenPanel, onOpenAdjust,
+  onOpenPanel, onOpenAdjust, onOpenDecommission,
 }: RowProps) {
+  // Une ligne refund ledger a son propre flow (modal décommissionnement)
+  // au lieu de la modal "Ajuster le commissionnable" classique.
+  const isRefundLedger =
+    row.auto_source === "stripe_refund_ledger" ||
+    row.auto_source === "manual_refund_ledger";
   // Highlight subtilement les lignes qui me concernent dans la vue équipe.
   const rowClass = isMine
     ? "border-t border-gray-100 hover:bg-gray-50/40 bg-blue-50/30"
@@ -1103,7 +1153,24 @@ function RowComponent({
               </button>
             );
           })()}
-          {editable && (
+          {editable && isRefundLedger && (
+            <button
+              onClick={onOpenDecommission}
+              className={`inline-flex items-center gap-0.5 text-[10px] ml-1 hover:text-amber-700 ${
+                row.decommission_commercial_id
+                  ? "text-amber-600"
+                  : "text-gray-400"
+              }`}
+              title={
+                row.decommission_commercial_id
+                  ? `Décommissionne ${row.decommission_commercial_name || "un négo"} de ${Math.round(Number(row.decommission_amount_eur || 0)).toLocaleString("fr-FR")} € — clique pour modifier`
+                  : "Décider du décommissionnement (par défaut : la boîte assume)"
+              }
+            >
+              <Scale className="w-3 h-3" />
+            </button>
+          )}
+          {editable && !isRefundLedger && (
             <button
               onClick={onOpenAdjust}
               className={`inline-flex items-center gap-0.5 text-[10px] ml-1 hover:text-amber-700 ${

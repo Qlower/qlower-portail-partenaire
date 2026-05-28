@@ -302,9 +302,14 @@ export async function POST(request: NextRequest) {
         // ───────────────────────────────────────────────────────────
         // LEDGER : pour chaque refund Stripe individuel, si le refund
         // tombe dans un mois différent du mois de la vente d'origine,
-        // créer une ligne NÉGATIVE dans le mois du refund attribuée
-        // au même négo. Ainsi le CA du mois en cours est diminué au
-        // fil de l'eau, et la commission/atteinte d'obj suit.
+        // créer une ligne NÉGATIVE dans le mois du refund. Cette ligne
+        // est NON ATTRIBUÉE par défaut (auto_commercial_id = NULL) :
+        //   - le CA équipe est diminué au fil de l'eau (cas par défaut)
+        //   - aucun négo individuel ne voit son CA baisser
+        //
+        // L'admin peut ensuite décider via la modale "Décommissionner"
+        // de quel négo retenir le montant sur sa prochaine paie commission
+        // (cf. colonnes decommission_*).
         //
         // Anti-doublon : charge_id = `refund_<stripe_refund_id>`.
         // Cas même mois : on ne crée pas de ligne (déjà capté via
@@ -330,7 +335,10 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          const effectiveCommercialId =
+          // Le négo de la vente d'origine — conservé en auto_reason pour
+          // l'audit (qui était commissionné à l'époque) MAIS PAS attribué
+          // à la ligne ledger. L'admin décide via la modale décommissionnement.
+          const originalCommercialId =
             orig.override_commercial_id || orig.auto_commercial_id;
 
           for (const refund of refunds) {
@@ -394,11 +402,14 @@ export async function POST(request: NextRequest) {
               product_name: null,
               newbiz_1m: null,
               newbiz_3m: null,
-              auto_commercial_id: effectiveCommercialId,
+              // NON ATTRIBUÉ par défaut : le CA équipe baisse, aucun négo
+              // individuel n'est impacté. L'admin décide ensuite si on
+              // décommissionne un négo (cf. colonnes decommission_*).
+              auto_commercial_id: null,
               override_commercial_id: null,
               auto_score: null,
               auto_source: "stripe_refund_ledger",
-              auto_reason: `Refund auto-décompté depuis vente ${charge.id} (originellement attribuée en ${originalYearMonth})`,
+              auto_reason: `Refund auto-décompté depuis vente ${charge.id} (originellement attribuée en ${originalYearMonth}${originalCommercialId ? ` au négo ${originalCommercialId}` : ""}). Non attribué par défaut — décision admin requise pour décommissionner un négo.`,
               run_id: refundRunId,
             });
 
@@ -411,7 +422,7 @@ export async function POST(request: NextRequest) {
             } else {
               ledgerCreated++;
               console.log(
-                `[stripe-webhook] REFUND-LEDGER : ${amount} € décompté sur ${refundYearMonth} (vente ${charge.id} de ${originalYearMonth}, négo ${effectiveCommercialId}, refund ${refund.id}).`,
+                `[stripe-webhook] REFUND-LEDGER : ${amount} € décompté sur ${refundYearMonth} (vente ${charge.id} de ${originalYearMonth}, négo origine ${originalCommercialId || "—"}, refund ${refund.id}). Non attribué — décision admin requise.`,
               );
             }
           }

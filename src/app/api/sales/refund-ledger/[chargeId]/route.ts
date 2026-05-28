@@ -65,7 +65,10 @@ export async function POST(
       { status: 500 },
     );
 
-  const effectiveCommercialId =
+  // On garde la trace du négo de la vente d'origine en auto_reason pour
+  // l'audit, mais on N'ATTRIBUE PAS la ligne ledger (NULL). L'admin
+  // décidera ensuite via la modale décommissionnement.
+  const originalCommercialId =
     (row as { override_commercial_id: string | null; auto_commercial_id: string | null }).override_commercial_id ||
     (row as { auto_commercial_id: string | null }).auto_commercial_id;
 
@@ -147,11 +150,13 @@ export async function POST(
     product_name: null,
     newbiz_1m: null,
     newbiz_3m: null,
-    auto_commercial_id: effectiveCommercialId,
+    // NON ATTRIBUÉ par défaut : le CA équipe baisse, aucun négo n'est
+    // impacté. L'admin décide ensuite via la modale décommissionnement.
+    auto_commercial_id: null,
     override_commercial_id: null,
     auto_score: null,
     auto_source: "manual_refund_ledger",
-    auto_reason: `Refund décompté manuellement par admin ${auth.email} depuis vente ${chargeId} (originellement attribuée en ${originalYearMonth})`,
+    auto_reason: `Refund décompté manuellement par admin ${auth.email} depuis vente ${chargeId} (originellement attribuée en ${originalYearMonth}${originalCommercialId ? ` au négo ${originalCommercialId}` : ""}). Non attribué — décision admin requise pour décommissionner un négo.`,
     run_id: currentRunId,
   });
 

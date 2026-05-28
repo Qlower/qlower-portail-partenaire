@@ -15,7 +15,7 @@ async function loadTeamData(yearMonth: string) {
 
   const { data: rows } = await sb
     .from("attribution_rows")
-    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, flagged_for_review")
+    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, flagged_for_review, decommission_commercial_id, decommission_amount_eur")
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
   const { data: commercials } = await sb
@@ -45,10 +45,25 @@ async function loadTeamData(yearMonth: string) {
     net: number;
     flagged: number;
     target: number;
+    // Cumul des retenues à appliquer sur la paie commission de fin de mois
+    // (décisions admin sur les lignes refund ledger qui ciblent ce négo).
+    retenue: number;
   };
   const byId = new Map<string, Agg>();
   let autonomeNet = 0;
   let autonomeRows = 0;
+
+  // Index décommissionnements par commercial_id pour ce mois
+  const retenueByCommercial = new Map<string, number>();
+  for (const r of rows || []) {
+    if (r.decommission_commercial_id && r.decommission_amount_eur) {
+      const prev = retenueByCommercial.get(r.decommission_commercial_id) || 0;
+      retenueByCommercial.set(
+        r.decommission_commercial_id,
+        prev + Number(r.decommission_amount_eur),
+      );
+    }
+  }
   // On commissionne sur commissionable_amount_eur si défini (override admin),
   // sinon amount_net_eur. Le classement reflète donc le vrai dû paie.
   const commish = (r: { amount_net_eur: number; commissionable_amount_eur: number | null }) =>
@@ -75,6 +90,7 @@ async function loadTeamData(yearMonth: string) {
       net: 0,
       flagged: 0,
       target: targetById.get(cid) || 0,
+      retenue: retenueByCommercial.get(cid) || 0,
     };
     cur.rows++;
     cur.net += amount;
@@ -93,6 +109,7 @@ async function loadTeamData(yearMonth: string) {
         net: 0,
         flagged: 0,
         target: targetById.get(c.id) || 0,
+        retenue: retenueByCommercial.get(c.id) || 0,
       });
     }
   }
@@ -141,6 +158,9 @@ export default async function EquipePage({
               <th className="px-4 py-3 text-right">Objectif</th>
               <th className="px-4 py-3 text-right">% atteint</th>
               <th className="px-4 py-3 text-right">Lignes</th>
+              <th className="px-4 py-3 text-right" title="Cumul des décommissionnements sur lignes refund — à retenir sur la paie commission">
+                Retenue paie
+              </th>
               <th className="px-4 py-3">Progression</th>
             </tr>
           </thead>
@@ -183,6 +203,15 @@ export default async function EquipePage({
                     ) : "—"}
                   </td>
                   <td className="px-4 py-3 text-right text-xs text-gray-500 font-mono tabular-nums">{c.rows}</td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums">
+                    {c.retenue > 0 ? (
+                      <span className="text-amber-700" title="À retenir sur la paie commission de ce mois">
+                        −{fmtEur(c.retenue)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden w-full max-w-[180px]">
                       <div className={`h-full ${colorBar} transition-all`} style={{ width: `${Math.min(100, pct)}%` }} />

@@ -51,6 +51,8 @@ interface PersonalStats {
   week: { obj: number; real: number; pct: number };
   month: { obj: number; real: number; pct: number };
   pacing: { expected: number; real: number; deltaDays: number };
+  // Retenue à appliquer sur la paie commission (cumul décommissionnements)
+  retenue: number;
 }
 
 // Filtre des charges selon le mode :
@@ -79,12 +81,13 @@ async function getPersonalStats(
       week: { obj: 0, real: 0, pct: 0 },
       month: { obj: monthlyObj, real: 0, pct: 0 },
       pacing: { expected: 0, real: 0, deltaDays: 0 },
+      retenue: 0,
     };
   }
 
   const { data: rows } = await sb
     .from("attribution_rows")
-    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, created_at")
+    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, created_at, decommission_commercial_id, decommission_amount_eur")
     .eq("run_id", run.id);
 
   const mine = (rows || []).filter((r) => {
@@ -118,6 +121,17 @@ async function getPersonalStats(
   const expected = dailyObj * elapsed;
   const todayObj = isToday ? dailyObj : 0;
 
+  // Retenue à appliquer sur la paie commission de ce négo (cumul des
+  // décommissionnements sur lignes refund ledger qui ciblent ce négo).
+  // En vue team, c'est le cumul de TOUTES les retenues du mois.
+  const retenue = (rows || [])
+    .filter((r) => {
+      if (!r.decommission_commercial_id || !r.decommission_amount_eur) return false;
+      if (filter.mode === "team") return true;
+      return r.decommission_commercial_id === filter.commercialId;
+    })
+    .reduce((s, r) => s + Number(r.decommission_amount_eur || 0), 0);
+
   return {
     today: {
       obj: todayObj,
@@ -139,6 +153,7 @@ async function getPersonalStats(
       real: monthReal,
       deltaDays: dailyObj > 0 ? (monthReal - expected) / dailyObj : 0,
     },
+    retenue,
   };
 }
 
@@ -358,6 +373,18 @@ export default async function PersonalObjective({
               ? `Bilan rétroactif du mois ${yearMonth} — comparé à l'objectif.`
               : "Décliné Jour / Semaine / Mois sur la base des jours ouvrés (Lun-Ven, hors fériés FR)."}
           </p>
+          {stats.retenue > 0 && (
+            <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-100 border border-amber-300 text-[11px] text-amber-800">
+              <span>⚠</span>
+              <span>
+                Retenue paie ce mois :{" "}
+                <strong>−{Math.round(stats.retenue).toLocaleString("fr-FR")} €</strong>{" "}
+                <span className="text-amber-700/70">
+                  (décommissionnements admin — n&apos;impacte pas le CA affiché)
+                </span>
+              </span>
+            </div>
+          )}
         </div>
         {isAdmin && (
           <ObjectiveViewSelector
