@@ -79,8 +79,12 @@ export default async function RapportPage({
         />
         <KpiCard
           label="Commissions à verser"
-          value={fmtEurCents(data.totalCommissions)}
-          sub={`${data.negos.filter((n) => n.commission.amount_eur > 0).length} négos rémunérés`}
+          value={fmtEurCents(data.totalCommissionsNet)}
+          sub={
+            data.totalRetenues > 0
+              ? `Brut ${fmtEurCents(data.totalCommissions)} − retenues ${fmtEurCents(data.totalRetenues)}`
+              : `${data.negos.filter((n) => n.commission_net_eur > 0).length} négos rémunérés`
+          }
           highlight="primary"
         />
       </div>
@@ -192,7 +196,11 @@ export default async function RapportPage({
               <th className="px-4 py-3 text-right">CA HT</th>
               <th className="px-4 py-3 text-right">Objectif</th>
               <th className="px-4 py-3 text-right">% atteint</th>
-              <th className="px-4 py-3 text-right">Commission</th>
+              <th className="px-4 py-3 text-right">Commission brute</th>
+              <th className="px-4 py-3 text-right" title="Décommissionnements admin sur refunds ledger">
+                Retenue
+              </th>
+              <th className="px-4 py-3 text-right">Net à verser</th>
               <th className="px-4 py-3">Règle</th>
             </tr>
           </thead>
@@ -201,7 +209,7 @@ export default async function RapportPage({
               <NegoRow key={n.commercial_id} nego={n} rank={i + 1} />
             ))}
             {data.negos.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400 text-sm">
+              <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400 text-sm">
                 Pas de données pour {monthLabel}.
               </td></tr>
             )}
@@ -217,8 +225,14 @@ export default async function RapportPage({
                   {fmtPct(teamPct)}
                 </span>
               </td>
-              <td className="px-4 py-3 text-right font-mono tabular-nums text-[#0A3855]">
+              <td className="px-4 py-3 text-right font-mono tabular-nums text-gray-500">
                 {fmtEurCents(data.totalCommissions)}
+              </td>
+              <td className="px-4 py-3 text-right font-mono tabular-nums text-amber-700">
+                {data.totalRetenues > 0 ? `−${fmtEurCents(data.totalRetenues)}` : "—"}
+              </td>
+              <td className="px-4 py-3 text-right font-mono tabular-nums text-[#0A3855]">
+                {fmtEurCents(data.totalCommissionsNet)}
               </td>
               <td className="px-4 py-3 text-xs text-gray-500">
                 {teamObjReached ? "Bonus 10% activé pour Hasan/Driss" : "Bonus équipe non activé"}
@@ -450,8 +464,23 @@ function NegoRow({ nego, rank }: { nego: NegoLine; rank: number }) {
         ) : "—"}
       </td>
       <td className="px-4 py-3 text-right">
-        <div className="font-bold text-[#0A3855] font-mono tabular-nums">{fmtEurCents(commission.amount_eur)}</div>
+        <div className="text-gray-600 font-mono tabular-nums">{fmtEurCents(commission.amount_eur)}</div>
         <div className="text-[10px] text-gray-400 mt-0.5">{commission.rate_label}</div>
+      </td>
+      <td className="px-4 py-3 text-right font-mono tabular-nums">
+        {nego.retenue_eur > 0 ? (
+          <span className="text-amber-700">−{fmtEurCents(nego.retenue_eur)}</span>
+        ) : (
+          <span className="text-gray-300">—</span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className="font-bold text-[#0A3855] font-mono tabular-nums">
+          {fmtEurCents(nego.commission_net_eur)}
+        </div>
+        {nego.retenue_eur > 0 && (
+          <div className="text-[10px] text-amber-700 mt-0.5">net après retenue</div>
+        )}
       </td>
       <td className="px-4 py-3 text-[11px] text-gray-500 max-w-xs">{commission.breakdown || "—"}</td>
     </tr>

@@ -18,6 +18,11 @@ export interface NegoLine {
   obj_eur: number;
   obj_pct: number;
   commission: CommissionResult;
+  // Cumul des retenues à appliquer sur la paie de ce négo ce mois-ci
+  // (décommissionnements admin sur lignes refund ledger qui le ciblent).
+  retenue_eur: number;
+  // Commission nette à verser = commission calculée − retenue
+  commission_net_eur: number;
 }
 
 export interface DailyPoint {
@@ -72,7 +77,9 @@ export interface ReportData {
   locked: boolean;
   negos: NegoLine[];
   daily: DailyPoint[];
-  totalCommissions: number;
+  totalCommissions: number;       // brut (avant retenues)
+  totalRetenues: number;          // somme des décommissionnements admin sur le mois
+  totalCommissionsNet: number;    // net à verser = totalCommissions − totalRetenues
   // Nouvelles sections "rapport direction"
   newbizStats: CompositionStat[]; // NewBiz vs OldBiz
   sourceStats: CompositionStat[]; // Sales-touched / Self-service / Mid
@@ -101,20 +108,29 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
   const { data: rows } = await sb
     .from("attribution_rows")
     .select(
-      "amount_net_eur, auto_commercial_id, override_commercial_id, flagged_for_review, created_at, email, client_name, family, newbiz_1m, newbiz_3m, auto_source, auto_score, last_efforts",
+      "amount_net_eur, commissionable_amount_eur, decommission_commercial_id, decommission_amount_eur, auto_commercial_id, override_commercial_id, flagged_for_review, created_at, email, client_name, family, newbiz_1m, newbiz_3m, auto_source, auto_score, last_efforts",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
+
+  // Helper : CA réel commissionable (override admin > brut Stripe).
+  // Aligné avec PersonalObjective, /sales, /sales/equipe.
+  type RowAmt = { amount_net_eur: number | null; commissionable_amount_eur: number | null };
+  const commish = (r: RowAmt) =>
+    (r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+      ? Number(r.commissionable_amount_eur)
+      : Number(r.amount_net_eur)) || 0;
 
   // Total team
   let totalCA_TTC = 0;
   let flaggedCount = 0;
   let autonomeNet = 0;
   for (const r of rows || []) {
-    totalCA_TTC += r.amount_net_eur || 0;
+    const amt = commish(r);
+    totalCA_TTC += amt;
     if (r.flagged_for_review) flaggedCount++;
     const cid = r.override_commercial_id || r.auto_commercial_id;
     const c = commercials?.find((x) => x.id === cid);
-    if (c?.role === "system_none") autonomeNet += r.amount_net_eur || 0;
+    if (c?.role === "system_none") autonomeNet += amt;
   }
 
   // Per-négo aggregation
@@ -133,10 +149,19 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     const c = commercials?.find((x) => x.id === cid);
     if (!c) continue;
     const cur = byId.get(cid) || { id: cid, name: c.name, role: c.role, ca_ttc: 0, rows: 0, flagged: 0 };
-    cur.ca_ttc += r.amount_net_eur || 0;
+    cur.ca_ttc += commish(r);
     cur.rows++;
     if (r.flagged_for_review) cur.flagged++;
     byId.set(cid, cur);
+  }
+
+  // Retenues sur paie par négo : cumul des décommissionnements admin
+  // sur les lignes refund ledger qui ciblent ce négo.
+  const retenueById = new Map<string, number>();
+  for (const r of rows || []) {
+    if (!r.decommission_commercial_id || !r.decommission_amount_eur) continue;
+    const prev = retenueById.get(r.decommission_commercial_id) || 0;
+    retenueById.set(r.decommission_commercial_id, prev + Number(r.decommission_amount_eur));
   }
   // Inclure les négos avec 0 CA mais qui ont un objectif
   for (const c of commercials || []) {
@@ -158,6 +183,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
         teamCA_TTC: totalCA_TTC,
         teamObj,
       });
+      const retenue = retenueById.get(a.id) || 0;
       return {
         commercial_id: a.id,
         name: a.name,
@@ -169,6 +195,8 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
         obj_eur: obj,
         obj_pct: obj > 0 ? (a.ca_ttc / obj) * 100 : 0,
         commission,
+        retenue_eur: retenue,
+        commission_net_eur: Math.max(0, commission.amount_eur - retenue),
       };
     })
     .sort((x, y) => y.ca_ttc - x.ca_ttc);
@@ -187,7 +215,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     if (!r.created_at) continue;
     const day = r.created_at.slice(0, 10);
     if (dailyMap.has(day)) {
-      dailyMap.set(day, (dailyMap.get(day) || 0) + (r.amount_net_eur || 0));
+      dailyMap.set(day, (dailyMap.get(day) || 0) + commish(r));
     }
   }
   const daily: DailyPoint[] = [];
@@ -210,7 +238,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     const k = r.newbiz_1m || "Inconnu";
     const cur = newbizMap.get(k) || { count: 0, ca: 0 };
     cur.count++;
-    cur.ca += r.amount_net_eur || 0;
+    cur.ca += commish(r);
     newbizMap.set(k, cur);
   }
   const newbizStats: CompositionStat[] = [...newbizMap.entries()]
@@ -237,7 +265,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     const k = classifySource(r.auto_score);
     const cur = sourceMap.get(k) || { count: 0, ca: 0 };
     cur.count++;
-    cur.ca += r.amount_net_eur || 0;
+    cur.ca += commish(r);
     sourceMap.set(k, cur);
   }
   const sourceOrder = ["Sales-touched", "Mid", "Self-service"];
@@ -259,7 +287,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     const k = r.family || "Non catégorisé";
     const cur = productMap.get(k) || { count: 0, ca: 0 };
     cur.count++;
-    cur.ca += r.amount_net_eur || 0;
+    cur.ca += commish(r);
     productMap.set(k, cur);
   }
   const productStats: CompositionStat[] = [...productMap.entries()]
@@ -276,9 +304,10 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
   const clientMap = new Map<string, ClientAgg>();
   for (const r of rows || []) {
     if (!r.email) continue;
+    const amt = commish(r);
     const cur = clientMap.get(r.email);
     if (cur) {
-      cur.ca += r.amount_net_eur || 0;
+      cur.ca += amt;
       cur.nb_charges++;
       // Garde le family le plus "chiffré" (genre Abonnement > Autre)
       if (!cur.client_name && r.client_name) cur.client_name = r.client_name;
@@ -286,7 +315,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
       clientMap.set(r.email, {
         email: r.email,
         client_name: r.client_name,
-        ca: r.amount_net_eur || 0,
+        ca: amt,
         nb_charges: 1,
         family: r.family || null,
       });
@@ -407,6 +436,8 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     negos,
     daily,
     totalCommissions: negos.reduce((s, n) => s + n.commission.amount_eur, 0),
+    totalRetenues: negos.reduce((s, n) => s + n.retenue_eur, 0),
+    totalCommissionsNet: negos.reduce((s, n) => s + n.commission_net_eur, 0),
     newbizStats,
     sourceStats,
     productStats,
