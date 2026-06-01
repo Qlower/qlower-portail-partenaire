@@ -300,16 +300,23 @@ export async function POST(request: NextRequest) {
           .eq("charge_id", charge.id);
 
         // ───────────────────────────────────────────────────────────
-        // LEDGER : pour chaque refund Stripe individuel, si le refund
-        // tombe dans un mois différent du mois de la vente d'origine,
-        // créer une ligne NÉGATIVE dans le mois du refund. Cette ligne
-        // est NON ATTRIBUÉE par défaut (auto_commercial_id = NULL) :
-        //   - le CA équipe est diminué au fil de l'eau (cas par défaut)
-        //   - aucun négo individuel ne voit son CA baisser
+        // LEDGER : on ne bascule un refund sur le mois courant via une
+        // ligne NÉGATIVE QUE SI le mois d'origine est déjà VERROUILLÉ.
         //
-        // L'admin peut ensuite décider via la modale "Décommissionner"
-        // de quel négo retenir le montant sur sa prochaine paie commission
-        // (cf. colonnes decommission_*).
+        //   - Mois d'origine ENCORE OUVERT (cas par défaut) : le refund
+        //     est déjà capté par la réduction de `amount_net_eur` sur la
+        //     ligne d'origine ci-dessus → le CA du mois d'origine (et du
+        //     négo qui l'a fait) baisse au bon endroit. On ne crée AUCUNE
+        //     ligne ledger, sinon le refund serait compté deux fois
+        //     (−X sur le mois d'origine ET −X sur le mois courant).
+        //
+        //   - Mois d'origine VERROUILLÉ (déjà clôturé/payé) : on ne peut
+        //     plus toucher le CA payé, donc on porte le refund dans le
+        //     mois courant via une ligne ledger NÉGATIVE, NON ATTRIBUÉE
+        //     par défaut (auto_commercial_id = NULL) : le CA équipe baisse,
+        //     aucun négo individuel ne voit son CA baisser. L'admin décide
+        //     ensuite via la modale "Décommissionner" de quel négo retenir
+        //     le montant sur sa paie commission (cf. colonnes decommission_*).
         //
         // Anti-doublon : charge_id = `refund_<stripe_refund_id>`.
         // Cas même mois : on ne crée pas de ligne (déjà capté via
@@ -317,7 +324,7 @@ export async function POST(request: NextRequest) {
         // ───────────────────────────────────────────────────────────
         let ledgerCreated = 0;
         let ledgerSkipped = 0;
-        if (orig && originalYearMonth && stripe) {
+        if (orig && originalYearMonth && stripe && isMonthLocked) {
           let refunds: Stripe.Refund[] = charge.refunds?.data || [];
           // Fallback : si refunds pas expansé sur l'event, on fetch.
           if (refunds.length === 0 && refunded > 0) {

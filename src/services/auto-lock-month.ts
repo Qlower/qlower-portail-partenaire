@@ -1,10 +1,10 @@
 // Auto-lock du mois précédent — invoqué par le cron quotidien à 9h.
 //
-// Règle : le 5 de chaque mois M, on verrouille automatiquement le mois M-1.
-// Donne 5 jours pleins à l'équipe pour arbitrer les contestations restantes
+// Règle : le 15 de chaque mois M, on verrouille automatiquement le mois M-1.
+// Donne 15 jours pleins à l'équipe pour arbitrer les contestations restantes
 // avant clôture définitive.
 //
-// Idempotent : si déjà verrouillé, no-op. Si on n'est pas le 5, no-op.
+// Idempotent : si déjà verrouillé, no-op. Si on n'est pas le 15, no-op.
 // Le manager peut toujours déverrouiller manuellement via le LockMonthButton
 // (avec une raison enregistrée).
 
@@ -14,7 +14,7 @@ import { shiftYearMonth, currentYearMonth, formatYearMonthFull } from "@/lib/yea
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://partenaire.qlower.com";
 // Jour du mois auquel on verrouille (UTC). Configurable via env.
-const AUTO_LOCK_DAY = parseInt(process.env.AUTO_LOCK_DAY_OF_MONTH || "5", 10);
+const AUTO_LOCK_DAY = parseInt(process.env.AUTO_LOCK_DAY_OF_MONTH || "15", 10);
 
 export interface AutoLockResult {
   ranOn: string;            // ISO date du run
