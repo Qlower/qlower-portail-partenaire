@@ -114,6 +114,28 @@ export default async function RapportPage({
         </div>
       )}
 
+      {/* Reconductions d'abonnement — hors commission, pour la vue CA total */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-semibold text-[#0A3855]">Reconductions d&apos;abonnement</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              {data.renewalsCount} reconduction{data.renewalsCount > 1 ? "s" : ""} ce mois · <strong>hors commission</strong> (les négos ne sont pas payés dessus) · jamais comptées dans le CA commissionnable
+            </p>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">CA reconductions</div>
+              <div className="text-2xl font-bold text-gray-700 tabular-nums">{fmtEur(data.renewalsTotal)}</div>
+            </div>
+            <div className="text-right border-l border-gray-100 pl-6">
+              <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">CA total incl. reconductions</div>
+              <div className="text-2xl font-bold text-[#0A3855] tabular-nums">{fmtEur(data.totalCA_TTC + data.renewalsTotal)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Graph cumul */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-[#0A3855] mb-4">CA cumulé jour par jour</h2>

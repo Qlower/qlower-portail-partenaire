@@ -41,11 +41,13 @@ export interface ChargeEnrichment {
   newbiz_1m: "NewBiz" | "OldBiz";
   newbiz_3m: "NewBiz" | "OldBiz";
   // Statut du client au moment de la charge (best-effort via historique Stripe) :
-  //   Conquête       = aucune charge captured avant (1er achat ever)
-  //   Renouvellement = charge précédente < 45 j (abonnement actif)
-  //   Reconquête     = charge précédente ≥ 45 j (client revenu après une pause)
-  //   Inconnu        = pas de customer / fetch échoué
-  client_status: "Conquête" | "Reconquête" | "Renouvellement" | "Inconnu";
+  //   Conquête                      = aucune charge captured avant (1er achat ever)
+  //   Conquête (1er paiement < 45j) = charge précédente < 45 j (client tout juste acquis qui réachète)
+  //   Reconquête                    = charge précédente ≥ 45 j (client revenu après une pause)
+  //   Inconnu                       = pas de customer / fetch échoué
+  // NB : les reconductions d'abonnement ("Subscription update") ne passent PAS
+  // ici — elles sont stockées à part dans subscription_renewals (non commissionnable).
+  client_status: "Conquête" | "Conquête (1er paiement < 45j)" | "Reconquête" | "Inconnu";
 }
 
 /**
@@ -142,7 +144,7 @@ export async function inferNewBiz(
     return {
       newbiz_1m: sinceLast >= ONE_MONTH_S ? "NewBiz" : "OldBiz",
       newbiz_3m: sinceLast >= THREE_MONTHS_S ? "NewBiz" : "OldBiz",
-      client_status: sinceLast >= RECONQUEST_S ? "Reconquête" : "Renouvellement",
+      client_status: sinceLast >= RECONQUEST_S ? "Reconquête" : "Conquête (1er paiement < 45j)",
     };
   } catch (e) {
     console.warn("[charge-classifier] previous charges fetch failed:", e instanceof Error ? e.message : e);

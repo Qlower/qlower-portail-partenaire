@@ -104,6 +104,8 @@ export interface ReportData {
   basketDistribution: { label: string; nb_clients: number; ca: number }[]; // 1/2/3+ charges
   funnel: FunnelData;
   provenance: ProvenanceData; // affilié vs direct, top partenaires, canal
+  renewalsTotal: number; // CA des reconductions d'abonnement (NON commissionnable)
+  renewalsCount: number; // nb de reconductions du mois
 }
 
 export async function loadReportData(yearMonth: string): Promise<ReportData> {
@@ -359,7 +361,13 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     cur.ca += commish(r);
     clientStatusMap.set(k, cur);
   }
-  const statusOrder = ["Conquête", "Reconquête", "Renouvellement", "Inconnu", "Non classé"];
+  const statusOrder = [
+    "Conquête",
+    "Conquête (1er paiement < 45j)",
+    "Reconquête",
+    "Inconnu",
+    "Non classé",
+  ];
   const clientStatusStats: CompositionStat[] = [...clientStatusMap.entries()]
     .map(([label, v]) => ({
       label,
@@ -591,6 +599,14 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
       .sort((a, b) => b.ca - a.ca),
   };
 
+  // Reconductions d'abonnement du mois (table dédiée, NON commissionnable).
+  const { data: renewalRows } = await sb
+    .from("subscription_renewals")
+    .select("amount_eur")
+    .eq("year_month", yearMonth);
+  const renewalsTotal = (renewalRows || []).reduce((s, r) => s + (Number(r.amount_eur) || 0), 0);
+  const renewalsCount = (renewalRows || []).length;
+
   const nbCharges = rows?.length || 0;
   const nbClients = clientMap.size;
 
@@ -623,5 +639,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     basketDistribution,
     funnel,
     provenance,
+    renewalsTotal,
+    renewalsCount,
   };
 }

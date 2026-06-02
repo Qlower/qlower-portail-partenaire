@@ -64,6 +64,22 @@ async function upsertCharge(input: ChargeUpsertInput): Promise<{ created: boolea
   // Don't process Stripe charges that are out of scope: e.g. amounts under 1€,
   // or descriptions that are "Subscription update" (renewals).
   if (input.description && input.description.toLowerCase().includes("subscription update")) {
+    // Reconduction d'abonnement : NON commissionnable. On ne crée AUCUNE ligne
+    // dans attribution_rows (sinon le CA commissionnable et les commissions
+    // seraient gonflés). On l'enregistre dans une table dédiée et isolée,
+    // lue uniquement par la vue "CA total incl. reconductions" du rapport.
+    await sb.from("subscription_renewals").upsert(
+      {
+        charge_id: input.charge_id,
+        customer_id: input.customer_id,
+        email: input.email,
+        amount_eur: input.amount_net_eur,
+        created_at: input.created_at,
+        year_month: yearMonthFromDate(input.created_at),
+        description: input.description,
+      },
+      { onConflict: "charge_id" },
+    );
     return { created: false, updated: false, skipped: "subscription_update" };
   }
   if (input.amount_net_eur < 1) {
