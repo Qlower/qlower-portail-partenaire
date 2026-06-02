@@ -21,6 +21,7 @@ const SOURCE_LABELS: Record<string, string> = {
   EMAIL_MARKETING: "Email",
   OFFLINE: "Offline / appel entrant",
   OTHER_CAMPAIGNS: "Autres campagnes",
+  AI_REFERRALS: "Référent IA (ChatGPT…)",
 };
 
 /** Libellé FR lisible pour une valeur hs_analytics_source. */
