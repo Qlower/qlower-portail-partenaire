@@ -11,10 +11,11 @@
 // ALEX (sales_admin) :
 //   - 100 € brut × nombre de sales qui ont atteint leur objectif perso
 //     (manager bonus — la prime tombe dès qu'au moins un sales atteint son obj)
+//   - 5% du CA HT généré par Alex lui-même — TOUJOURS (base, quelle que soit l'équipe)
 //   - SI objectif ÉQUIPE atteint, EN PLUS :
-//       - 10% du CA HT généré par Alex lui-même
+//       - 10% du CA HT généré par Alex lui-même (soit 15% au total sur ses ventes)
 //       - 5% sur le DÉPASSEMENT de l'objectif équipe HT
-//   - SI obj équipe non atteint : seule la prime 100€/sales s'applique
+//   - SI obj équipe non atteint : prime 100€/sales + 5% de base sur ses ventes
 //
 // JENNYFER (upsell) :
 //   - 2% du CA HT généré (toujours)
@@ -122,11 +123,16 @@ export function computeCommission(input: CommissionInput): CommissionResult {
       parts.push(`Aucun sales n'a atteint son obj perso → prime manager 0 €`);
     }
 
+    // Base : 5% sur ses propres ventes — TOUJOURS, quelle que soit l'équipe.
+    const baseOwn = myCA_HT * 0.05;
+    total += baseOwn;
+    parts.push(`5% × ${fmtEurCents(myCA_HT)} (mes ventes, base) = ${fmtEurCents(baseOwn)}`);
+
     let teamBonusOwn = 0;
     let teamBonusOverage = 0;
     if (teamObjReached) {
       teamBonusOwn = myCA_HT * 0.10;
-      parts.push(`10% × ${fmtEurCents(myCA_HT)} (mes ventes) = ${fmtEurCents(teamBonusOwn)}`);
+      parts.push(`+10% × ${fmtEurCents(myCA_HT)} (mes ventes, bonus équipe) = ${fmtEurCents(teamBonusOwn)}`);
       if (teamCA_HT > teamObj_HT) {
         const teamSurplus = teamCA_HT - teamObj_HT;
         teamBonusOverage = teamSurplus * 0.05;
@@ -134,19 +140,17 @@ export function computeCommission(input: CommissionInput): CommissionResult {
       }
       total += teamBonusOwn + teamBonusOverage;
     } else if (teamObj_HT > 0) {
-      parts.push(`Équipe ${fmtEurCents(teamCA_HT)} / obj ${fmtEurCents(teamObj_HT)} non atteint → pas de bonus %`);
+      parts.push(`Équipe ${fmtEurCents(teamCA_HT)} / obj ${fmtEurCents(teamObj_HT)} non atteint → pas de bonus équipe`);
     }
 
-    let label: string;
-    if (teamObjReached && reachedSales > 0) {
-      label = `${reachedSales} × 100€ + 10% perso${teamCA_HT > teamObj_HT ? " + 5% dépassement" : ""}`;
-    } else if (teamObjReached) {
-      label = `10% perso${teamCA_HT > teamObj_HT ? " + 5% dépassement" : ""}`;
-    } else if (reachedSales > 0) {
-      label = `Prime manager ${reachedSales} × 100€`;
-    } else {
-      label = "—";
-    }
+    // Label : le 5% de base est toujours présent ; il devient 15% si l'obj
+    // équipe est atteint (5% base + 10% bonus équipe sur ses propres ventes).
+    const ownPct = teamObjReached ? 15 : 5;
+    const labelParts: string[] = [];
+    if (reachedSales > 0) labelParts.push(`${reachedSales} × 100€`);
+    labelParts.push(`${ownPct}% perso`);
+    if (teamObjReached && teamCA_HT > teamObj_HT) labelParts.push(`5% dépassement`);
+    const label = labelParts.join(" + ");
 
     return {
       amount_eur: round2(total),
