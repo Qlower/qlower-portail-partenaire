@@ -140,7 +140,7 @@ export default async function EquipePage({
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#0A3855]">Équipe — {monthLabel}</h1>
+          <h1 className="text-2xl font-bold text-[#0A3855]">Classement — {monthLabel}</h1>
           <p className="text-sm text-gray-500 mt-1">
             Classement temps réel · {fmtEur(totalNet)} sur {fmtEur(teamTarget)} d&apos;objectif équipe ({fmtPct(teamPct)})
           </p>

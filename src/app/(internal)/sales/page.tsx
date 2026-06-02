@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createServiceClient } from "@/lib/supabase-server";
+import Link from "next/link";
 import MonthSelector from "@/components/internal/MonthSelector";
 import PersonalObjective from "@/components/internal/PersonalObjective";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
@@ -212,62 +213,21 @@ export default async function SalesHomePage({
         </div>
       )}
 
-      {/* Per-commercial */}
-      <div className="bg-white border border-gray-200 rounded-lg">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-[#0A3855]">Performance par commercial</h2>
+      {/* Lien vers le classement complet (le détail par commercial vit sur l'onglet Classement) */}
+      <Link
+        href="/sales/equipe"
+        className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-5 py-4 hover:border-[#0A3855]/40 transition-colors group"
+      >
+        <div>
+          <h2 className="text-sm font-semibold text-[#0A3855]">Classement par commercial</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Objectif individuel = part annuelle (Hasan/Driss 1/3 chacun, Alex/Rudo 1/6 chacun) × cible mensuelle équipe.
+            CA, objectifs et retenues paie, négo par négo.
           </p>
         </div>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
-              <th className="px-5 py-3">Commercial</th>
-              <th className="px-3 py-3 text-right">CA Net</th>
-              <th className="px-3 py-3 text-right">Objectif</th>
-              <th className="px-3 py-3 text-right">% atteint</th>
-              <th className="px-3 py-3 text-right">Lignes</th>
-              <th className="px-3 py-3">Progression</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.perCommercial.map((c) => {
-              const pct = c.target > 0 ? (c.net / c.target) * 100 : 0;
-              const ahead = pct >= 100;
-              const colorBar = ahead
-                ? "bg-emerald-500"
-                : pct >= 70
-                  ? "bg-[#0A3855]"
-                  : "bg-orange-400";
-              return (
-                <tr key={c.id} className="border-t border-gray-100">
-                  <td className="px-5 py-3">
-                    <span className="font-semibold text-gray-900">{c.name}</span>
-                    <span className="ml-2 text-xs text-gray-400">({c.role})</span>
-                    {c.flagged > 0 && (
-                      <span className="ml-2 text-xs text-orange-600">🚩 {c.flagged}</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-right font-mono tabular-nums">{fmtEur(c.net)}</td>
-                  <td className="px-3 py-3 text-right font-mono tabular-nums text-gray-500">
-                    {c.target > 0 ? fmtEur(c.target) : "—"}
-                  </td>
-                  <td className="px-3 py-3 text-right font-semibold tabular-nums">
-                    {c.target > 0 ? fmtPct(pct) : "—"}
-                  </td>
-                  <td className="px-3 py-3 text-right font-mono tabular-nums text-gray-500">{c.rows}</td>
-                  <td className="px-3 py-3">
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden w-full max-w-[200px]">
-                      <div className={`h-full ${colorBar} transition-all`} style={{ width: `${Math.min(100, pct)}%` }} />
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+        <span className="text-sm text-[#0A3855] font-medium group-hover:translate-x-0.5 transition-transform">
+          Ouvrir le classement →
+        </span>
+      </Link>
     </div>
   );
 }

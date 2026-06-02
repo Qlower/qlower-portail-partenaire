@@ -14,6 +14,7 @@ import {
   ChevronDown,
   FileBarChart,
   Copy,
+  Trophy,
 } from "lucide-react";
 
 type InternalRole = "sales" | "sales_admin";
@@ -24,9 +25,9 @@ interface InternalShellProps {
 }
 
 const NAV_BASE = [
-  { href: "/sales", label: "Mon mois", icon: LayoutDashboard, exact: true },
-  { href: "/sales/ventes", label: "Mes ventes", icon: TrendingUp, exact: false },
-  { href: "/sales/equipe", label: "Équipe", icon: Users, exact: false },
+  { href: "/sales", label: "Vue d'ensemble", icon: LayoutDashboard, exact: true },
+  { href: "/sales/ventes", label: "Détail ventes", icon: TrendingUp, exact: false },
+  { href: "/sales/equipe", label: "Classement", icon: Trophy, exact: false },
   { href: "/sales/rapport", label: "Rapport", icon: FileBarChart, exact: false },
   { href: "/sales/historique", label: "Historique", icon: History, exact: false },
 ];

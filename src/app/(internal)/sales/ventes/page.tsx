@@ -8,7 +8,6 @@ import AttributionTable, {
   type NoteEntry,
 } from "@/components/internal/AttributionTable";
 import MonthSelector from "@/components/internal/MonthSelector";
-import PersonalObjective from "@/components/internal/PersonalObjective";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
 import { resolveSalesView } from "@/lib/sales-view";
@@ -166,7 +165,6 @@ export default async function VentesPage({
   // Vues résolues (2 dimensions distinctes : table vs speedometer)
   const resolved = resolveSalesView({ viewParam, internalRole, myCommercialId });
   const tableView = resolved?.tableView;
-  const speedometerView = resolved?.speedometerView;
 
   const { rows, commercials } = await loadVentesData(yearMonth);
 
@@ -189,7 +187,7 @@ export default async function VentesPage({
     <div className="max-w-[1400px] mx-auto space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#0A3855]">Tour de contrôle — {monthLabel}</h1>
+          <h1 className="text-2xl font-bold text-[#0A3855]">Détail des ventes — {monthLabel}</h1>
           <p className="text-sm text-gray-500 mt-1">
             {rows.length} ligne{rows.length > 1 ? "s" : ""} équipe · {Math.round(total).toLocaleString("fr-FR")} €
             {myCommercialId && (
@@ -199,9 +197,6 @@ export default async function VentesPage({
         </div>
         <MonthSelector current={yearMonth} available={availableMonths} />
       </div>
-
-      {/* Speedometer : pour sales = leur perso, pour admin = ?view ou team */}
-      <PersonalObjective yearMonth={yearMonth} view={speedometerView || undefined} />
 
       <AttributionTable
         key={`${yearMonth}-${tableView || "team"}`}
