@@ -137,6 +137,11 @@ HUBSPOT_CLIENT_SECRET=
 - **Admin**: admin@qlower.com / admin2026 → /admin
 - **Test partenaire**: tristan@qlower.com → /dashboard
 
+## Workflow Git
+- **Travailler en direct sur `main`** — pas de branche intermédiaire ni de PR (Alexandre est seul sur le repo).
+- ⚠️ Chaque `commit` + `push` sur `main` déclenche le **déploiement Vercel en prod** (`partenaire.qlower.com`). Pas de filet : pousser = mettre en ligne.
+- Commit + push en autonomie, sans redemander à chaque fois.
+
 ## Commandes
 ```bash
 npm run dev                        # Dev (localhost:3000)
