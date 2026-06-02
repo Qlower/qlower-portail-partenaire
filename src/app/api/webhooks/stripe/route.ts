@@ -110,6 +110,7 @@ async function upsertCharge(input: ChargeUpsertInput): Promise<{ created: boolea
     product_name: input.enrichment.product_name,
     newbiz_1m: input.enrichment.newbiz_1m,
     newbiz_3m: input.enrichment.newbiz_3m,
+    client_status: input.enrichment.client_status,
     auto_commercial_id: scoring.commercial_id,
     auto_score: scoring.score,
     auto_source: scoring.source,
@@ -212,6 +213,7 @@ export async function POST(request: NextRequest) {
             product_name: charge.description || null,
             newbiz_1m: "NewBiz" as const,
             newbiz_3m: "NewBiz" as const,
+            client_status: "Inconnu" as const,
           };
         }
 

@@ -151,6 +151,44 @@ export default async function RapportPage({
         <KpiCard label="Panier moyen / client" value={fmtEur(data.panierMoyen_client)} sub="TTC tous achats cumulés" highlight="primary" />
       </div>
 
+      {/* Top produits validés (product_name détaillé) */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-[#0A3855]">Top produits validés</h3>
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            Détail par libellé produit Stripe (l&apos;année figure dans le libellé quand elle existe) · top 8 par CA
+          </p>
+        </div>
+        {data.productNameStats.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-gray-400">Aucun produit.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
+              <tr>
+                <th className="px-4 py-2.5 text-left">Produit</th>
+                <th className="px-4 py-2.5 text-right">Ventes</th>
+                <th className="px-4 py-2.5 text-right">CA TTC</th>
+                <th className="px-4 py-2.5 text-right">% CA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.productNameStats.map((p) => (
+                <tr key={p.label} className="border-t border-gray-100 hover:bg-gray-50/40">
+                  <td className="px-4 py-2.5 text-gray-800">{p.label}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{p.count}</td>
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums text-[#0A3855] font-semibold">
+                    {fmtEur(p.ca)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs text-gray-500 tabular-nums">
+                    {p.pct_ca.toFixed(1)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
       {/* ====== Section Provenance ====== */}
       <div id="provenance" />
       <h2 className="text-lg font-semibold text-[#0A3855] flex items-center gap-2 pt-2">
@@ -171,46 +209,15 @@ export default async function RapportPage({
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-[#0A3855]">Top partenaires apporteurs</h3>
-            <p className="text-[11px] text-gray-500 mt-0.5">
-              CA généré ce mois par les clients qu&apos;ils ont apportés
-            </p>
-          </div>
-          {data.provenance.byPartner.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-gray-400">Aucun client apporté ce mois.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
-                <tr>
-                  <th className="px-4 py-2.5 text-left">Partenaire</th>
-                  <th className="px-4 py-2.5 text-right">Clients</th>
-                  <th className="px-4 py-2.5 text-right">CA TTC</th>
-                  <th className="px-4 py-2.5 text-right">% CA affilié</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.provenance.byPartner.slice(0, 10).map((p) => (
-                  <tr key={p.partner} className="border-t border-gray-100 hover:bg-gray-50/40">
-                    <td className="px-4 py-2.5 font-medium text-gray-900">{p.partner}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{p.clients}</td>
-                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-[#0A3855] font-semibold">
-                      {fmtEur(p.ca)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right text-xs text-gray-500 tabular-nums">
-                      {data.provenance.affiliate.ca > 0
-                        ? `${((p.ca / data.provenance.affiliate.ca) * 100).toFixed(1)}%`
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CompositionCard
+          title="Statut client"
+          subtitle="Conquête / reconquête / renouvellement"
+          stats={data.clientStatusStats}
+          totalCA={data.totalCA_TTC}
+          palette={["bg-emerald-500", "bg-amber-400", "bg-[#0A3855]", "bg-gray-300", "bg-gray-200"]}
+          helpHover="Conquête = 1er achat ever · Reconquête = revenu après ≥ 45 j · Renouvellement = abonnement actif (< 45 j). Calculé à l'ingestion via l'historique Stripe ; 'Non classé' = charges antérieures à la mesure."
+        />
         <CompositionCard
           title="Canal d'acquisition"
           subtitle="Parmi les clients apportés"
@@ -218,6 +225,45 @@ export default async function RapportPage({
           totalCA={data.provenance.affiliate.ca}
           palette={["bg-[#0A3855]", "bg-[#F6CCA4]", "bg-emerald-500", "bg-gray-400"]}
         />
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-[#0A3855]">Top partenaires apporteurs</h3>
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            CA généré ce mois par les clients qu&apos;ils ont apportés
+          </p>
+        </div>
+        {data.provenance.byPartner.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-gray-400">Aucun client apporté ce mois.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
+              <tr>
+                <th className="px-4 py-2.5 text-left">Partenaire</th>
+                <th className="px-4 py-2.5 text-right">Clients</th>
+                <th className="px-4 py-2.5 text-right">CA TTC</th>
+                <th className="px-4 py-2.5 text-right">% CA affilié</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.provenance.byPartner.slice(0, 10).map((p) => (
+                <tr key={p.partner} className="border-t border-gray-100 hover:bg-gray-50/40">
+                  <td className="px-4 py-2.5 font-medium text-gray-900">{p.partner}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{p.clients}</td>
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums text-[#0A3855] font-semibold">
+                    {fmtEur(p.ca)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs text-gray-500 tabular-nums">
+                    {data.provenance.affiliate.ca > 0
+                      ? `${((p.ca / data.provenance.affiliate.ca) * 100).toFixed(1)}%`
+                      : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* ====== Section Funnel & délais ====== */}

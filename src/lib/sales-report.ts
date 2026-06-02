@@ -95,6 +95,8 @@ export interface ReportData {
   newbizStats: CompositionStat[]; // NewBiz vs OldBiz
   sourceStats: CompositionStat[]; // Sales-touched / Self-service / Mid
   productStats: CompositionStat[]; // Par family
+  productNameStats: CompositionStat[]; // Par produit détaillé (product_name) — top
+  clientStatusStats: CompositionStat[]; // Conquête / Reconquête / Renouvellement
   topClients: TopClient[]; // Top 10 par CA
   concentrationTop10Pct: number; // % du CA fait par les top 10% clients
   basketDistribution: { label: string; nb_clients: number; ca: number }[]; // 1/2/3+ charges
@@ -120,7 +122,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
   const { data: rows } = await sb
     .from("attribution_rows")
     .select(
-      "amount_net_eur, commissionable_amount_eur, decommission_commercial_id, decommission_amount_eur, auto_commercial_id, override_commercial_id, flagged_for_review, created_at, email, client_name, family, newbiz_1m, newbiz_3m, auto_source, auto_score, last_efforts",
+      "amount_net_eur, commissionable_amount_eur, decommission_commercial_id, decommission_amount_eur, auto_commercial_id, override_commercial_id, flagged_for_review, created_at, email, client_name, family, product_name, client_status, newbiz_1m, newbiz_3m, auto_source, auto_score, last_efforts",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
@@ -324,6 +326,46 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
       pct_ca: totalCA_TTC > 0 ? (v.ca / totalCA_TTC) * 100 : 0,
     }))
     .sort((a, b) => b.ca - a.ca);
+
+  // 3b) Produit détaillé (product_name) — top 8 par CA
+  const productNameMap = new Map<string, { count: number; ca: number }>();
+  for (const r of rows || []) {
+    const k = ((r.product_name as string | null) || "").trim() || "Inconnu";
+    const cur = productNameMap.get(k) || { count: 0, ca: 0 };
+    cur.count++;
+    cur.ca += commish(r);
+    productNameMap.set(k, cur);
+  }
+  const productNameStats: CompositionStat[] = [...productNameMap.entries()]
+    .map(([label, v]) => ({
+      label,
+      count: v.count,
+      ca: v.ca,
+      pct_ca: totalCA_TTC > 0 ? (v.ca / totalCA_TTC) * 100 : 0,
+    }))
+    .sort((a, b) => b.ca - a.ca)
+    .slice(0, 8);
+
+  // 3c) Statut client : Conquête / Reconquête / Renouvellement (best-effort,
+  // calculé à l'ingestion via l'historique Stripe ; "Non classé" pour les
+  // charges ingérées avant l'ajout de la colonne).
+  const clientStatusMap = new Map<string, { count: number; ca: number }>();
+  for (const r of rows || []) {
+    const k = (r.client_status as string | null) || "Non classé";
+    const cur = clientStatusMap.get(k) || { count: 0, ca: 0 };
+    cur.count++;
+    cur.ca += commish(r);
+    clientStatusMap.set(k, cur);
+  }
+  const statusOrder = ["Conquête", "Reconquête", "Renouvellement", "Inconnu", "Non classé"];
+  const clientStatusStats: CompositionStat[] = [...clientStatusMap.entries()]
+    .map(([label, v]) => ({
+      label,
+      count: v.count,
+      ca: v.ca,
+      pct_ca: totalCA_TTC > 0 ? (v.ca / totalCA_TTC) * 100 : 0,
+    }))
+    .sort((a, b) => statusOrder.indexOf(a.label) - statusOrder.indexOf(b.label));
 
   // 4) Top 10 clients par CA (GROUP BY email)
   type ClientAgg = { email: string; client_name: string | null; ca: number; nb_charges: number; family: string | null };
@@ -535,6 +577,8 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     newbizStats,
     sourceStats,
     productStats,
+    productNameStats,
+    clientStatusStats,
     topClients,
     concentrationTop10Pct,
     basketDistribution,

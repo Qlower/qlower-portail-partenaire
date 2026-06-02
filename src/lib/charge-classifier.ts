@@ -40,6 +40,12 @@ export interface ChargeEnrichment {
   product_name: string | null;
   newbiz_1m: "NewBiz" | "OldBiz";
   newbiz_3m: "NewBiz" | "OldBiz";
+  // Statut du client au moment de la charge (best-effort via historique Stripe) :
+  //   Conquête       = aucune charge captured avant (1er achat ever)
+  //   Renouvellement = charge précédente < 45 j (abonnement actif)
+  //   Reconquête     = charge précédente ≥ 45 j (client revenu après une pause)
+  //   Inconnu        = pas de customer / fetch échoué
+  client_status: "Conquête" | "Reconquête" | "Renouvellement" | "Inconnu";
 }
 
 /**
@@ -108,14 +114,19 @@ export async function fetchProductInfo(
 export async function inferNewBiz(
   stripe: Stripe,
   charge: Stripe.Charge,
-): Promise<{ newbiz_1m: "NewBiz" | "OldBiz"; newbiz_3m: "NewBiz" | "OldBiz" }> {
+): Promise<{
+  newbiz_1m: "NewBiz" | "OldBiz";
+  newbiz_3m: "NewBiz" | "OldBiz";
+  client_status: ChargeEnrichment["client_status"];
+}> {
   const customerId =
     typeof charge.customer === "string" ? charge.customer : charge.customer?.id;
-  if (!customerId) return { newbiz_1m: "NewBiz", newbiz_3m: "NewBiz" };
+  if (!customerId) return { newbiz_1m: "NewBiz", newbiz_3m: "NewBiz", client_status: "Inconnu" };
 
   const chargeTs = charge.created;
   const ONE_MONTH_S = 30 * 24 * 3600;
   const THREE_MONTHS_S = 90 * 24 * 3600;
+  const RECONQUEST_S = 45 * 24 * 3600; // au-delà = client revenu après une pause
 
   try {
     const list = await stripe.charges.list({ customer: customerId, limit: 100 });
@@ -123,18 +134,19 @@ export async function inferNewBiz(
       (c) => c.id !== charge.id && c.created < chargeTs && c.captured,
     );
     if (previous.length === 0) {
-      // 1ère charge ever pour ce client
-      return { newbiz_1m: "NewBiz", newbiz_3m: "NewBiz" };
+      // 1ère charge ever pour ce client → conquête
+      return { newbiz_1m: "NewBiz", newbiz_3m: "NewBiz", client_status: "Conquête" };
     }
     const mostRecent = previous.reduce((max, c) => (c.created > max.created ? c : max));
     const sinceLast = chargeTs - mostRecent.created;
     return {
       newbiz_1m: sinceLast >= ONE_MONTH_S ? "NewBiz" : "OldBiz",
       newbiz_3m: sinceLast >= THREE_MONTHS_S ? "NewBiz" : "OldBiz",
+      client_status: sinceLast >= RECONQUEST_S ? "Reconquête" : "Renouvellement",
     };
   } catch (e) {
     console.warn("[charge-classifier] previous charges fetch failed:", e instanceof Error ? e.message : e);
-    return { newbiz_1m: "NewBiz", newbiz_3m: "NewBiz" };
+    return { newbiz_1m: "NewBiz", newbiz_3m: "NewBiz", client_status: "Inconnu" };
   }
 }
 
@@ -142,9 +154,9 @@ export async function enrichCharge(
   stripe: Stripe,
   charge: Stripe.Charge,
 ): Promise<ChargeEnrichment> {
-  const [{ product_name, family }, { newbiz_1m, newbiz_3m }] = await Promise.all([
+  const [{ product_name, family }, { newbiz_1m, newbiz_3m, client_status }] = await Promise.all([
     fetchProductInfo(stripe, charge),
     inferNewBiz(stripe, charge),
   ]);
-  return { family, product_name, newbiz_1m, newbiz_3m };
+  return { family, product_name, newbiz_1m, newbiz_3m, client_status };
 }
