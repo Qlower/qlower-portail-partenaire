@@ -4,7 +4,7 @@
 //
 // /sales/rapport?ym=YYYY-MM (sélecteur de mois en haut)
 
-import { Trophy, AlertTriangle, TrendingUp, Users, Package, Clock, Crown } from "lucide-react";
+import { Trophy, AlertTriangle, TrendingUp, Users, Package, Clock, Crown, Share2 } from "lucide-react";
 import MonthSelector from "@/components/internal/MonthSelector";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
@@ -33,6 +33,8 @@ export default async function RapportPage({
   const monthLabel = formatYearMonthFull(yearMonth);
   const teamPct = data.teamObj_eur > 0 ? (data.totalCA_TTC / data.teamObj_eur) * 100 : 0;
   const teamObjReached = teamPct >= 100;
+  const pctAff = data.totalCA_TTC > 0 ? (data.provenance.affiliate.ca / data.totalCA_TTC) * 100 : 0;
+  const pctDir = data.totalCA_TTC > 0 ? (data.provenance.direct.ca / data.totalCA_TTC) * 100 : 0;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -51,10 +53,11 @@ export default async function RapportPage({
         <span className="font-semibold text-gray-400">Sections :</span>
         <a href="#kpis" className="hover:text-[#0A3855] hover:underline">1. KPIs</a>
         <a href="#composition" className="hover:text-[#0A3855] hover:underline">2. Composition du CA</a>
-        <a href="#funnel" className="hover:text-[#0A3855] hover:underline">3. Funnel & délais</a>
-        <a href="#negos" className="hover:text-[#0A3855] hover:underline">4. Performance négos</a>
-        <a href="#top-clients" className="hover:text-[#0A3855] hover:underline">5. Top clients</a>
-        <a href="#distribution" className="hover:text-[#0A3855] hover:underline">6. Panier</a>
+        <a href="#provenance" className="hover:text-[#0A3855] hover:underline">3. Provenance</a>
+        <a href="#funnel" className="hover:text-[#0A3855] hover:underline">4. Funnel & délais</a>
+        <a href="#negos" className="hover:text-[#0A3855] hover:underline">5. Performance négos</a>
+        <a href="#top-clients" className="hover:text-[#0A3855] hover:underline">6. Top clients</a>
+        <a href="#distribution" className="hover:text-[#0A3855] hover:underline">7. Panier</a>
       </nav>
 
       <div id="kpis"></div>
@@ -146,6 +149,75 @@ export default async function RapportPage({
         <KpiCard label="Clients uniques" value={data.totalClients.toLocaleString("fr-FR")} sub={`${data.totalRows} ligne${data.totalRows > 1 ? "s" : ""} Stripe`} />
         <KpiCard label="Panier moyen / charge" value={fmtEur(data.panierMoyen_charge)} sub="TTC par ligne Stripe" />
         <KpiCard label="Panier moyen / client" value={fmtEur(data.panierMoyen_client)} sub="TTC tous achats cumulés" highlight="primary" />
+      </div>
+
+      {/* ====== Section Provenance ====== */}
+      <div id="provenance" />
+      <h2 className="text-lg font-semibold text-[#0A3855] flex items-center gap-2 pt-2">
+        <Share2 className="w-5 h-5" /> Provenance & acquisition
+      </h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <KpiCard
+          label="CA via apporteurs"
+          value={fmtEur(data.provenance.affiliate.ca)}
+          sub={`${data.provenance.affiliate.clients} client${data.provenance.affiliate.clients > 1 ? "s" : ""} · ${fmtPct(pctAff)} du CA`}
+          highlight="primary"
+        />
+        <KpiCard
+          label="CA acquisition directe"
+          value={fmtEur(data.provenance.direct.ca)}
+          sub={`${data.provenance.direct.clients} client${data.provenance.direct.clients > 1 ? "s" : ""} · ${fmtPct(pctDir)} du CA`}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-[#0A3855]">Top partenaires apporteurs</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              CA généré ce mois par les clients qu&apos;ils ont apportés
+            </p>
+          </div>
+          {data.provenance.byPartner.length === 0 ? (
+            <p className="px-5 py-6 text-sm text-gray-400">Aucun client apporté ce mois.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
+                <tr>
+                  <th className="px-4 py-2.5 text-left">Partenaire</th>
+                  <th className="px-4 py-2.5 text-right">Clients</th>
+                  <th className="px-4 py-2.5 text-right">CA TTC</th>
+                  <th className="px-4 py-2.5 text-right">% CA affilié</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.provenance.byPartner.slice(0, 10).map((p) => (
+                  <tr key={p.partner} className="border-t border-gray-100 hover:bg-gray-50/40">
+                    <td className="px-4 py-2.5 font-medium text-gray-900">{p.partner}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{p.clients}</td>
+                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-[#0A3855] font-semibold">
+                      {fmtEur(p.ca)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-xs text-gray-500 tabular-nums">
+                      {data.provenance.affiliate.ca > 0
+                        ? `${((p.ca / data.provenance.affiliate.ca) * 100).toFixed(1)}%`
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <CompositionCard
+          title="Canal d'acquisition"
+          subtitle="Parmi les clients apportés"
+          stats={data.provenance.bySource}
+          totalCA={data.provenance.affiliate.ca}
+          palette={["bg-[#0A3855]", "bg-[#F6CCA4]", "bg-emerald-500", "bg-gray-400"]}
+        />
       </div>
 
       {/* ====== Section Funnel & délais ====== */}

@@ -63,6 +63,17 @@ export interface FunnelData {
   avg_first_touch_to_payment_days: number | null;
 }
 
+export interface ProvenanceData {
+  /** Clients du mois rattachés à un lead apporteur (affilié) */
+  affiliate: { ca: number; clients: number };
+  /** Clients du mois sans lead apporteur (acquisition directe) */
+  direct: { ca: number; clients: number };
+  /** Top partenaires apporteurs du mois (CA décroissant) */
+  byPartner: { partner: string; ca: number; clients: number }[];
+  /** Canal d'acquisition des clients apportés (UTM / Promo / Manuel) */
+  bySource: CompositionStat[];
+}
+
 export interface ReportData {
   yearMonth: string;
   teamObj_eur: number;
@@ -88,6 +99,7 @@ export interface ReportData {
   concentrationTop10Pct: number; // % du CA fait par les top 10% clients
   basketDistribution: { label: string; nb_clients: number; ca: number }[]; // 1/2/3+ charges
   funnel: FunnelData;
+  provenance: ProvenanceData; // affilié vs direct, top partenaires, canal
 }
 
 export async function loadReportData(yearMonth: string): Promise<ReportData> {
@@ -357,33 +369,42 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
 
   // 6) Funnel — délai lead→payement via JOIN sur leads.email
   const emails = [...clientMap.keys()];
+  // Lead apporteur le plus ancien par email (premier apporteur) — sert au
+  // funnel (délai) ET à la provenance (affilié/direct, partenaire, canal).
+  const leadByEmail = new Map<
+    string,
+    { created_at: string; partner_id: string | null; source: string | null }
+  >();
   let avgLeadToPaymentDays: number | null = null;
   let matchedLeadCount = 0;
   if (emails.length > 0) {
     const { data: leadRows } = await sb
       .from("leads")
-      .select("email, created_at")
+      .select("email, created_at, partner_id, source")
       .in("email", emails)
       .limit(500);
-    const leadByEmail = new Map<string, string>();
     for (const l of leadRows || []) {
       if (!l.email) continue;
-      // Prend la plus ancienne création (premier touchpoint)
+      // Prend la plus ancienne création (premier apporteur)
       const existing = leadByEmail.get(l.email);
-      if (!existing || l.created_at < existing) {
-        leadByEmail.set(l.email, l.created_at);
+      if (!existing || l.created_at < existing.created_at) {
+        leadByEmail.set(l.email, {
+          created_at: l.created_at,
+          partner_id: (l as { partner_id?: string | null }).partner_id ?? null,
+          source: (l as { source?: string | null }).source ?? null,
+        });
       }
     }
     const deltas: number[] = [];
     for (const c of allClients) {
-      const leadAt = leadByEmail.get(c.email);
-      if (!leadAt) continue;
+      const lead = leadByEmail.get(c.email);
+      if (!lead) continue;
       // 1ère charge de ce client dans le mois
       const firstCharge = (rows || [])
         .filter((r) => r.email === c.email)
         .sort((a, b) => (a.created_at < b.created_at ? -1 : 1))[0];
       if (!firstCharge) continue;
-      const dt = new Date(firstCharge.created_at).getTime() - new Date(leadAt).getTime();
+      const dt = new Date(firstCharge.created_at).getTime() - new Date(lead.created_at).getTime();
       if (dt > 0) {
         deltas.push(dt / (24 * 3600 * 1000));
         matchedLeadCount++;
@@ -432,6 +453,65 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     avg_first_touch_to_payment_days: avgFirstTouchDays,
   };
 
+  // ====== Provenance / acquisition ======
+  // On rattache chaque client du mois à son premier apporteur (lead le plus
+  // ancien). Si pas de lead → acquisition directe. CA = CA commissionable du
+  // client sur le mois (cohérent avec le reste du rapport).
+  const provPartnerIds = [
+    ...new Set(
+      [...leadByEmail.values()]
+        .map((l) => l.partner_id)
+        .filter((id): id is string => !!id),
+    ),
+  ];
+  const partnerNameById = new Map<string, string>();
+  if (provPartnerIds.length > 0) {
+    const { data: prs } = await sb.from("partners").select("id, nom").in("id", provPartnerIds);
+    for (const p of prs || []) partnerNameById.set(p.id, p.nom);
+  }
+  let affiliateCA = 0;
+  let affiliateClients = 0;
+  let directCA = 0;
+  let directClients = 0;
+  const partnerAgg = new Map<string, { ca: number; clients: number }>();
+  const sourceAgg = new Map<string, { ca: number; clients: number }>();
+  for (const c of allClients) {
+    const lead = leadByEmail.get(c.email);
+    if (lead) {
+      affiliateCA += c.ca;
+      affiliateClients++;
+      const pname =
+        (lead.partner_id && partnerNameById.get(lead.partner_id)) || "Partenaire inconnu";
+      const pa = partnerAgg.get(pname) || { ca: 0, clients: 0 };
+      pa.ca += c.ca;
+      pa.clients++;
+      partnerAgg.set(pname, pa);
+      const src = lead.source || "Inconnu";
+      const sa = sourceAgg.get(src) || { ca: 0, clients: 0 };
+      sa.ca += c.ca;
+      sa.clients++;
+      sourceAgg.set(src, sa);
+    } else {
+      directCA += c.ca;
+      directClients++;
+    }
+  }
+  const provenance: ProvenanceData = {
+    affiliate: { ca: affiliateCA, clients: affiliateClients },
+    direct: { ca: directCA, clients: directClients },
+    byPartner: [...partnerAgg.entries()]
+      .map(([partner, v]) => ({ partner, ca: v.ca, clients: v.clients }))
+      .sort((a, b) => b.ca - a.ca),
+    bySource: [...sourceAgg.entries()]
+      .map(([label, v]) => ({
+        label,
+        count: v.clients,
+        ca: v.ca,
+        pct_ca: affiliateCA > 0 ? (v.ca / affiliateCA) * 100 : 0,
+      }))
+      .sort((a, b) => b.ca - a.ca),
+  };
+
   const nbCharges = rows?.length || 0;
   const nbClients = clientMap.size;
 
@@ -459,5 +539,6 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     concentrationTop10Pct,
     basketDistribution,
     funnel,
+    provenance,
   };
 }
