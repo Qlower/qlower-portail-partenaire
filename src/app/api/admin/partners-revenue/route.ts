@@ -121,6 +121,10 @@ export async function GET(request: NextRequest) {
   // 4) Aggregate par partenaire et par année
   const totalsByPartner = new Map<string, PartnerRevenue>();
   const totalsByYear = new Map<number, YearTotal>();
+  const totalsByMonth = new Map<string, { ca: number; charges: number; clients: Set<string> }>();
+  // Part pros (matched) uniquement — pour le breakdown année + 2 derniers mois.
+  const matchedByYear = new Map<number, { ca: number; charges: number; clients: Set<string> }>();
+  const matchedByMonth = new Map<string, { ca: number; charges: number; clients: Set<string> }>();
   const uniqueClientsByYear = new Map<number, Set<string>>();
   const uniqueClientsPartnerYear = new Map<string, Set<string>>(); // key: `${partnerId}|${year}`
 
@@ -136,8 +140,10 @@ export async function GET(request: NextRequest) {
     if (!c.email || c.amount_net_eur == null) continue;
     const amount = Number(c.amount_net_eur) || 0;
     if (amount <= 0) continue;
-    const year = new Date(c.created_at).getUTCFullYear();
+    const d = new Date(c.created_at);
+    const year = d.getUTCFullYear();
     if (isNaN(year)) continue;
+    const monthKey = `${year}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
     const emailKey = c.email.toLowerCase();
 
     globalTotalCa += amount;
@@ -155,6 +161,16 @@ export async function GET(request: NextRequest) {
     yt.charges++;
     uniqueClientsByYear.get(year)!.add(emailKey);
 
+    // Bucket par mois (total tous clients, pour le contexte des 2 derniers mois)
+    let tm = totalsByMonth.get(monthKey);
+    if (!tm) {
+      tm = { ca: 0, charges: 0, clients: new Set() };
+      totalsByMonth.set(monthKey, tm);
+    }
+    tm.ca += amount;
+    tm.charges++;
+    tm.clients.add(emailKey);
+
     const partnerId = partnerByEmail.get(emailKey);
     if (!partnerId) {
       unmatchedCa += amount;
@@ -162,6 +178,26 @@ export async function GET(request: NextRequest) {
       unmatchedClients.add(emailKey);
       continue;
     }
+
+    // Part pros (matched) — par année + par mois. Cohérent avec matched.ca :
+    // on compte dès qu'un lead partenaire matche l'email (même si la fiche
+    // partenaire a depuis été supprimée).
+    let myr = matchedByYear.get(year);
+    if (!myr) {
+      myr = { ca: 0, charges: 0, clients: new Set() };
+      matchedByYear.set(year, myr);
+    }
+    myr.ca += amount;
+    myr.charges++;
+    myr.clients.add(emailKey);
+    let mmo = matchedByMonth.get(monthKey);
+    if (!mmo) {
+      mmo = { ca: 0, charges: 0, clients: new Set() };
+      matchedByMonth.set(monthKey, mmo);
+    }
+    mmo.ca += amount;
+    mmo.charges++;
+    mmo.clients.add(emailKey);
 
     const partner = partnerById.get(partnerId);
     if (!partner) continue; // lead orphelin (partner supprimé)
@@ -237,6 +273,41 @@ export async function GET(request: NextRequest) {
       unique_clients: unmatchedClients.size,
     },
     by_year: byYearArr.map((y) => ({ ...y, ca: Math.round(y.ca) })),
+    // CA pros (matched) par année — chiffre principal du bloc "Évolution".
+    matched_by_year: Array.from(matchedByYear.entries())
+      .map(([year, v]) => ({
+        year,
+        ca: Math.round(v.ca),
+        charges: v.charges,
+        uniqueClients: v.clients.size,
+      }))
+      .sort((a, b) => b.year - a.year),
+    // CA pros (matched) des 2 derniers mois (mois en cours + précédent),
+    // avec le total Stripe du mois en contexte.
+    matched_by_month: (() => {
+      const now = new Date();
+      const out: Array<{
+        month: string;
+        ca: number;
+        charges: number;
+        uniqueClients: number;
+        total_ca: number;
+      }> = [];
+      for (let i = 0; i < 2; i++) {
+        const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+        const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+        const m = matchedByMonth.get(key);
+        const t = totalsByMonth.get(key);
+        out.push({
+          month: key,
+          ca: m ? Math.round(m.ca) : 0,
+          charges: m ? m.charges : 0,
+          uniqueClients: m ? m.clients.size : 0,
+          total_ca: t ? Math.round(t.ca) : 0,
+        });
+      }
+      return out;
+    })(),
     by_partner: byPartnerArr.map((p) => ({
       ...p,
       total_ca: Math.round(p.total_ca),

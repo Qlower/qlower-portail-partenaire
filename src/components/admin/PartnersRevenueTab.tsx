@@ -44,6 +44,14 @@ interface RevenueResponse {
   matched: { ca: number; charges: number; unique_clients: number };
   unmatched: { ca: number; charges: number; unique_clients: number };
   by_year: Array<{ year: number; ca: number; charges: number; uniqueClients: number }>;
+  matched_by_year: Array<{ year: number; ca: number; charges: number; uniqueClients: number }>;
+  matched_by_month: Array<{
+    month: string;
+    ca: number;
+    charges: number;
+    uniqueClients: number;
+    total_ca: number;
+  }>;
   by_partner: PartnerRevenue[];
 }
 
@@ -52,6 +60,17 @@ interface RevenueResponse {
 // ============================================================================
 const fmtEUR = (n: number) =>
   Math.round(n).toLocaleString("fr-FR", { maximumFractionDigits: 0 });
+
+const MONTHS_FR = [
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+];
+// "2026-06" → "Juin 2026"
+const fmtMonth = (key: string) => {
+  const [y, m] = key.split("-");
+  const idx = parseInt(m, 10) - 1;
+  return `${MONTHS_FR[idx] ?? m} ${y}`;
+};
 
 // ============================================================================
 // Main tab
@@ -72,10 +91,17 @@ export default function PartnersRevenueTab() {
     staleTime: 60_000,
   });
 
-  // Liste des années disponibles
+  // Liste des années disponibles (basée sur les années où les pros ont du CA)
   const availableYears = useMemo<number[]>(() => {
     if (!data) return [];
-    return data.by_year.map((y) => y.year);
+    return data.matched_by_year.map((y) => y.year);
+  }, [data]);
+
+  // Lookup du total Stripe par année (affiché en contexte sous le CA pros)
+  const totalByYear = useMemo(() => {
+    const m = new Map<number, { ca: number; charges: number; uniqueClients: number }>();
+    for (const y of data?.by_year || []) m.set(y.year, y);
+    return m;
   }, [data]);
 
   // Filtrage de la liste partenaires
@@ -258,39 +284,82 @@ export default function PartnersRevenueTab() {
               Évolution année par année
             </h3>
             <span className="text-[10px] text-gray-400">
-              Total tous partenaires (matchés et non matchés)
+              CA généré par les pros · total Stripe en contexte
             </span>
           </div>
-          {data.by_year.length === 0 ? (
+          {data.matched_by_year.length === 0 ? (
             <p className="text-xs text-gray-400 italic">Aucune donnée de CA disponible.</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-              {data.by_year.map((y) => (
-                <button
-                  key={y.year}
-                  onClick={() =>
-                    setYearFilter(yearFilter === y.year ? "all" : y.year)
-                  }
-                  className={`text-left p-3 rounded-lg border transition-all ${
-                    yearFilter === y.year
-                      ? "border-[#0A3855] bg-[#E5EDF1]/50"
-                      : "border-gray-100 hover:border-gray-300"
-                  }`}
-                >
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
-                    {y.year}
-                  </p>
-                  <p className="text-lg font-bold text-[#0A3855] tabular-nums mt-0.5">
-                    {fmtEUR(y.ca)} €
-                  </p>
-                  <p className="text-[10px] text-gray-400">
-                    {y.uniqueClients} client{y.uniqueClients > 1 ? "s" : ""} ·{" "}
-                    {y.charges} charge{y.charges > 1 ? "s" : ""}
-                  </p>
-                </button>
-              ))}
+              {data.matched_by_year.map((y) => {
+                const tot = totalByYear.get(y.year);
+                return (
+                  <button
+                    key={y.year}
+                    onClick={() =>
+                      setYearFilter(yearFilter === y.year ? "all" : y.year)
+                    }
+                    className={`text-left p-3 rounded-lg border transition-all ${
+                      yearFilter === y.year
+                        ? "border-[#0A3855] bg-[#E5EDF1]/50"
+                        : "border-gray-100 hover:border-gray-300"
+                    }`}
+                  >
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                      {y.year}
+                    </p>
+                    <p className="text-lg font-bold text-[#0A3855] tabular-nums mt-0.5">
+                      {fmtEUR(y.ca)} €
+                    </p>
+                    <p className="text-[10px] text-gray-400">
+                      {y.uniqueClients} client{y.uniqueClients > 1 ? "s" : ""} ·{" "}
+                      {y.charges} charge{y.charges > 1 ? "s" : ""}
+                    </p>
+                    <p className="text-[9px] text-gray-300 mt-1 border-t border-gray-50 pt-1">
+                      Total Stripe : {fmtEUR(tot?.ca || 0)} €
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* CA pros sur les 2 derniers mois */}
+      <Card>
+        <CardContent>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-sm text-[#0A3855] flex items-center gap-1.5">
+              <TrendingUp className="size-4" />
+              2 derniers mois
+            </h3>
+            <span className="text-[10px] text-gray-400">
+              CA généré par les pros · total Stripe en contexte
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {data.matched_by_month.map((m) => (
+              <div
+                key={m.month}
+                className="text-left p-3 rounded-lg border border-gray-100"
+              >
+                <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                  {fmtMonth(m.month)}
+                </p>
+                <p className="text-lg font-bold text-[#0A3855] tabular-nums mt-0.5">
+                  {fmtEUR(m.ca)} €
+                </p>
+                <p className="text-[10px] text-gray-400">
+                  {m.uniqueClients} client{m.uniqueClients > 1 ? "s" : ""} ·{" "}
+                  {m.charges} charge{m.charges > 1 ? "s" : ""}
+                </p>
+                <p className="text-[9px] text-gray-300 mt-1 border-t border-gray-50 pt-1">
+                  Total Stripe : {fmtEUR(m.total_ca)} €
+                </p>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
