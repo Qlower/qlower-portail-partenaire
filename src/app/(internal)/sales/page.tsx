@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createServiceClient } from "@/lib/supabase-server";
-import Link from "next/link";
 import MonthSelector from "@/components/internal/MonthSelector";
 import PersonalObjective from "@/components/internal/PersonalObjective";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
@@ -268,19 +267,6 @@ export default async function SalesHomePage({
             })}
           </tbody>
         </table>
-      </div>
-
-      {/* Quick links to other pages — placeholder until V2.C/D are built */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
-        <h3 className="text-sm font-semibold text-[#0A3855] mb-2">📌 V2 en cours de construction</h3>
-        <p className="text-xs text-gray-700 mb-3">
-          Pages à venir : <Link href="/sales/ventes" className="underline">Mes ventes (détail + édition)</Link> ·{" "}
-          <Link href="/sales/equipe" className="underline">Équipe</Link> ·{" "}
-          <Link href="/sales/historique" className="underline">Historique</Link>
-        </p>
-        <p className="text-[11px] text-gray-500">
-          Données Supabase live — ingest du {yearMonth} effectué le 05/05/2026.
-        </p>
       </div>
     </div>
   );
