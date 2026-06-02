@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase-server";
 import { scoreCharge } from "@/lib/sales-scoring";
 import { enrichCharge, type ChargeEnrichment } from "@/lib/charge-classifier";
+import { fetchOriginByEmail } from "@/lib/hubspot-origin";
 import {
   findPartnerByStripePromoCode,
   attributeLeadFromPromoMatch,
@@ -89,6 +90,13 @@ async function upsertCharge(input: ChargeUpsertInput): Promise<{ created: boolea
     paymentDate: input.created_at,
   });
 
+  // Vraie origine marketing depuis HubSpot (Google / Ads / direct / appel…).
+  // Best-effort : si non trouvée, on n'écrase pas une valeur existante.
+  const origin = await fetchOriginByEmail(input.email).catch(() => null);
+  const originFields = origin
+    ? { origin_source: origin.origin_source, origin_detail: origin.origin_detail }
+    : {};
+
   // Upsert the row (don't overwrite override if it exists)
   const { data: existing } = await sb
     .from("attribution_rows")
@@ -120,7 +128,10 @@ async function upsertCharge(input: ChargeUpsertInput): Promise<{ created: boolea
   };
 
   if (existing) {
-    const { error } = await sb.from("attribution_rows").update(baseFields).eq("charge_id", input.charge_id);
+    const { error } = await sb
+      .from("attribution_rows")
+      .update({ ...baseFields, ...originFields })
+      .eq("charge_id", input.charge_id);
     if (error) return { created: false, updated: false, skipped: `update_error:${error.message}` };
     return { created: false, updated: true };
   }
@@ -128,6 +139,7 @@ async function upsertCharge(input: ChargeUpsertInput): Promise<{ created: boolea
   const { error } = await sb.from("attribution_rows").insert({
     charge_id: input.charge_id,
     ...baseFields,
+    ...originFields,
   });
   if (error) return { created: false, updated: false, skipped: `insert_error:${error.message}` };
   return { created: true, updated: false };

@@ -266,6 +266,51 @@ export default async function RapportPage({
         )}
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <CompositionCard
+          title="Origine réelle (HubSpot)"
+          subtitle="D'où viennent les clients : SEO, Ads, direct, appel…"
+          stats={data.originStats}
+          totalCA={data.totalCA_TTC}
+          palette={["bg-[#0A3855]", "bg-emerald-500", "bg-[#F6CCA4]", "bg-violet-400", "bg-sky-400", "bg-orange-400", "bg-gray-300"]}
+          helpHover="Source analytique HubSpot (hs_analytics_source). 'Non renseigné' = client sans donnée HubSpot ou pas encore backfillé."
+        />
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-[#0A3855]">Top mots-clés / campagnes</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              Détail de l&apos;origine (hs_analytics_source_data_1)
+            </p>
+          </div>
+          {data.originDetailStats.length === 0 ? (
+            <p className="px-5 py-6 text-sm text-gray-400">Aucun détail d&apos;origine disponible.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
+                <tr>
+                  <th className="px-4 py-2.5 text-left">Détail</th>
+                  <th className="px-4 py-2.5 text-right">Clients</th>
+                  <th className="px-4 py-2.5 text-right">CA TTC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.originDetailStats.map((d) => (
+                  <tr key={d.label} className="border-t border-gray-100 hover:bg-gray-50/40">
+                    <td className="px-4 py-2.5 text-gray-800 truncate max-w-[260px]" title={d.label}>
+                      {d.label}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{d.count}</td>
+                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-[#0A3855] font-semibold">
+                      {fmtEur(d.ca)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
       {/* ====== Section Funnel & délais ====== */}
       <div id="funnel" />
       <h2 className="text-lg font-semibold text-[#0A3855] flex items-center gap-2 pt-2">

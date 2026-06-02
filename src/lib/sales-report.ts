@@ -97,6 +97,8 @@ export interface ReportData {
   productStats: CompositionStat[]; // Par family
   productNameStats: CompositionStat[]; // Par produit détaillé (product_name) — top
   clientStatusStats: CompositionStat[]; // Conquête / Reconquête / Renouvellement
+  originStats: CompositionStat[]; // Vraie origine (HubSpot) : SEO / Ads / direct / appel…
+  originDetailStats: CompositionStat[]; // Top détails origine (mots-clés / campagnes)
   topClients: TopClient[]; // Top 10 par CA
   concentrationTop10Pct: number; // % du CA fait par les top 10% clients
   basketDistribution: { label: string; nb_clients: number; ca: number }[]; // 1/2/3+ charges
@@ -122,7 +124,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
   const { data: rows } = await sb
     .from("attribution_rows")
     .select(
-      "amount_net_eur, commissionable_amount_eur, decommission_commercial_id, decommission_amount_eur, auto_commercial_id, override_commercial_id, flagged_for_review, created_at, email, client_name, family, product_name, client_status, newbiz_1m, newbiz_3m, auto_source, auto_score, last_efforts",
+      "amount_net_eur, commissionable_amount_eur, decommission_commercial_id, decommission_amount_eur, auto_commercial_id, override_commercial_id, flagged_for_review, created_at, email, client_name, family, product_name, client_status, origin_source, origin_detail, newbiz_1m, newbiz_3m, auto_source, auto_score, last_efforts",
     )
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
@@ -367,6 +369,41 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     }))
     .sort((a, b) => statusOrder.indexOf(a.label) - statusOrder.indexOf(b.label));
 
+  // 3d) Vraie origine (HubSpot) : SEO / Ads / direct / appel entrant…
+  const originMap = new Map<string, { count: number; ca: number }>();
+  const originDetailMap = new Map<string, { count: number; ca: number }>();
+  for (const r of rows || []) {
+    const k = (r.origin_source as string | null) || "Non renseigné";
+    const cur = originMap.get(k) || { count: 0, ca: 0 };
+    cur.count++;
+    cur.ca += commish(r);
+    originMap.set(k, cur);
+    const d = ((r.origin_detail as string | null) || "").trim();
+    if (d) {
+      const cd = originDetailMap.get(d) || { count: 0, ca: 0 };
+      cd.count++;
+      cd.ca += commish(r);
+      originDetailMap.set(d, cd);
+    }
+  }
+  const originStats: CompositionStat[] = [...originMap.entries()]
+    .map(([label, v]) => ({
+      label,
+      count: v.count,
+      ca: v.ca,
+      pct_ca: totalCA_TTC > 0 ? (v.ca / totalCA_TTC) * 100 : 0,
+    }))
+    .sort((a, b) => b.ca - a.ca);
+  const originDetailStats: CompositionStat[] = [...originDetailMap.entries()]
+    .map(([label, v]) => ({
+      label,
+      count: v.count,
+      ca: v.ca,
+      pct_ca: totalCA_TTC > 0 ? (v.ca / totalCA_TTC) * 100 : 0,
+    }))
+    .sort((a, b) => b.ca - a.ca)
+    .slice(0, 10);
+
   // 4) Top 10 clients par CA (GROUP BY email)
   type ClientAgg = { email: string; client_name: string | null; ca: number; nb_charges: number; family: string | null };
   const clientMap = new Map<string, ClientAgg>();
@@ -579,6 +616,8 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     productStats,
     productNameStats,
     clientStatusStats,
+    originStats,
+    originDetailStats,
     topClients,
     concentrationTop10Pct,
     basketDistribution,
