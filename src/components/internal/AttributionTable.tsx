@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, History, MessageSquare, Flag, Plus, Search, Wallet, Scale } from "lucide-react";
+import { ChevronDown, History, MessageSquare, Flag, Plus, Search, Wallet, Scale, RefreshCw } from "lucide-react";
 import EngagementPanel from "./EngagementPanel";
 import DecommissionDecisionModal, { type DecommissionRowData } from "./DecommissionDecisionModal";
 import { hubspotSearchByEmailUrl } from "@/lib/hubspot-urls";
@@ -426,6 +426,44 @@ export default function AttributionTable({
     }
   }
 
+  // Requalifier une "création" en RECONDUCTION (ex: abo recréé après échec CB).
+  // → commissionnable à 0 (hors CA équipe + indi) + bascule en subscription_renewals.
+  // cancel=true : annule (restaure le commissionnable au net Stripe).
+  async function requalifyRenewal(chargeId: string, cancel: boolean) {
+    let reason = "";
+    if (!cancel) {
+      reason = (window.prompt("Motif de la requalification en reconduction (ex : abo recréé après échec CB) :") || "").trim();
+      if (!reason) return;
+    } else if (!window.confirm("Annuler la requalification ? La vente redevient commissionnable.")) {
+      return;
+    }
+    try {
+      const url = `/api/sales/requalify-renewal/${encodeURIComponent(chargeId)}`;
+      const r = await fetch(url, {
+        method: cancel ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: cancel ? undefined : JSON.stringify({ reason }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Erreur");
+      setRows((prev) =>
+        prev.map((rr) =>
+          rr.charge_id === chargeId
+            ? {
+                ...rr,
+                commissionable_amount_eur: cancel ? null : 0,
+                commissionable_adjusted_reason: cancel ? null : `Reconduction (hors CA) — ${reason}`,
+              }
+            : rr,
+        ),
+      );
+      showToast(cancel ? "Requalification annulée" : "Requalifié en reconduction (hors CA)");
+      startTransition(() => router.refresh());
+    } catch (e) {
+      console.error("[attribution] requalifyRenewal failed", e);
+      showToast(`Erreur : ${e instanceof Error ? e.message : "inconnue"}`, true);
+    }
+  }
+
   async function addNote(chargeId: string) {
     if (!noteText.trim()) return;
     try {
@@ -548,6 +586,7 @@ export default function AttributionTable({
                 onChangeAttribution={(cid) => changeAttribution(r.charge_id, cid)}
                 onOpenAdjust={() => setAdjustingChargeId(r.charge_id)}
                 onOpenDecommission={() => setDecommissioningChargeId(r.charge_id)}
+                onRequalifyRenewal={(cancel) => requalifyRenewal(r.charge_id, cancel)}
                 onToggleFlag={async () => {
                   const newFlag = !r.flagged_for_review;
 
@@ -912,6 +951,7 @@ interface RowProps {
   onOpenPanel: () => void;
   onOpenAdjust: () => void;
   onOpenDecommission: () => void;
+  onRequalifyRenewal: (cancel: boolean) => void;
 }
 
 function RowComponent({
@@ -919,7 +959,7 @@ function RowComponent({
   openHistory, openNotes, noteForm, noteText,
   onToggleHistory, onToggleNotes, onOpenNoteForm, onCancelNoteForm,
   onChangeNoteText, onSubmitNote, onChangeAttribution, onToggleFlag,
-  onOpenPanel, onOpenAdjust, onOpenDecommission,
+  onOpenPanel, onOpenAdjust, onOpenDecommission, onRequalifyRenewal,
 }: RowProps) {
   // Une ligne refund ledger a son propre flow (modal décommissionnement)
   // au lieu de la modal "Ajuster le commissionnable" classique.
@@ -1187,6 +1227,24 @@ function RowComponent({
               <Wallet className="w-3 h-3" />
             </button>
           )}
+          {editable && !isRefundLedger && (() => {
+            const isRequalified = row.commissionable_amount_eur === 0;
+            return (
+              <button
+                onClick={() => onRequalifyRenewal(isRequalified)}
+                className={`inline-flex items-center gap-0.5 text-[10px] ml-1 hover:text-violet-700 ${
+                  isRequalified ? "text-violet-600" : "text-gray-400"
+                }`}
+                title={
+                  isRequalified
+                    ? "Cette ligne est requalifiée en reconduction (hors CA) — clique pour annuler"
+                    : "Requalifier en reconduction (ex: abo recréé après échec CB) — sort du CA équipe + indi"
+                }
+              >
+                <RefreshCw className="w-3 h-3" />
+              </button>
+            );
+          })()}
         </td>
       </tr>
       {openHistory && row.history.length > 0 && (
