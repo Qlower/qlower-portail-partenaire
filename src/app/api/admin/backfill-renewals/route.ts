@@ -38,9 +38,13 @@ export async function POST(request: NextRequest) {
   let found = 0;
   let inserted = 0;
   let total = 0;
-  let startingAfter: string | undefined;
+  // Reprenable : on reprend la pagination Stripe via ?after=<charge_id> et on
+  // s'arrête sous ~45 s pour ne jamais dépasser la limite de 60 s.
+  let startingAfter: string | undefined = searchParams.get("after") || undefined;
+  let more = false;
+  const started = Date.now();
 
-  for (let page = 0; page < 40; page++) {
+  for (let page = 0; page < 200; page++) {
     const list = await stripe.charges.list({
       created: { gte, lte },
       limit: 100,
@@ -76,7 +80,11 @@ export async function POST(request: NextRequest) {
     if (!list.has_more) break;
     startingAfter = list.data[list.data.length - 1]?.id;
     if (!startingAfter) break;
+    if (Date.now() - started > 45000) {
+      more = true;
+      break;
+    }
   }
 
-  return NextResponse.json({ ym, scanned, found, inserted, total_eur: total });
+  return NextResponse.json({ ym, scanned, found, inserted, total_eur: total, after: startingAfter, more });
 }
