@@ -315,14 +315,20 @@ export async function POST(request: NextRequest) {
         const isMonthLocked = !!runInfo?.locked;
         const originalYearMonth = runInfo?.year_month;
 
-        const updateFields: Record<string, unknown> = {
-          amount_refunded_eur: refunded,
-          amount_net_eur: net,
-        };
-        if (isMonthLocked) {
-          updateFields.refunded_after_lock = true;
-          updateFields.refund_post_lock_at = new Date().toISOString();
-        }
+        // Mois VERROUILLÉ (déjà payé) : on NE touche PAS au net de la ligne d'origine
+        //   → le CA du mois clôturé reste celui qui a été payé. Le refund est porté
+        //     UNIQUEMENT par la ligne ledger dans le mois courant (créée plus bas).
+        //     On flague seulement pour audit/clawback. (Évite le double-compte.)
+        // Mois OUVERT : le refund réduit directement la vente d'origine (aucun ledger).
+        const updateFields: Record<string, unknown> = isMonthLocked
+          ? {
+              refunded_after_lock: true,
+              refund_post_lock_at: new Date().toISOString(),
+            }
+          : {
+              amount_refunded_eur: refunded,
+              amount_net_eur: net,
+            };
 
         const { error } = await sb
           .from("attribution_rows")
