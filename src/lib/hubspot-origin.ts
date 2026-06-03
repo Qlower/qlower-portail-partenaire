@@ -47,7 +47,7 @@ export async function fetchOriginByEmail(email: string): Promise<HubspotOrigin |
       headers: { Authorization: `Bearer ${HS_TOKEN}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         filterGroups: [{ filters: [{ propertyName: "email", operator: "EQ", value: email }] }],
-        properties: ["hs_analytics_source", "hs_analytics_source_data_1"],
+        properties: ["hs_analytics_source", "hs_analytics_source_data_1", "hs_analytics_first_url"],
         limit: 1,
       }),
     });
@@ -57,8 +57,35 @@ export async function fetchOriginByEmail(email: string): Promise<HubspotOrigin |
     };
     const props = data.results?.[0]?.properties;
     if (!props) return null;
+
+    const source = props.hs_analytics_source;
+    const firstUrl = (props.hs_analytics_first_url || "").trim();
+
+    // OFFLINE = fiche créée hors web (app/intégration/import/manuel). Le libellé
+    // brut ("Saisie manuelle / intégration") est trop grossier : on affine via la
+    // PREMIÈRE URL vue par le contact (hs_analytics_first_url), qui révèle la
+    // vraie porte d'entrée (app produit / blog / landing page).
+    if (source === "OFFLINE") {
+      const u = firstUrl.toLowerCase();
+      let label = "Saisie manuelle / intégration";
+      if (u.includes("secure.qlower.com") || u.includes("app.qlower") || u.includes("/journey")) {
+        label = "Inscription directe (app)";
+      } else if (u.includes("/blog")) {
+        label = "Blog (SEO / contenu)";
+      } else if (u.includes("/lp/") || u.includes("landing") || u.includes("/guide")) {
+        label = "Landing page";
+      }
+      return {
+        origin_source: label,
+        // Détail = page d'entrée réelle si dispo, sinon le data_1 (INTEGRATION/CRM_UI/IMPORT).
+        origin_detail: firstUrl
+          ? firstUrl.replace(/^https?:\/\//, "").slice(0, 200)
+          : props.hs_analytics_source_data_1 || null,
+      };
+    }
+
     return {
-      origin_source: prettyOrigin(props.hs_analytics_source),
+      origin_source: prettyOrigin(source),
       origin_detail: props.hs_analytics_source_data_1 || null,
     };
   } catch {
