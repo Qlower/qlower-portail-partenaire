@@ -33,10 +33,17 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
   if (!run) return NextResponse.json({ error: `Aucun run pour ${ym}` }, { status: 404 });
 
+  // Reprenable : seulement les lignes sans origine (origin_source NULL) et positives,
+  // par lots de 100. Les "non trouvé" reçoivent un sentinel 'Non renseigné' pour
+  // ne pas être retraités en boucle.
   const { data: rows } = await sb
     .from("attribution_rows")
     .select("charge_id, email, amount_net_eur, auto_source")
-    .eq("run_id", run.id);
+    .eq("run_id", run.id)
+    .is("origin_source", null)
+    .gt("amount_net_eur", 0)
+    .order("created_at")
+    .limit(100);
 
   let processed = 0;
   let updated = 0;
@@ -53,7 +60,9 @@ export async function POST(request: NextRequest) {
     processed++;
     const origin = await fetchOriginByEmail(email);
     if (!origin) {
-      bySource["(non trouvé)"] = (bySource["(non trouvé)"] || 0) + 1;
+      // Sentinel : évite de re-tenter cette ligne à chaque relance.
+      await sb.from("attribution_rows").update({ origin_source: "Non renseigné" }).eq("charge_id", r.charge_id);
+      bySource["Non renseigné"] = (bySource["Non renseigné"] || 0) + 1;
       continue;
     }
     const { error } = await sb
@@ -67,5 +76,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ym, processed, updated, skipped, bySource });
+  const more = (rows?.length || 0) >= 100;
+  return NextResponse.json({ ym, processed, updated, skipped, bySource, more });
 }

@@ -40,10 +40,16 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
   if (!run) return NextResponse.json({ error: `Aucun run pour ${ym}` }, { status: 404 });
 
+  // Reprenable : on ne traite que les lignes pas encore classées (client_status NULL)
+  // et positives (les refund ledgers négatifs sont ignorés), par lots de 100.
   const { data: rows } = await sb
     .from("attribution_rows")
     .select("charge_id, customer_id, created_at, amount_net_eur, auto_source")
-    .eq("run_id", run.id);
+    .eq("run_id", run.id)
+    .is("client_status", null)
+    .gt("amount_net_eur", 0)
+    .order("created_at")
+    .limit(100);
 
   let processed = 0;
   let updated = 0;
@@ -84,5 +90,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ym, processed, updated, skipped, byStatus });
+  const more = (rows?.length || 0) >= 100;
+  return NextResponse.json({ ym, processed, updated, skipped, byStatus, more });
 }
