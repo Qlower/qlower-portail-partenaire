@@ -19,9 +19,9 @@ const SOURCE_LABELS: Record<string, string> = {
   SOCIAL_MEDIA: "Réseaux sociaux",
   PAID_SOCIAL: "Réseaux sociaux (payant)",
   EMAIL_MARKETING: "Email",
-  OFFLINE: "Offline / appel entrant",
+  OFFLINE: "Saisie manuelle / intégration",
   OTHER_CAMPAIGNS: "Autres campagnes",
-  AI_REFERRALS: "Référent IA (ChatGPT…)",
+  AI_REFERRALS: "Référent IA (ChatGPT)",
 };
 
 /** Libellé FR lisible pour une valeur hs_analytics_source. */
