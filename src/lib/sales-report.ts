@@ -335,7 +335,12 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
   // 3b) Produit détaillé (product_name) — top 8 par CA
   const productNameMap = new Map<string, { count: number; ca: number }>();
   for (const r of rows || []) {
-    const k = ((r.product_name as string | null) || "").trim() || "Inconnu";
+    // Pas de product_name (charge sans libellé d'invoice) → on retombe sur la
+    // family (Déclaration fiscale / Abonnement…), bien plus parlant que "Inconnu".
+    const k =
+      ((r.product_name as string | null) || "").trim() ||
+      ((r.family as string | null) || "").trim() ||
+      "Autre / non précisé";
     const cur = productNameMap.get(k) || { count: 0, ca: 0 };
     cur.count++;
     cur.ca += commish(r);

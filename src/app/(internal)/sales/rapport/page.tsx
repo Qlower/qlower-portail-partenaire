@@ -185,7 +185,13 @@ export default async function RapportPage({
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <CompositionCard title="NewBiz vs OldBiz" subtitle="Sur tous les paiements du mois" stats={data.newbizStats} totalCA={data.totalCA_TTC} />
+        <CompositionCard
+          title="Répartition du CA total"
+          subtitle="Conquête / reconquête / reconductions d'abo"
+          stats={caSplitStats}
+          totalCA={data.totalCA_TTC + data.renewalsTotal}
+          helpHover="Conquête (1er achat) / Conquête <45j (réachat récent) / Reconquête (≥45j) = ventes commissionnables, par statut client. Reconductions = abos reconduits, HORS commission. La somme = CA total."
+        />
         <CompositionCard title="Mix produits (family)" subtitle="Par catégorie de prestation" stats={data.productStats} totalCA={data.totalCA_TTC} />
       </div>
 
@@ -255,18 +261,17 @@ export default async function RapportPage({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <CompositionCard
-          title="Répartition du CA total"
-          subtitle="Conquête / reconquête / reconductions d'abo"
-          stats={caSplitStats}
-          totalCA={data.totalCA_TTC + data.renewalsTotal}
-          helpHover="Conquête (1er achat) / Conquête <45j (réachat récent) / Reconquête (revenu après ≥45j) = ventes commissionnables, par statut client. Reconductions = abos reconduits, HORS commission. La somme = CA total (incl. reconductions)."
+          title="Origine réelle (HubSpot)"
+          subtitle="D'où viennent les clients : SEO, Ads, direct, saisie manuelle…"
+          stats={data.originStats}
+          totalCA={data.totalCA_TTC}
+          helpHover="Source HubSpot (hs_analytics_source). 'Saisie manuelle / intégration' = fiche créée par une intégration/l'app, à la main (CRM) ou un import — pas un canal marketing. 'Non renseigné' = client sans donnée HubSpot."
         />
         <CompositionCard
           title="Canal d'acquisition"
-          subtitle="Parmi les clients apportés"
+          subtitle="Parmi les clients apportés (affiliés)"
           stats={data.provenance.bySource}
           totalCA={data.provenance.affiliate.ca}
-          palette={["bg-[#0A3855]", "bg-[#F6CCA4]", "bg-emerald-500", "bg-gray-400"]}
         />
       </div>
 
@@ -309,15 +314,7 @@ export default async function RapportPage({
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <CompositionCard
-          title="Origine réelle (HubSpot)"
-          subtitle="D'où viennent les clients : SEO, Ads, direct, saisie manuelle…"
-          stats={data.originStats}
-          totalCA={data.totalCA_TTC}
-          palette={["bg-[#0A3855]", "bg-emerald-500", "bg-[#F6CCA4]", "bg-violet-400", "bg-sky-400", "bg-orange-400", "bg-gray-300"]}
-          helpHover="Source analytique HubSpot (hs_analytics_source). 'Non renseigné' = client sans donnée HubSpot ou pas encore backfillé."
-        />
+      <div>
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-[#0A3855]">Détail par origine</h3>
           <p className="text-[11px] text-gray-500 mt-0.5 mb-2">
