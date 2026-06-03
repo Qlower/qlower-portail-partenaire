@@ -106,6 +106,7 @@ export interface ReportData {
   provenance: ProvenanceData; // affilié vs direct, top partenaires, canal
   renewalsTotal: number; // CA des reconductions d'abonnement (NON commissionnable)
   renewalsCount: number; // nb de reconductions du mois
+  trend: { month: string; ca: number; renewals: number }[]; // 6 derniers mois
 }
 
 export async function loadReportData(yearMonth: string): Promise<ReportData> {
@@ -614,6 +615,48 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
   const renewalsTotal = (renewalRows || []).reduce((s, r) => s + (Number(r.amount_eur) || 0), 0);
   const renewalsCount = (renewalRows || []).length;
 
+  // ── Tendance : 6 derniers mois (CA commissionnable + reconductions) ──
+  const trendMonths: string[] = [];
+  {
+    const [ty, tm] = yearMonth.split("-").map(Number);
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(Date.UTC(ty, tm - 1 - i, 1));
+      trendMonths.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+    }
+  }
+  const { data: trendRuns } = await sb
+    .from("monthly_runs")
+    .select("id, year_month")
+    .in("year_month", trendMonths);
+  const runIdByMonth = new Map<string, string>(
+    (trendRuns || []).map((r) => [r.year_month as string, r.id as string]),
+  );
+  const trend: { month: string; ca: number; renewals: number }[] = [];
+  for (const m of trendMonths) {
+    const rid = runIdByMonth.get(m);
+    let ca = 0;
+    if (rid) {
+      const { data: tr } = await sb
+        .from("attribution_rows")
+        .select("amount_net_eur, commissionable_amount_eur")
+        .eq("run_id", rid);
+      ca = (tr || []).reduce(
+        (s, r) =>
+          s +
+          ((r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+            ? Number(r.commissionable_amount_eur)
+            : Number(r.amount_net_eur)) || 0),
+        0,
+      );
+    }
+    const { data: rn } = await sb
+      .from("subscription_renewals")
+      .select("amount_eur")
+      .eq("year_month", m);
+    const renewals = (rn || []).reduce((s, r) => s + (Number(r.amount_eur) || 0), 0);
+    trend.push({ month: m, ca: Math.round(ca), renewals: Math.round(renewals) });
+  }
+
   const nbCharges = rows?.length || 0;
   const nbClients = clientMap.size;
 
@@ -648,5 +691,6 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     provenance,
     renewalsTotal,
     renewalsCount,
+    trend,
   };
 }

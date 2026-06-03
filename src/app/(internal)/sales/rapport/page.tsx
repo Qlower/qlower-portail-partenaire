@@ -143,6 +143,22 @@ export default async function RapportPage({
         </div>
       </div>
 
+      {/* Tendance 6 mois */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h3 className="text-sm font-semibold text-[#0A3855]">Tendance — 6 derniers mois</h3>
+          <span className="text-[10px] text-gray-400 flex gap-3">
+            <span className="inline-flex items-center gap-1">
+              <span className="w-2 h-2 rounded-sm bg-[#0A3855]" /> CA commissionnable
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="w-2 h-2 rounded-sm bg-gray-300" /> Reconductions
+            </span>
+          </span>
+        </div>
+        <TrendChart data={data.trend} />
+      </div>
+
       {/* Graph cumul */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-[#0A3855] mb-4">CA cumulé jour par jour</h2>
@@ -534,6 +550,41 @@ export default async function RapportPage({
           <div className="text-gray-500 mt-2">CA HT = CA TTC ÷ 1.20 (TVA 20%). Centimes affichés pour le calcul de paie. Si tu réattribues une vente manuellement, la commission suit la nouvelle attribution.</div>
         </div>
       </details>
+    </div>
+  );
+}
+
+// Mini-graphe de tendance : barres empilées CA commissionnable + reconductions.
+const TREND_MONTHS_FR = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"];
+function TrendChart({ data }: { data: { month: string; ca: number; renewals: number }[] }) {
+  if (!data.length) return <p className="text-xs text-gray-400">Pas de données.</p>;
+  const max = Math.max(1, ...data.map((d) => d.ca + d.renewals));
+  return (
+    <div className="flex items-end gap-3 h-44">
+      {data.map((d) => {
+        const total = d.ca + d.renewals;
+        const [, mm] = d.month.split("-");
+        return (
+          <div key={d.month} className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+            <div className="text-[10px] text-gray-500 tabular-nums">
+              {total >= 1000 ? `${Math.round(total / 1000)}k` : total}
+            </div>
+            <div className="w-full max-w-[52px] flex flex-col justify-end h-full">
+              <div
+                className="w-full bg-gray-300 rounded-t"
+                style={{ height: `${(d.renewals / max) * 100}%` }}
+                title={`Reconductions : ${fmtEur(d.renewals)}`}
+              />
+              <div
+                className="w-full bg-[#0A3855]"
+                style={{ height: `${(d.ca / max) * 100}%` }}
+                title={`CA commissionnable : ${fmtEur(d.ca)}`}
+              />
+            </div>
+            <div className="text-[10px] text-gray-500">{TREND_MONTHS_FR[parseInt(mm, 10) - 1] || mm}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
