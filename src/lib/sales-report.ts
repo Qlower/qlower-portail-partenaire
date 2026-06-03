@@ -97,8 +97,8 @@ export interface ReportData {
   productStats: CompositionStat[]; // Par family
   productNameStats: CompositionStat[]; // Par produit détaillé (product_name) — top
   clientStatusStats: CompositionStat[]; // Conquête / Reconquête / Renouvellement
-  originStats: CompositionStat[]; // Vraie origine (HubSpot) : SEO / Ads / direct / appel…
-  originDetailStats: CompositionStat[]; // Top détails origine (mots-clés / campagnes)
+  originStats: CompositionStat[]; // Vraie origine (HubSpot) : SEO / Ads / direct / saisie…
+  originDetailBySource: { source: string; details: CompositionStat[] }[]; // détail (mots-clés/sources) par origine
   topClients: TopClient[]; // Top 10 par CA
   concentrationTop10Pct: number; // % du CA fait par les top 10% clients
   basketDistribution: { label: string; nb_clients: number; ca: number }[]; // 1/2/3+ charges
@@ -379,7 +379,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
 
   // 3d) Vraie origine (HubSpot) : SEO / Ads / direct / appel entrant…
   const originMap = new Map<string, { count: number; ca: number }>();
-  const originDetailMap = new Map<string, { count: number; ca: number }>();
+  const originDetailBySrc = new Map<string, Map<string, { count: number; ca: number }>>();
   for (const r of rows || []) {
     const k = (r.origin_source as string | null) || "Non renseigné";
     const cur = originMap.get(k) || { count: 0, ca: 0 };
@@ -388,10 +388,15 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     originMap.set(k, cur);
     const d = ((r.origin_detail as string | null) || "").trim();
     if (d) {
-      const cd = originDetailMap.get(d) || { count: 0, ca: 0 };
+      let perSrc = originDetailBySrc.get(k);
+      if (!perSrc) {
+        perSrc = new Map();
+        originDetailBySrc.set(k, perSrc);
+      }
+      const cd = perSrc.get(d) || { count: 0, ca: 0 };
       cd.count++;
       cd.ca += commish(r);
-      originDetailMap.set(d, cd);
+      perSrc.set(d, cd);
     }
   }
   const originStats: CompositionStat[] = [...originMap.entries()]
@@ -402,15 +407,17 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
       pct_ca: totalCA_TTC > 0 ? (v.ca / totalCA_TTC) * 100 : 0,
     }))
     .sort((a, b) => b.ca - a.ca);
-  const originDetailStats: CompositionStat[] = [...originDetailMap.entries()]
-    .map(([label, v]) => ({
-      label,
-      count: v.count,
-      ca: v.ca,
-      pct_ca: totalCA_TTC > 0 ? (v.ca / totalCA_TTC) * 100 : 0,
-    }))
-    .sort((a, b) => b.ca - a.ca)
-    .slice(0, 10);
+  // Détail (mots-clés / sources) par origine — second rideau dépliable, top 6.
+  const originDetailBySource = originStats.map((s) => {
+    const dmap = originDetailBySrc.get(s.label);
+    const details: CompositionStat[] = dmap
+      ? [...dmap.entries()]
+          .map(([label, v]) => ({ label, count: v.count, ca: v.ca, pct_ca: 0 }))
+          .sort((a, b) => b.ca - a.ca)
+          .slice(0, 6)
+      : [];
+    return { source: s.label, details };
+  });
 
   // 4) Top 10 clients par CA (GROUP BY email)
   type ClientAgg = { email: string; client_name: string | null; ca: number; nb_charges: number; family: string | null };
@@ -633,7 +640,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     productNameStats,
     clientStatusStats,
     originStats,
-    originDetailStats,
+    originDetailBySource,
     topClients,
     concentrationTop10Pct,
     basketDistribution,

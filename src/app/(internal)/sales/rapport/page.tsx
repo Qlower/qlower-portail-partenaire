@@ -291,44 +291,42 @@ export default async function RapportPage({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CompositionCard
           title="Origine réelle (HubSpot)"
-          subtitle="D'où viennent les clients : SEO, Ads, direct, appel…"
+          subtitle="D'où viennent les clients : SEO, Ads, direct, saisie manuelle…"
           stats={data.originStats}
           totalCA={data.totalCA_TTC}
           palette={["bg-[#0A3855]", "bg-emerald-500", "bg-[#F6CCA4]", "bg-violet-400", "bg-sky-400", "bg-orange-400", "bg-gray-300"]}
           helpHover="Source analytique HubSpot (hs_analytics_source). 'Non renseigné' = client sans donnée HubSpot ou pas encore backfillé."
         />
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-[#0A3855]">Top mots-clés / campagnes</h3>
-            <p className="text-[11px] text-gray-500 mt-0.5">
-              Détail de l&apos;origine (hs_analytics_source_data_1)
-            </p>
-          </div>
-          {data.originDetailStats.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-gray-400">Aucun détail d&apos;origine disponible.</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-[#0A3855]">Détail par origine</h3>
+          <p className="text-[11px] text-gray-500 mt-0.5 mb-2">
+            Déplie une origine pour voir les mots-clés / sources (HubSpot)
+          </p>
+          {data.originDetailBySource.filter((o) => o.details.length > 0).length === 0 ? (
+            <p className="text-sm text-gray-400 py-4">Aucun détail d&apos;origine disponible.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500">
-                <tr>
-                  <th className="px-4 py-2.5 text-left">Détail</th>
-                  <th className="px-4 py-2.5 text-right">Clients</th>
-                  <th className="px-4 py-2.5 text-right">CA TTC</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.originDetailStats.map((d) => (
-                  <tr key={d.label} className="border-t border-gray-100 hover:bg-gray-50/40">
-                    <td className="px-4 py-2.5 text-gray-800 truncate max-w-[260px]" title={d.label}>
-                      {d.label}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{d.count}</td>
-                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-[#0A3855] font-semibold">
-                      {fmtEur(d.ca)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            data.originDetailBySource
+              .filter((o) => o.details.length > 0)
+              .map((o) => (
+                <details key={o.source} className="border-t border-gray-100 py-1.5 group">
+                  <summary className="cursor-pointer text-sm text-gray-800 flex items-center justify-between list-none">
+                    <span className="font-medium">{o.source}</span>
+                    <span className="text-[11px] text-gray-400">
+                      {o.details.length} détail{o.details.length > 1 ? "s" : ""} ▾
+                    </span>
+                  </summary>
+                  <ul className="mt-1.5 pl-2 space-y-1 text-xs">
+                    {o.details.map((d) => (
+                      <li key={d.label} className="flex items-center justify-between gap-2">
+                        <span className="text-gray-600 truncate max-w-[220px]" title={d.label}>{d.label}</span>
+                        <span className="text-gray-500 tabular-nums whitespace-nowrap">
+                          {d.count} client{d.count > 1 ? "s" : ""} · {fmtEur(d.ca)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ))
           )}
         </div>
       </div>
@@ -541,59 +539,70 @@ export default async function RapportPage({
   );
 }
 
+// Palette donut (couleurs hex — réutilisées pour les segments ET la légende).
+const DONUT_COLORS = ["#0A3855", "#10b981", "#F6CCA4", "#a78bfa", "#38bdf8", "#fb923c", "#f472b6", "#94a3b8"];
+
 function CompositionCard({
   title,
   subtitle,
   stats,
   totalCA,
-  palette,
   helpHover,
 }: {
   title: string;
   subtitle: string;
   stats: CompositionStat[];
-  totalCA: number;
-  palette: string[];
+  totalCA?: number;
+  palette?: string[]; // conservé pour compat — non utilisé (donut a sa propre palette)
   helpHover?: string;
 }) {
-  // Stacked bar
+  // Camembert (donut) : part de chaque segment = CA / total des segments positifs.
+  const slices = stats.filter((s) => s.ca > 0);
+  const sum = slices.reduce((a, s) => a + s.ca, 0) || 1;
+  let acc = 0;
+  const segs = slices.map((s, i) => {
+    const a0 = (acc / sum) * 100;
+    acc += s.ca;
+    const a1 = (acc / sum) * 100;
+    return `${DONUT_COLORS[i % DONUT_COLORS.length]} ${a0}% ${a1}%`;
+  });
+  const bg = slices.length ? `conic-gradient(${segs.join(", ")})` : "#f1f5f9";
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5">
       <div className="flex items-baseline justify-between mb-1">
         <h3 className="text-sm font-semibold text-[#0A3855]">{title}</h3>
-        {helpHover && <span className="text-[10px] text-gray-400" title={helpHover}>ⓘ</span>}
+        {helpHover && <span className="text-[10px] text-gray-400 cursor-help" title={helpHover}>ⓘ</span>}
       </div>
       <p className="text-[11px] text-gray-500 mb-3">{subtitle}</p>
-
-      {/* Stacked progress bar */}
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden flex mb-3">
-        {stats.map((s, i) => (
-          <div
-            key={s.label}
-            className={`h-full ${palette[i % palette.length]}`}
-            style={{ width: `${s.pct_ca}%` }}
-            title={`${s.label} : ${s.pct_ca.toFixed(1)}%`}
-          />
-        ))}
+      <div className="flex items-center gap-4">
+        <div className="relative shrink-0" style={{ width: 88, height: 88 }}>
+          <div className="rounded-full w-full h-full" style={{ background: bg }} />
+          <div className="absolute rounded-full bg-white" style={{ inset: "24%" }} />
+        </div>
+        <ul className="flex-1 space-y-1 text-xs min-w-0">
+          {slices.length === 0 && <li className="text-gray-400 italic">Aucune donnée.</li>}
+          {slices.map((s, i) => (
+            <li key={s.label} className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }}
+                />
+                <span className="text-gray-700 truncate" title={s.label}>{s.label}</span>
+              </span>
+              <span className="text-gray-600 tabular-nums whitespace-nowrap">
+                {Math.round(s.ca).toLocaleString("fr-FR")} € ·{" "}
+                <span className="text-gray-400">{((s.ca / sum) * 100).toFixed(0)}%</span>
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
-
-      {/* Liste détaillée */}
-      <ul className="space-y-1.5 text-xs">
-        {stats.map((s, i) => (
-          <li key={s.label} className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 min-w-0">
-              <span className={`w-2 h-2 rounded-full ${palette[i % palette.length]} shrink-0`} />
-              <span className="text-gray-700 truncate">{s.label}</span>
-            </span>
-            <span className="text-gray-600 tabular-nums whitespace-nowrap">
-              {Math.round(s.ca).toLocaleString("fr-FR")} € · <span className="text-gray-400">{s.pct_ca.toFixed(1)}%</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-      <div className="text-[10px] text-gray-400 mt-3 pt-2 border-t border-gray-100">
-        Total : {Math.round(totalCA).toLocaleString("fr-FR")} € TTC
-      </div>
+      {totalCA !== undefined && (
+        <div className="text-[10px] text-gray-400 mt-3 pt-2 border-t border-gray-100">
+          Total : {Math.round(totalCA).toLocaleString("fr-FR")} € TTC
+        </div>
+      )}
     </div>
   );
 }
