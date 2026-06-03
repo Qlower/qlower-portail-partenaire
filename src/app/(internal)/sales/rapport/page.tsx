@@ -342,7 +342,7 @@ export default async function RapportPage({
         <Clock className="w-5 h-5" /> Funnel & délais de conversion
       </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KpiCard
           label="Délai Lead → 1er paiement"
           value={data.funnel.avg_lead_to_payment_days != null ? `${Math.round(data.funnel.avg_lead_to_payment_days)} j` : "—"}
@@ -357,12 +357,6 @@ export default async function RapportPage({
           label="Interactions avant closing"
           value={data.funnel.avg_interactions_before_close != null ? data.funnel.avg_interactions_before_close.toFixed(1) : "—"}
           sub="Effort commercial moyen (Modjo + RDV + Aircall)"
-        />
-        <KpiCard
-          label="% Self-service"
-          value={data.totalRows > 0 ? `${Math.round((data.funnel.self_service_clients / data.totalRows) * 100)}%` : "—"}
-          sub={`${data.funnel.self_service_clients} ligne${data.funnel.self_service_clients > 1 ? "s" : ""} sans effort traçable`}
-          highlight="amber"
         />
       </div>
 
