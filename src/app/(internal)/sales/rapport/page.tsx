@@ -35,6 +35,13 @@ export default async function RapportPage({
   const teamObjReached = teamPct >= 100;
   const pctAff = data.totalCA_TTC > 0 ? (data.provenance.affiliate.ca / data.totalCA_TTC) * 100 : 0;
   const pctDir = data.totalCA_TTC > 0 ? (data.provenance.direct.ca / data.totalCA_TTC) * 100 : 0;
+  // Répartition du CA TOTAL = statut client (commissionnable) + reconductions (hors commission).
+  const caSplitStats = [
+    ...data.clientStatusStats,
+    ...(data.renewalsTotal > 0
+      ? [{ label: "Reconductions (abo)", count: data.renewalsCount, ca: data.renewalsTotal, pct_ca: 0 }]
+      : []),
+  ];
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -161,10 +168,9 @@ export default async function RapportPage({
         <Package className="w-5 h-5" /> Composition du CA
       </h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <CompositionCard title="NewBiz vs OldBiz" subtitle="Sur tous les paiements du mois" stats={data.newbizStats} totalCA={data.totalCA_TTC} palette={["bg-emerald-500", "bg-gray-400", "bg-amber-400"]} />
-        <CompositionCard title="Sales-touched vs Self-service" subtitle="Effort commercial avant le paiement" stats={data.sourceStats} totalCA={data.totalCA_TTC} palette={["bg-[#0A3855]", "bg-amber-400", "bg-gray-300"]} helpHover="Sales-touched = score ≥ 5 (Modjo, RDV, Aircall, SMS). Mid = owner identifié sans effort récent. Self-service = aucun effort traçable." />
-        <CompositionCard title="Mix produits (family)" subtitle="Par catégorie de prestation" stats={data.productStats} totalCA={data.totalCA_TTC} palette={["bg-[#0A3855]", "bg-[#F6CCA4]", "bg-emerald-500", "bg-violet-400", "bg-sky-400", "bg-orange-400", "bg-pink-400"]} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CompositionCard title="NewBiz vs OldBiz" subtitle="Sur tous les paiements du mois" stats={data.newbizStats} totalCA={data.totalCA_TTC} />
+        <CompositionCard title="Mix produits (family)" subtitle="Par catégorie de prestation" stats={data.productStats} totalCA={data.totalCA_TTC} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -233,12 +239,11 @@ export default async function RapportPage({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <CompositionCard
-          title="Statut client"
-          subtitle="Conquête / reconquête / renouvellement"
-          stats={data.clientStatusStats}
-          totalCA={data.totalCA_TTC}
-          palette={["bg-emerald-500", "bg-amber-400", "bg-[#0A3855]", "bg-gray-300", "bg-gray-200"]}
-          helpHover="Conquête = 1er achat ever · Reconquête = revenu après ≥ 45 j · Renouvellement = abonnement actif (< 45 j). Calculé à l'ingestion via l'historique Stripe ; 'Non classé' = charges antérieures à la mesure."
+          title="Répartition du CA total"
+          subtitle="Conquête / reconquête / reconductions d'abo"
+          stats={caSplitStats}
+          totalCA={data.totalCA_TTC + data.renewalsTotal}
+          helpHover="Conquête (1er achat) / Conquête <45j (réachat récent) / Reconquête (revenu après ≥45j) = ventes commissionnables, par statut client. Reconductions = abos reconduits, HORS commission. La somme = CA total (incl. reconductions)."
         />
         <CompositionCard
           title="Canal d'acquisition"
