@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
           { filters: [{ propertyName: "partenaire__lead_", operator: "HAS_PROPERTY" }] },
         ],
         properties: PROPS,
-        limit: 100,
+        limit: 50,
         after,
       }),
     });
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
       more = false;
       break;
     }
-    if (Date.now() - started > 45000) {
+    if (Date.now() - started > 30000) {
       more = true;
       break;
     }
