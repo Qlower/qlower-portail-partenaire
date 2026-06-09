@@ -467,39 +467,65 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     .filter((k) => distMap.has(k))
     .map((k) => ({ label: k, ...distMap.get(k)! }));
 
-  // 6) Funnel — délai lead→payement via JOIN sur leads.email
-  const emails = [...clientMap.keys()];
-  // Lead apporteur le plus ancien par email (premier apporteur) — sert au
-  // funnel (délai) ET à la provenance (affilié/direct, partenaire, canal).
+  // 6) Reconductions d'abonnement du mois (avec email) — total + attribution affilié.
+  const { data: renewalRows } = await sb
+    .from("subscription_renewals")
+    .select("amount_eur, email")
+    .eq("year_month", yearMonth);
+  const renewalsTotal = (renewalRows || []).reduce((s, r) => s + (Number(r.amount_eur) || 0), 0);
+  const renewalsCount = (renewalRows || []).length;
+
+  // Funnel + provenance : on résout les leads par email pour (a) le délai
+  // lead→paiement et (b) rattacher chaque client à son apporteur. On inclut les
+  // emails des clients en RECONDUCTION (sinon un client qui ne fait qu'un
+  // renouvellement ce mois-ci n'aurait pas de lead chargé → CA apporté sous-estimé).
+  const emailList: string[] = [];
+  const seenEmailLc = new Set<string>();
+  const pushEmail = (e: string | null | undefined) => {
+    if (!e) return;
+    const lc = e.toLowerCase();
+    if (!seenEmailLc.has(lc)) {
+      seenEmailLc.add(lc);
+      emailList.push(e);
+    }
+  };
+  for (const e of clientMap.keys()) pushEmail(e);
+  for (const rn of renewalRows || []) pushEmail((rn as { email?: string | null }).email);
+
+  // Lead apporteur le plus ancien par email (clé en MINUSCULES, robuste à la casse).
+  // Fetch par lots de 200 pour éviter les limites d'URL sur .in().
   const leadByEmail = new Map<
     string,
     { created_at: string; partner_id: string | null; source: string | null }
   >();
-  let avgLeadToPaymentDays: number | null = null;
-  let matchedLeadCount = 0;
-  if (emails.length > 0) {
+  for (let i = 0; i < emailList.length; i += 200) {
+    const chunk = emailList.slice(i, i + 200);
     const { data: leadRows } = await sb
       .from("leads")
       .select("email, created_at, partner_id, source")
-      .in("email", emails)
-      .limit(500);
+      .in("email", chunk);
     for (const l of leadRows || []) {
       if (!l.email) continue;
-      // Prend la plus ancienne création (premier apporteur)
-      const existing = leadByEmail.get(l.email);
+      const key = l.email.toLowerCase();
+      const existing = leadByEmail.get(key);
       if (!existing || l.created_at < existing.created_at) {
-        leadByEmail.set(l.email, {
+        leadByEmail.set(key, {
           created_at: l.created_at,
           partner_id: (l as { partner_id?: string | null }).partner_id ?? null,
           source: (l as { source?: string | null }).source ?? null,
         });
       }
     }
+  }
+
+  // Délai lead → 1er paiement (funnel)
+  let avgLeadToPaymentDays: number | null = null;
+  let matchedLeadCount = 0;
+  {
     const deltas: number[] = [];
     for (const c of allClients) {
-      const lead = leadByEmail.get(c.email);
+      const lead = leadByEmail.get(c.email.toLowerCase());
       if (!lead) continue;
-      // 1ère charge de ce client dans le mois
       const firstCharge = (rows || [])
         .filter((r) => r.email === c.email)
         .sort((a, b) => (a.created_at < b.created_at ? -1 : 1))[0];
@@ -510,9 +536,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
         matchedLeadCount++;
       }
     }
-    if (deltas.length > 0) {
-      avgLeadToPaymentDays = deltas.reduce((s, n) => s + n, 0) / deltas.length;
-    }
+    if (deltas.length > 0) avgLeadToPaymentDays = deltas.reduce((s, n) => s + n, 0) / deltas.length;
   }
 
   // Nb interactions moyennes avant closing (sales-touched uniquement)
@@ -569,56 +593,70 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     const { data: prs } = await sb.from("partners").select("id, nom").in("id", provPartnerIds);
     for (const p of prs || []) partnerNameById.set(p.id, p.nom);
   }
+  // Le "CA apporté" inclut les charges commissionnables (conquête/reconquête/
+  // one-shot) ET les reconductions d'abonnement des clients apportés (revenu
+  // récurrent généré par l'affilié). Comptage clients = emails uniques.
   let affiliateCA = 0;
-  let affiliateClients = 0;
   let directCA = 0;
-  let directClients = 0;
-  const partnerAgg = new Map<string, { ca: number; clients: number }>();
-  const sourceAgg = new Map<string, { ca: number; clients: number }>();
+  const affEmails = new Set<string>();
+  const directEmails = new Set<string>();
+  const partnerCA = new Map<string, number>();
+  const partnerEmails = new Map<string, Set<string>>();
+  const sourceCA = new Map<string, number>();
+  const sourceEmails = new Map<string, Set<string>>();
+  const addAffiliate = (
+    emailLc: string,
+    lead: { partner_id: string | null; source: string | null },
+    ca: number,
+  ) => {
+    affiliateCA += ca;
+    affEmails.add(emailLc);
+    const pname = (lead.partner_id && partnerNameById.get(lead.partner_id)) || "Partenaire inconnu";
+    partnerCA.set(pname, (partnerCA.get(pname) || 0) + ca);
+    if (!partnerEmails.has(pname)) partnerEmails.set(pname, new Set());
+    partnerEmails.get(pname)!.add(emailLc);
+    const src = lead.source || "Inconnu";
+    sourceCA.set(src, (sourceCA.get(src) || 0) + ca);
+    if (!sourceEmails.has(src)) sourceEmails.set(src, new Set());
+    sourceEmails.get(src)!.add(emailLc);
+  };
+  // a) Charges commissionnables du mois
   for (const c of allClients) {
-    const lead = leadByEmail.get(c.email);
-    if (lead) {
-      affiliateCA += c.ca;
-      affiliateClients++;
-      const pname =
-        (lead.partner_id && partnerNameById.get(lead.partner_id)) || "Partenaire inconnu";
-      const pa = partnerAgg.get(pname) || { ca: 0, clients: 0 };
-      pa.ca += c.ca;
-      pa.clients++;
-      partnerAgg.set(pname, pa);
-      const src = lead.source || "Inconnu";
-      const sa = sourceAgg.get(src) || { ca: 0, clients: 0 };
-      sa.ca += c.ca;
-      sa.clients++;
-      sourceAgg.set(src, sa);
-    } else {
+    const emailLc = c.email.toLowerCase();
+    const lead = leadByEmail.get(emailLc);
+    if (lead) addAffiliate(emailLc, lead, c.ca);
+    else {
       directCA += c.ca;
-      directClients++;
+      directEmails.add(emailLc);
+    }
+  }
+  // b) Reconductions d'abonnement du mois (rattachées au même apporteur)
+  for (const rn of renewalRows || []) {
+    const emailLc = ((rn as { email?: string | null }).email || "").toLowerCase();
+    if (!emailLc) continue;
+    const amt = Number((rn as { amount_eur?: number }).amount_eur) || 0;
+    const lead = leadByEmail.get(emailLc);
+    if (lead) addAffiliate(emailLc, lead, amt);
+    else {
+      directCA += amt;
+      directEmails.add(emailLc);
     }
   }
   const provenance: ProvenanceData = {
-    affiliate: { ca: affiliateCA, clients: affiliateClients },
-    direct: { ca: directCA, clients: directClients },
-    byPartner: [...partnerAgg.entries()]
-      .map(([partner, v]) => ({ partner, ca: v.ca, clients: v.clients }))
+    affiliate: { ca: Math.round(affiliateCA), clients: affEmails.size },
+    direct: { ca: Math.round(directCA), clients: directEmails.size },
+    byPartner: [...partnerCA.entries()]
+      .map(([partner, ca]) => ({ partner, ca: Math.round(ca), clients: partnerEmails.get(partner)!.size }))
       .sort((a, b) => b.ca - a.ca),
-    bySource: [...sourceAgg.entries()]
-      .map(([label, v]) => ({
+    bySource: [...sourceCA.entries()]
+      .map(([label, ca]) => ({
         label,
-        count: v.clients,
-        ca: v.ca,
-        pct_ca: affiliateCA > 0 ? (v.ca / affiliateCA) * 100 : 0,
+        count: sourceEmails.get(label)!.size,
+        ca: Math.round(ca),
+        pct_ca: affiliateCA > 0 ? (ca / affiliateCA) * 100 : 0,
       }))
       .sort((a, b) => b.ca - a.ca),
   };
-
-  // Reconductions d'abonnement du mois (table dédiée, NON commissionnable).
-  const { data: renewalRows } = await sb
-    .from("subscription_renewals")
-    .select("amount_eur")
-    .eq("year_month", yearMonth);
-  const renewalsTotal = (renewalRows || []).reduce((s, r) => s + (Number(r.amount_eur) || 0), 0);
-  const renewalsCount = (renewalRows || []).length;
 
   // ── Tendance : 6 derniers mois (CA commissionnable + reconductions) ──
   const trendMonths: string[] = [];

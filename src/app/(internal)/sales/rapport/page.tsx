@@ -33,8 +33,11 @@ export default async function RapportPage({
   const monthLabel = formatYearMonthFull(yearMonth);
   const teamPct = data.teamObj_eur > 0 ? (data.totalCA_TTC / data.teamObj_eur) * 100 : 0;
   const teamObjReached = teamPct >= 100;
-  const pctAff = data.totalCA_TTC > 0 ? (data.provenance.affiliate.ca / data.totalCA_TTC) * 100 : 0;
-  const pctDir = data.totalCA_TTC > 0 ? (data.provenance.direct.ca / data.totalCA_TTC) * 100 : 0;
+  // % calculés sur le CA total INCL. reconductions (affilié + direct couvrent
+  // désormais charges commissionnables + reconductions = total incl. reconductions).
+  const provTotal = data.totalCA_TTC + data.renewalsTotal;
+  const pctAff = provTotal > 0 ? (data.provenance.affiliate.ca / provTotal) * 100 : 0;
+  const pctDir = provTotal > 0 ? (data.provenance.direct.ca / provTotal) * 100 : 0;
   // Répartition du CA TOTAL = statut client (commissionnable) + reconductions (hors commission).
   const caSplitStats = [
     ...data.clientStatusStats,
@@ -279,7 +282,7 @@ export default async function RapportPage({
         <div className="px-5 py-3 border-b border-gray-100">
           <h3 className="text-sm font-semibold text-[#0A3855]">Top partenaires apporteurs</h3>
           <p className="text-[11px] text-gray-500 mt-0.5">
-            CA généré ce mois par les clients qu&apos;ils ont apportés
+            CA généré ce mois par les clients apportés — charges <strong>+ reconductions d&apos;abo</strong>
           </p>
         </div>
         {data.provenance.byPartner.length === 0 ? (
