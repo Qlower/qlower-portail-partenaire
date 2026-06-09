@@ -212,12 +212,13 @@ async function upsertLead(
   const partnerUtm = props.partenaire__lead_ || props.utm_source || "";
   if (!partnerUtm) return { status: "skip:no_partner_utm" };
 
-  // Find partner by UTM
-  const { data: partner } = await supabase
+  // Find partner by UTM — INSENSIBLE À LA CASSE (corrige "CocoonR" vs "cocoonr").
+  const { data: partnersFound } = await supabase
     .from("partners")
     .select("id")
-    .eq("utm", partnerUtm)
-    .single();
+    .ilike("utm", partnerUtm)
+    .limit(1);
+  const partner = partnersFound?.[0];
 
   if (!partner) return { status: `skip:partner_not_found(${partnerUtm})` };
 
