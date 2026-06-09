@@ -25,7 +25,9 @@ export async function upsertLeadFromContact(
   contactId: string,
   props: Record<string, string | null>,
 ): Promise<{ status: string }> {
-  const partnerUtm = (props.partenaire__lead_ || props.utm_source || "").trim();
+  // Normalise les UTM : underscore → tiret (corrige "boost_invest" vs "boost-invest",
+  // "jamax_conseils" vs "jamax-conseils" — décalage de format des tags HubSpot).
+  const partnerUtm = (props.partenaire__lead_ || props.utm_source || "").trim().replace(/_/g, "-");
   if (!partnerUtm) return { status: "skip:no_partner_utm" };
 
   // Partenaire par UTM — INSENSIBLE À LA CASSE (ilike, sans wildcard = égalité).

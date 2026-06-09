@@ -209,7 +209,7 @@ async function upsertLead(
   contactId: string,
   props: Record<string, string | null>
 ) {
-  const partnerUtm = props.partenaire__lead_ || props.utm_source || "";
+  const partnerUtm = (props.partenaire__lead_ || props.utm_source || "").replace(/_/g, "-");
   if (!partnerUtm) return { status: "skip:no_partner_utm" };
 
   // Find partner by UTM — INSENSIBLE À LA CASSE (corrige "CocoonR" vs "cocoonr").
