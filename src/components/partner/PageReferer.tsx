@@ -2,7 +2,7 @@
 
 import { useState, type ReactElement } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { usePartner, useReferrals } from "@/hooks/usePartnerData";
+import { usePartner, useLeads } from "@/hooks/usePartnerData";
 import { buildRdvLink } from "@/services/links";
 import { STAGE_STYLES } from "@/services/constants";
 import { PageHeader } from "@/components/ui/page-header";
@@ -20,7 +20,9 @@ interface PageRefererProps {
 }
 
 export default function PageReferer({ partner }: PageRefererProps) {
-  const { data: referrals, isLoading: referralsLoading } = useReferrals(partner.id);
+  // Historique = les contacts réellement référés par le partenaire = ses leads
+  // (UTM + formulaire), pas seulement les soumissions de formulaire.
+  const { data: leads, isLoading: leadsLoading } = useLeads(partner.id);
   const [mode, setMode] = useState<Mode>("page");
 
   const rdvLink = buildRdvLink(partner.utm);
@@ -175,20 +177,20 @@ export default function PageReferer({ partner }: PageRefererProps) {
             <CardTitle className="text-sm font-semibold text-gray-900">
               Historique de vos contacts
             </CardTitle>
-            {referrals && referrals.length > 0 && (
+            {leads && leads.length > 0 && (
               <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855] text-xs">
-                {referrals.length} contact{referrals.length > 1 ? "s" : ""}
+                {leads.length} contact{leads.length > 1 ? "s" : ""}
               </Badge>
             )}
           </div>
         </CardHeader>
         <CardContent>
-          {referralsLoading ? (
+          {leadsLoading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="w-8 h-8 border-2 border-[#0A3855] border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-gray-400 mt-3">Chargement...</p>
             </div>
-          ) : !referrals || referrals.length === 0 ? (
+          ) : !leads || leads.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="w-12 h-12 rounded-full bg-[#E5EDF1] flex items-center justify-center mb-3">
                 <svg className="w-6 h-6 text-[#0A3855]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -210,21 +212,19 @@ export default function PageReferer({ partner }: PageRefererProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {referrals.map((r) => {
-                    const stageStyle = STAGE_STYLES[r.statut] || { text: "text-gray-600", bg: "bg-gray-100" };
+                  {leads.map((l) => {
+                    const stageStyle = STAGE_STYLES[l.stage] || { text: "text-gray-600", bg: "bg-gray-100" };
                     return (
-                      <tr key={r.id} className="hover:bg-[#E5EDF1]/20 transition-colors">
-                        <td className="px-6 py-3.5 font-medium text-gray-900">
-                          {r.prenom} {r.nom}
-                        </td>
-                        <td className="px-6 py-3.5 text-gray-500">{r.email}</td>
+                      <tr key={l.id} className="hover:bg-[#E5EDF1]/20 transition-colors">
+                        <td className="px-6 py-3.5 font-medium text-gray-900">{l.nom}</td>
+                        <td className="px-6 py-3.5 text-gray-500">{l.email}</td>
                         <td className="px-6 py-3.5">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${stageStyle.bg} ${stageStyle.text}`}>
-                            {r.statut}
+                            {l.stage}
                           </span>
                         </td>
                         <td className="px-6 py-3.5 text-gray-400 tabular-nums">
-                          {new Date(r.created_at).toLocaleDateString("fr-FR")}
+                          {new Date(l.created_at).toLocaleDateString("fr-FR")}
                         </td>
                       </tr>
                     );
