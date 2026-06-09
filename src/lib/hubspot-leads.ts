@@ -60,12 +60,20 @@ export async function upsertLeadFromContact(
   }
 
   // Existe déjà chez le BON partenaire ? (match par hs_contact_id OU email)
-  const { data: existing } = await supabase
+  // .limit(1) (pas .maybeSingle) : si plusieurs lignes matchent — données
+  // anormales, ex. 2 emails sous 1 hs_contact_id — on en prend une au lieu de
+  // planter (ce qui re-créait des doublons à chaque run).
+  const orFilter = email
+    ? `hs_contact_id.eq.${contactId},email.eq.${email}`
+    : `hs_contact_id.eq.${contactId}`;
+  const { data: existingRows } = await supabase
     .from("leads")
     .select("id, stage, commission_due")
     .eq("partner_id", partner.id)
-    .or(`hs_contact_id.eq.${contactId},email.eq.${email}`)
-    .maybeSingle();
+    .or(orFilter)
+    .order("id")
+    .limit(1);
+  const existing = existingRows?.[0];
 
   if (existing) {
     const newCommissionDue = existing.commission_due || commissionDue;
