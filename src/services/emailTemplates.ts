@@ -71,7 +71,8 @@ function statCard(label: string, value: string, color: string = "#0A3855"): stri
 }
 
 export function getEmailContent(key: TemplateKey, p: PartnerEmailData): { subject: string; html: string } {
-  const link = `https://www.qlower.com/qlower-x-partenaire?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}`;
+  // utm_campaign = utm (pas le code) : c'est la campaign qui pilote le tag HubSpot partenaire__lead_.
+  const link = `https://www.qlower.com/qlower-x-partenaire?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.utm}`;
   const conversionRate = p.leads > 0 ? ((p.abonnes / p.leads) * 100).toFixed(1) : "0";
   const commission = p.abonnes * 100;
 

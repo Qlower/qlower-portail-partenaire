@@ -116,7 +116,8 @@ export async function POST(request: NextRequest) {
     const p = eligible[i];
     if (i > 0) await sleep(THROTTLE_MS);
 
-    const link = `https://www.qlower.com/qlower-x-partenaire?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.code}`;
+    // utm_campaign = utm (pas le code) : c'est la campaign qui pilote le tag HubSpot partenaire__lead_.
+    const link = `https://www.qlower.com/qlower-x-partenaire?utm_source=${p.utm}&utm_medium=affiliation&utm_campaign=${p.utm}`;
 
     // Setup-password link 7j (NOT consumed by email scanners) — preferred for new comm
     let setupLink = `${siteUrl}/login`;

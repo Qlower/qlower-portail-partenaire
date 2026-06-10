@@ -26,7 +26,9 @@ export default function PageReferer({ partner }: PageRefererProps) {
   const [mode, setMode] = useState<Mode>("page");
 
   const rdvLink = buildRdvLink(partner.utm);
-  const partnerPageLink = `https://www.qlower.com/qlower-x-partenaire?utm_source=${encodeURIComponent(partner.utm)}&utm_medium=affiliation&utm_campaign=${encodeURIComponent(partner.code || partner.utm)}`;
+  // utm_campaign = utm partenaire (et non le code) : c'est la campaign qui pilote
+  // le tag HubSpot `partenaire__lead_`, et elle doit matcher une option du menu = l'utm.
+  const partnerPageLink = `https://www.qlower.com/qlower-x-partenaire?utm_source=${encodeURIComponent(partner.utm)}&utm_medium=affiliation&utm_campaign=${encodeURIComponent(partner.utm)}`;
 
   const modes: { key: Mode; icon: ReactElement; title: string; desc: string }[] = [
     {

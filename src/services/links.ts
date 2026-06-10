@@ -12,16 +12,19 @@ export const slug = (s: string): string =>
 /**
  * Lien d'inscription Qlower tracké pour un partenaire donné.
  *
- *   https://www.qlower.com/qlower-x-partenaire?utm_source=<utm>&utm_medium=affiliation&utm_campaign=<code>
+ *   https://www.qlower.com/qlower-x-partenaire?utm_source=<utm>&utm_medium=affiliation&utm_campaign=<utm>
  *
- * Page d'atterrissage commune côté site marketing — les UTMs en query-string
- * sont capturés par HubSpot dans hs_analytics_source_data_2 → enables the
- * auto-tag du webhook contact (lead-to-partner attribution).
+ * ⚠️ utm_campaign = l'UTM du partenaire (PAS le code). C'est l'`utm_campaign`
+ * qui pilote le workflow HubSpot remplissant le menu `partenaire__lead_` : il
+ * ne tague le contact que si la campaign correspond EXACTEMENT à une option du
+ * menu — or les options du menu = les valeurs `utm` des partenaires. Mettre le
+ * code (ex. "VAUVERT") laisserait le contact non tagué donc non attribué.
+ * Le 2e paramètre est conservé pour compat. d'appel mais n'est plus utilisé.
  */
-export const buildSignupLink = (utm: string, code?: string | null): string => {
+export const buildSignupLink = (utm: string, _code?: string | null): string => {
   const safeUtm = encodeURIComponent(utm || "");
   const base = `${SIGNUP_BASE}?utm_source=${safeUtm}&utm_medium=affiliation`;
-  return code ? `${base}&utm_campaign=${encodeURIComponent(code)}` : base;
+  return utm ? `${base}&utm_campaign=${safeUtm}` : base;
 };
 
 export const buildRdvLink = (utm: string): string =>
