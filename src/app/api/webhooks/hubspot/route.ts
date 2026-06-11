@@ -210,7 +210,26 @@ async function upsertLead(
   props: Record<string, string | null>
 ) {
   const partnerUtm = (props.partenaire__lead_ || props.utm_source || "").replace(/_/g, "-");
-  if (!partnerUtm) return { status: "skip:no_partner_utm" };
+  if (!partnerUtm) {
+    // Plus aucun tag partenaire sur le contact → DÉTACHEMENT.
+    // On retire le lead du compte affilié (lead + commission + compteurs), car
+    // une absence de tag = attribution retirée (souvent une correction d'erreur
+    // de tag côté HubSpot). Ça ne doit plus apparaître chez le partenaire.
+    const { data: orphans } = await supabase
+      .from("leads")
+      .select("id, partner_id, commission_due")
+      .eq("hs_contact_id", contactId);
+    let detached = 0;
+    for (const o of orphans || []) {
+      await supabase.from("leads").delete().eq("id", o.id);
+      await supabase.rpc("decrement_partner_leads", { p_id: o.partner_id });
+      if (o.commission_due) {
+        await supabase.rpc("decrement_partner_abonnes", { p_id: o.partner_id });
+      }
+      detached++;
+    }
+    return { status: detached ? `detached:${detached}` : "skip:no_partner_utm" };
+  }
 
   // Find partner by UTM — INSENSIBLE À LA CASSE (corrige "CocoonR" vs "cocoonr").
   const { data: partnersFound } = await supabase

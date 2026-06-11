@@ -122,10 +122,14 @@ async function upsertLead(
 // Sync contacts modified in the last 26 hours (cron runs once per day around midnight Paris time)
 // 24h + 2h safety margin to cover DST transitions and any missed run.
 // If full=true, skip the date filter entirely (used to rattraper d'anciens decalages).
-async function fetchRecentContacts(full = false) {
+async function fetchRecentContacts(full = false): Promise<{
+  contacts: Array<{ id: string; properties: Record<string, string | null> }>;
+  complete: boolean;
+}> {
   const since = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
   const contacts: Array<{ id: string; properties: Record<string, string | null> }> = [];
   let after: string | undefined;
+  let complete = true;
 
   do {
     const filters: Array<Record<string, string>> = [
@@ -147,7 +151,13 @@ async function fetchRecentContacts(full = false) {
       body: JSON.stringify(body),
     });
 
-    if (!res.ok) break;
+    // Un échec en cours de pagination = snapshot PARTIEL. On le signale pour
+    // que la passe de suppression/détachement soit annulée (sinon des contacts
+    // simplement non-récupérés passeraient pour "absents" → suppressions à tort).
+    if (!res.ok) {
+      complete = false;
+      break;
+    }
     const data = await res.json();
     for (const c of data.results || []) {
       contacts.push({ id: c.id, properties: c.properties });
@@ -155,7 +165,7 @@ async function fetchRecentContacts(full = false) {
     after = data.paging?.next?.after;
   } while (after);
 
-  return contacts;
+  return { contacts, complete };
 }
 
 // Anonymize a lead whose HubSpot contact no longer exists (RGPD erasure).
@@ -212,39 +222,62 @@ async function hubspotContactExists(id: string): Promise<boolean> {
   }
 }
 
-// Detect leads whose HubSpot contact was deleted: present in Supabase with a
-// hs_contact_id, absent from the full HubSpot fetch. Only reliable in full mode.
-//
-// ⚠️ Un contact peut être absent du snapshot pour DEUX raisons :
-//   1. il a été supprimé de HubSpot (RGPD) → on anonymise,
-//   2. on lui a juste retiré le tag partenaire__lead_ → le contact existe
-//      toujours, il ne faut SURTOUT PAS l'anonymiser (sinon faux "Supprimé").
-// On lève le doute via un GET sur le contact avant d'anonymiser.
-async function detectDeletions(
+// Plafond de sécurité : si plus de N leads sont absents du snapshot, c'est
+// quasi certainement un problème de récupération (pas N vraies suppressions).
+// On annule alors toute la passe pour ne JAMAIS supprimer/anonymiser en masse.
+const MAX_RECONCILE = 60;
+
+// Réconcilie les leads présents en base mais absents du snapshot HubSpot taggé.
+// Deux cas, qu'on distingue par un GET sur le contact :
+//   1. Contact réellement supprimé de HubSpot (404/archivé) → anonymisation RGPD.
+//   2. Contact existant mais sans tag partenaire → DÉTACHEMENT : on retire le
+//      lead du compte affilié (lead + commission + compteurs), car l'attribution
+//      a été retirée (souvent une correction d'erreur de tag).
+// Seulement fiable en mode full ET snapshot complet (vérifié par l'appelant).
+async function reconcileMissing(
   supabase: ReturnType<typeof createServiceClient>,
   hsIds: Set<string>
-): Promise<number> {
+): Promise<{ anonymized: number; detached: number }> {
   const { data: supaLeads } = await supabase
     .from("leads")
-    .select("id, hs_contact_id")
+    .select("id, hs_contact_id, partner_id, commission_due")
     .not("hs_contact_id", "is", null)
     .eq("hs_deleted", false);
 
-  let count = 0;
-  for (const lead of supaLeads || []) {
-    if (!lead.hs_contact_id) continue;
-    if (hsIds.has(lead.hs_contact_id)) continue;
-    // Absent du snapshot taggé : on confirme la suppression réelle avant d'agir.
-    const stillExists = await hubspotContactExists(lead.hs_contact_id);
-    if (stillExists) continue; // tag retiré uniquement → on ne touche pas au lead
-    try {
-      await anonymizeDeletedLead(supabase, lead.id);
-      count++;
-    } catch {
-      // already logged inside anonymizeDeletedLead
+  const candidates = (supaLeads || []).filter(
+    (l) => l.hs_contact_id && !hsIds.has(l.hs_contact_id)
+  );
+
+  if (candidates.length > MAX_RECONCILE) {
+    console.error(
+      `[sync] ${candidates.length} leads absents du snapshot (> ${MAX_RECONCILE}) — passe de réconciliation ANNULÉE par sécurité`
+    );
+    return { anonymized: 0, detached: 0 };
+  }
+
+  let anonymized = 0;
+  let detached = 0;
+  for (const lead of candidates) {
+    const stillExists = await hubspotContactExists(lead.hs_contact_id as string);
+    if (stillExists) {
+      // Tag retiré → détachement complet du compte affilié.
+      await supabase.from("leads").delete().eq("id", lead.id);
+      await supabase.rpc("decrement_partner_leads", { p_id: lead.partner_id });
+      if (lead.commission_due) {
+        await supabase.rpc("decrement_partner_abonnes", { p_id: lead.partner_id });
+      }
+      detached++;
+    } else {
+      // Contact réellement supprimé de HubSpot → anonymisation RGPD.
+      try {
+        await anonymizeDeletedLead(supabase, lead.id);
+        anonymized++;
+      } catch {
+        // already logged inside anonymizeDeletedLead
+      }
     }
   }
-  return count;
+  return { anonymized, detached };
 }
 
 export async function GET(request: NextRequest) {
@@ -257,7 +290,7 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const full = url.searchParams.get("full") === "true";
-    const contacts = await fetchRecentContacts(full);
+    const { contacts, complete } = await fetchRecentContacts(full);
     const supabase = createServiceClient();
     const results = {
       total: contacts.length,
@@ -266,6 +299,8 @@ export async function GET(request: NextRequest) {
       transferred: 0,
       skipped: 0,
       deleted: 0,
+      detached: 0,
+      reconcile_skipped: false,
     };
 
     for (const contact of contacts) {
@@ -276,10 +311,16 @@ export async function GET(request: NextRequest) {
       else results.skipped++;
     }
 
-    // Deletion detection only reliable when we have the complete HubSpot snapshot
-    if (full) {
+    // Réconciliation (anonymisation RGPD + détachement) : fiable uniquement avec
+    // un snapshot COMPLET (sinon on annule pour éviter des suppressions de masse).
+    if (full && complete) {
       const hsIds = new Set(contacts.map((c) => c.id));
-      results.deleted = await detectDeletions(supabase, hsIds);
+      const { anonymized, detached } = await reconcileMissing(supabase, hsIds);
+      results.deleted = anonymized;
+      results.detached = detached;
+    } else if (full && !complete) {
+      results.reconcile_skipped = true;
+      console.error("[sync] snapshot HubSpot incomplet — passe de réconciliation (suppression/détachement) SKIPPÉE");
     }
 
     return NextResponse.json(results);
