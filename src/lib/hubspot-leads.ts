@@ -68,7 +68,7 @@ export async function upsertLeadFromContact(
     : `hs_contact_id.eq.${contactId}`;
   const { data: existingRows } = await supabase
     .from("leads")
-    .select("id, stage, commission_due")
+    .select("id, stage, commission_due, hs_deleted")
     .eq("partner_id", partner.id)
     .or(orFilter)
     .order("id")
@@ -82,6 +82,14 @@ export async function upsertLeadFromContact(
       hs_contact_id: contactId,
       commission_due: newCommissionDue,
     };
+    // Auto-réparation : si le lead avait été marqué supprimé à tort (tag retiré
+    // puis remis), on lève le flag et on restaure l'identité réelle.
+    if (existing.hs_deleted) {
+      updateFields.nom = nom;
+      updateFields.email = email;
+      updateFields.hs_deleted = false;
+      updateFields.hs_deleted_at = null;
+    }
     if (props.createdate) updateFields.created_at = new Date(props.createdate).toISOString();
     await supabase.from("leads").update(updateFields).eq("id", existing.id);
     if (!existing.commission_due && newCommissionDue) {

@@ -78,14 +78,18 @@ async function upsertLead(
 
   if (existing) {
     const newCommissionDue = existing.commission_due || commissionDue;
-    // Do NOT overwrite name/email if the lead has been pseudonymized (RGPD erasure)
-    const preserveIdentity = existing.hs_deleted === true;
+    // Si le lead était marqué supprimé mais qu'on retombe dessus ici, c'est que
+    // le contact existe bel et bien (on l'a dans le snapshot taggé) → c'était un
+    // faux positif (tag retiré puis remis) : on lève le flag et on restaure
+    // l'identité réelle depuis HubSpot.
+    const wasDeleted = existing.hs_deleted === true;
     await supabase.from("leads").update({
       stage, hs_contact_id: contactId, commission_due: newCommissionDue,
       subscribed_at: subscribedAt,
       unsubscribed_at: unsubscribedAt,
       first_paid_at: firstPaidAt,
-      ...(preserveIdentity ? {} : { nom, email }),
+      nom, email,
+      ...(wasDeleted ? { hs_deleted: false, hs_deleted_at: null } : {}),
       ...(props.createdate ? { created_at: new Date(props.createdate).toISOString() } : {}),
     }).eq("id", existing.id);
 
@@ -190,8 +194,32 @@ async function anonymizeDeletedLead(
   }
 }
 
+// Vérifie qu'un contact HubSpot a RÉELLEMENT été supprimé (404 / archivé),
+// par opposition à "il a juste perdu son tag partenaire__lead_". En cas de
+// doute (erreur réseau / 5xx), on renvoie true (= existe) pour ne jamais
+// anonymiser à tort.
+async function hubspotContactExists(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${HS_BASE}/crm/v3/objects/contacts/${id}`, {
+      headers: { Authorization: `Bearer ${HS_TOKEN}` },
+    });
+    if (res.status === 404) return false;
+    if (!res.ok) return true;
+    const data = await res.json();
+    return data?.archived !== true;
+  } catch {
+    return true;
+  }
+}
+
 // Detect leads whose HubSpot contact was deleted: present in Supabase with a
 // hs_contact_id, absent from the full HubSpot fetch. Only reliable in full mode.
+//
+// ⚠️ Un contact peut être absent du snapshot pour DEUX raisons :
+//   1. il a été supprimé de HubSpot (RGPD) → on anonymise,
+//   2. on lui a juste retiré le tag partenaire__lead_ → le contact existe
+//      toujours, il ne faut SURTOUT PAS l'anonymiser (sinon faux "Supprimé").
+// On lève le doute via un GET sur le contact avant d'anonymiser.
 async function detectDeletions(
   supabase: ReturnType<typeof createServiceClient>,
   hsIds: Set<string>
@@ -206,6 +234,9 @@ async function detectDeletions(
   for (const lead of supaLeads || []) {
     if (!lead.hs_contact_id) continue;
     if (hsIds.has(lead.hs_contact_id)) continue;
+    // Absent du snapshot taggé : on confirme la suppression réelle avant d'agir.
+    const stillExists = await hubspotContactExists(lead.hs_contact_id);
+    if (stillExists) continue; // tag retiré uniquement → on ne touche pas au lead
     try {
       await anonymizeDeletedLead(supabase, lead.id);
       count++;
