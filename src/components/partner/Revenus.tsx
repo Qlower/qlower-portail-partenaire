@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useInvoices, useLeads, useCommissions } from "@/hooks/usePartnerData";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,15 +41,34 @@ export default function Revenus({ partner }: RevenusProps) {
   const { data: leads } = useLeads(partner.id);
   const { data: commissionData, isLoading: commLoading } = useCommissions(partner.id, selectedYear);
 
-  const paidTotal = invoices
-    ? invoices.filter((i) => i.statut === "Payee").reduce((sum, i) => sum + i.montant, 0)
-    : 0;
+  // Vrai système de factures (partner_invoices) — alimente les tuiles ci-dessous.
+  // (L'ancienne table `invoices` ne servait plus qu'à l'historique legacy en bas.)
+  const { data: partnerInvoices = [] } = useQuery<
+    { amount: number; file_url: string | null; is_paid: boolean; paid_at: string | null }[]
+  >({
+    queryKey: ["partner-invoices", partner.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/partner/invoices?partner_id=${partner.id}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!partner.id,
+  });
 
-  const pendingTotal = invoices
-    ? invoices.filter((i) => i.statut === "En attente").reduce((sum, i) => sum + i.montant, 0)
-    : 0;
+  const paidTotal = partnerInvoices
+    .filter((i) => i.is_paid)
+    .reduce((sum, i) => sum + (i.amount || 0), 0);
 
-  const nextPayment = invoices?.find((i) => i.statut === "En attente");
+  // En attente de versement = factures déposées mais pas encore réglées.
+  const pendingTotal = partnerInvoices
+    .filter((i) => !i.is_paid && i.file_url)
+    .reduce((sum, i) => sum + (i.amount || 0), 0);
+
+  const lastPaidDate = partnerInvoices
+    .filter((i) => i.is_paid && i.paid_at)
+    .map((i) => i.paid_at as string)
+    .sort()
+    .pop();
 
   const objectifAnnuel = partner.comm_obj_annuel || 10000;
   const totalCommission = commissionData?.totalCommission ?? 0;
@@ -343,9 +363,9 @@ export default function Revenus({ partner }: RevenusProps) {
                 </svg>
               </div>
               <div>
-                <p className="text-xs text-gray-500 font-medium">Prochain versement</p>
+                <p className="text-xs text-gray-500 font-medium">Dernier versement</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {nextPayment ? new Date(nextPayment.date).toLocaleDateString("fr-FR", { month: "short", year: "numeric" }) : "-"}
+                  {lastPaidDate ? new Date(lastPaidDate).toLocaleDateString("fr-FR", { month: "short", year: "numeric" }) : "-"}
                 </p>
               </div>
             </div>

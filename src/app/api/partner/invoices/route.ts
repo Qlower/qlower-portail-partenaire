@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { getResend, INTERNAL_FROM } from "@/lib/resend";
+
+// Destinataires de l'alerte "nouvelle facture déposée".
+const INVOICE_ALERT_TO = ["coline@qlower.com", "alexandre@qlower.com"];
 
 // GET /api/partner/invoices?partner_id=X
 // Returns all invoices for a partner (ordered by year desc)
@@ -64,6 +68,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Préserve le statut de paiement existant : (re)déposer un PDF ne doit JAMAIS
+  // dépayer une facture déjà réglée (utile quand l'admin attache après coup le
+  // PDF d'une année déjà soldée hors facture).
+  const { data: existingInv } = await supabase
+    .from("partner_invoices")
+    .select("is_paid, paid_at")
+    .eq("partner_id", partnerId)
+    .eq("year", year)
+    .maybeSingle();
+
   // Upsert invoice record
   const { data, error } = await supabase
     .from("partner_invoices")
@@ -74,8 +88,8 @@ export async function POST(request: NextRequest) {
         amount,
         file_url: filename,
         uploaded_at: new Date().toISOString(),
-        is_paid: false,
-        paid_at: null,
+        is_paid: existingInv?.is_paid ?? false,
+        paid_at: existingInv?.paid_at ?? null,
         historical: false,
         updated_at: new Date().toISOString(),
       },
@@ -85,5 +99,33 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Alerte interne — sauf si c'est l'admin qui dépose lui-même (via=admin).
+  // N'échoue jamais le dépôt si l'email part mal.
+  const via = String(form.get("via") || "");
+  if (via !== "admin") {
+    try {
+      const { data: partner } = await supabase
+        .from("partners")
+        .select("nom, utm")
+        .eq("id", partnerId)
+        .maybeSingle();
+      const nom = partner?.nom || partnerId;
+      await getResend().emails.send({
+        from: INTERNAL_FROM,
+        to: INVOICE_ALERT_TO,
+        subject: `🧾 Nouvelle facture déposée — ${nom} (${year})`,
+        html: `<p>Le partenaire <strong>${nom}</strong> vient de déposer sa facture pour <strong>${year}</strong>.</p>
+<ul>
+  <li>Montant déclaré : <strong>${amount.toLocaleString("fr-FR")} €</strong></li>
+  <li>Année : ${year}</li>
+</ul>
+<p>À vérifier puis marquer payée dans la <a href="https://partenaire.qlower.com/admin">tour de contrôle &rsaquo; Facturation</a>.</p>`,
+      });
+    } catch (e) {
+      console.error("[invoices] notif dépôt échouée:", e);
+    }
+  }
+
   return NextResponse.json(data, { status: 201 });
 }

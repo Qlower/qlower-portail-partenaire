@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Check, X, FileText, Download, Mail, AlertCircle, Eye } from "lucide-react";
+import { Loader2, Check, X, FileText, Download, Mail, AlertCircle, Eye, Upload } from "lucide-react";
 
 interface PartnerInvoice {
   id: string;
@@ -132,6 +132,36 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
       setSendResult(e instanceof Error ? `❌ ${e.message}` : "❌ Erreur");
     } finally {
       setSending(false);
+    }
+  };
+
+  // Dépôt du PDF par l'admin à la place du partenaire (facture reçue hors portail,
+  // ex. par email). Réutilise l'endpoint partenaire — qui préserve le statut payé.
+  const [uploadingYear, setUploadingYear] = useState<number | null>(null);
+  const uploadInvoiceFile = async (year: number, amount: number, file: File) => {
+    if (file.type !== "application/pdf") {
+      alert("Format PDF uniquement");
+      return;
+    }
+    setUploadingYear(year);
+    try {
+      const fd = new FormData();
+      fd.append("partner_id", partnerId);
+      fd.append("year", String(year));
+      fd.append("amount", String(amount > 0 ? amount : 0));
+      fd.append("file", file);
+      fd.append("via", "admin"); // dépôt admin → pas d'auto-notification
+      const res = await fetch("/api/partner/invoices", { method: "POST", body: fd });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Échec de l'upload");
+      }
+      await qc.invalidateQueries({ queryKey: ["admin-partner-invoices", partnerId] });
+      await qc.invalidateQueries({ queryKey: ["admin-all-invoices"] });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erreur");
+    } finally {
+      setUploadingYear(null);
     }
   };
 
@@ -379,7 +409,7 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
                   >
                     <Download className="size-3" />
                   </a>
-                  {!inv.file_url && !inv.historical && partnerEmail && inv.amount > 0 && (
+                  {!inv.file_url && !inv.historical && !inv.is_paid && partnerEmail && inv.amount > 0 && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -393,6 +423,31 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
                       <Mail className="size-3 mr-0.5" />
                       Envoyer appel
                     </Button>
+                  )}
+                  {/* Déposer le PDF à la place du partenaire (facture reçue hors portail) */}
+                  {!inv.file_url && !inv.historical && inv.amount > 0 && (
+                    <label
+                      className="h-6 text-[10px] px-2 inline-flex items-center gap-0.5 border border-gray-200 rounded cursor-pointer hover:bg-gray-50 text-gray-600"
+                      title="Déposer le PDF de la facture à la place du partenaire"
+                    >
+                      {uploadingYear === inv.year ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <Upload className="size-3" />
+                      )}
+                      PDF
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        className="hidden"
+                        disabled={uploadingYear !== null}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadInvoiceFile(inv.year, inv.amount, f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
                   )}
                   {/* Soldé hors facture : pour placeholder year uniquement (pas de
                       facture déposée), permet de marquer comme déjà payé sans appel.

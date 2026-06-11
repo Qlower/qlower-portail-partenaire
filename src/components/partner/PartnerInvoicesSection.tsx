@@ -165,10 +165,11 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
     return Array.from(map.values()).sort((a, b) => b.year - a.year);
   }, [invoices, partnerId, eligibleYears, commissionsByYear]);
 
-  // Années où il reste une facture à déposer (commission > 0, pas déjà uploadée, pas historique)
+  // Années où il reste une facture à déposer (commission > 0, ni déjà uploadée,
+  // ni déjà réglée — une année payée hors facture ne doit plus rien réclamer).
   const yearsToInvoice = Array.from(eligibleYears)
     .filter((y) => (commissionsByYear[y] ?? 0) > 0)
-    .filter((y) => !invoices.find((i) => i.year === y && i.file_url))
+    .filter((y) => !invoices.find((i) => i.year === y && (i.file_url || i.is_paid)))
     .sort((a, b) => b - a);
 
   return (
@@ -247,7 +248,9 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
               <tbody className="divide-y divide-gray-50">
                 {displayRows.map((inv) => {
                   const isPlaceholder = inv.id.startsWith("placeholder-");
-                  const needsUpload = !inv.file_url && !inv.historical;
+                  // Une année déjà réglée (paiement enregistré) ne réclame plus de dépôt,
+                  // même si aucun PDF n'a été déposé (réglé hors facture / cash / virement).
+                  const needsUpload = !inv.file_url && !inv.historical && !inv.is_paid;
                   return (
                     <tr key={inv.id} className="hover:bg-[#E5EDF1]/20 transition-colors">
                       <td className="py-3.5 font-semibold text-gray-900">{inv.year}</td>
@@ -267,6 +270,8 @@ export default function PartnerInvoicesSection({ partnerId }: Props) {
                           </a>
                         ) : inv.historical ? (
                           <span className="text-xs text-gray-400">Historique pré-portail</span>
+                        ) : inv.is_paid ? (
+                          <span className="text-xs text-gray-400">Réglé hors facture</span>
                         ) : (
                           <Badge variant="secondary" className="bg-amber-50 text-amber-700 border border-amber-200 shadow-none text-[10px]">
                             En attente de dépôt
