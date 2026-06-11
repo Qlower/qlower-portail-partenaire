@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
   const { data: partners, error: partnersErr } = await supabase
     .from("partners")
     .select("id, nom, code, utm, active")
+    .eq("is_test", false) // exclut les comptes de test des chiffres réels
     .order("nom");
   if (partnersErr) {
     return NextResponse.json({ error: partnersErr.message }, { status: 500 });

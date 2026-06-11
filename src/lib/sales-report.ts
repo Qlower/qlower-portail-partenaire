@@ -589,10 +589,21 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     ),
   ];
   const partnerNameById = new Map<string, string>();
+  const testPartnerIds = new Set<string>();
   if (provPartnerIds.length > 0) {
-    const { data: prs } = await sb.from("partners").select("id, nom").in("id", provPartnerIds);
-    for (const p of prs || []) partnerNameById.set(p.id, p.nom);
+    const { data: prs } = await sb
+      .from("partners")
+      .select("id, nom, is_test")
+      .in("id", provPartnerIds);
+    for (const p of prs || []) {
+      partnerNameById.set(p.id, p.nom);
+      if ((p as { is_test?: boolean }).is_test) testPartnerIds.add(p.id);
+    }
   }
+  // Un lead rattaché à un compte de test ne compte pas comme "affilié" : on le
+  // bascule en acquisition directe pour ne pas polluer les chiffres réels.
+  const isRealAffiliate = (lead: { partner_id: string | null }) =>
+    !testPartnerIds.has(lead.partner_id ?? "");
   // Le "CA apporté" inclut les charges commissionnables (conquête/reconquête/
   // one-shot) ET les reconductions d'abonnement des clients apportés (revenu
   // récurrent généré par l'affilié). Comptage clients = emails uniques.
@@ -624,7 +635,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
   for (const c of allClients) {
     const emailLc = c.email.toLowerCase();
     const lead = leadByEmail.get(emailLc);
-    if (lead) addAffiliate(emailLc, lead, c.ca);
+    if (lead && isRealAffiliate(lead)) addAffiliate(emailLc, lead, c.ca);
     else {
       directCA += c.ca;
       directEmails.add(emailLc);
@@ -636,7 +647,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     if (!emailLc) continue;
     const amt = Number((rn as { amount_eur?: number }).amount_eur) || 0;
     const lead = leadByEmail.get(emailLc);
-    if (lead) addAffiliate(emailLc, lead, amt);
+    if (lead && isRealAffiliate(lead)) addAffiliate(emailLc, lead, amt);
     else {
       directCA += amt;
       directEmails.add(emailLc);

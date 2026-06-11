@@ -156,7 +156,8 @@ export async function GET(request: NextRequest) {
   const { data: partners } = await supabase
     .from("partners")
     .select("id, utm, comm_rules, biens_moyens, ca_par_client, commission_ht, contract_signed_at")
-    .eq("active", true);
+    .eq("active", true)
+    .eq("is_test", false); // exclut les comptes de test des chiffres réels
 
   if (!partners) return NextResponse.json([]);
 

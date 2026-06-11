@@ -197,6 +197,7 @@ export async function GET(request: NextRequest) {
       "id, nom, email, code, utm, comm_rules, biens_moyens, ca_par_client, commission_ht, contract_signed_at",
     )
     .eq("active", true)
+    .eq("is_test", false) // exclut les comptes de test des chiffres réels
     .order("nom");
 
   if (!partners) return NextResponse.json({ rows: [], year });
