@@ -29,6 +29,8 @@ const PROPS = [
   "lifecyclestage",
   "hs_lifecyclestage",
   "hs_v2_date_entered_999998694",
+  "hs_v2_date_exited_999998694",
+  "date_premier_paiement_abonnement",
   "createdate",
 ];
 

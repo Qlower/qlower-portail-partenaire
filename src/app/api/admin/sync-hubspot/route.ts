@@ -45,15 +45,16 @@ async function upsertLead(
   contactId: string,
   props: Record<string, string | null>
 ): Promise<{ status: "created" | "updated" | "skipped"; detail?: string }> {
-  const partnerUtm = props.partenaire__lead_ || props.utm_source || "";
+  const partnerUtm = (props.partenaire__lead_ || props.utm_source || "").replace(/_/g, "-");
   if (!partnerUtm) return { status: "skipped", detail: "no_partner_utm" };
 
-  // Find partner by UTM
-  const { data: partner } = await supabase
+  // Find partner by UTM — INSENSIBLE À LA CASSE (ilike) + limit(1).
+  const { data: partnersFound } = await supabase
     .from("partners")
     .select("id")
-    .eq("utm", partnerUtm)
-    .single();
+    .ilike("utm", partnerUtm)
+    .limit(1);
+  const partner = partnersFound?.[0];
 
   if (!partner)
     return { status: "skipped", detail: `partner_not_found(${partnerUtm})` };

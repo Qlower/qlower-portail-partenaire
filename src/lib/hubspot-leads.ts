@@ -43,6 +43,17 @@ export async function upsertLeadFromContact(
   const email = props.email || "";
   const stage = mapStage(props);
   const commissionDue = !!props.hs_v2_date_entered_999998694;
+  // Dates d'abonnement — indispensables au calcul des "années éligibles"
+  // (facturation : appel + dépôt). Sans elles, aucune année n'est facturable.
+  const subscribedAt = props.hs_v2_date_entered_999998694
+    ? new Date(props.hs_v2_date_entered_999998694).toISOString()
+    : null;
+  const unsubscribedAt = props.hs_v2_date_exited_999998694
+    ? new Date(props.hs_v2_date_exited_999998694).toISOString()
+    : null;
+  const firstPaidAt = props.date_premier_paiement_abonnement
+    ? new Date(props.date_premier_paiement_abonnement).toISOString()
+    : null;
 
   // Transfert : ce contact était chez un AUTRE partenaire ?
   const { data: oldLead } = await supabase
@@ -81,6 +92,9 @@ export async function upsertLeadFromContact(
       stage,
       hs_contact_id: contactId,
       commission_due: newCommissionDue,
+      subscribed_at: subscribedAt,
+      unsubscribed_at: unsubscribedAt,
+      first_paid_at: firstPaidAt,
     };
     // Auto-réparation : si le lead avait été marqué supprimé à tort (tag retiré
     // puis remis), on lève le flag et on restaure l'identité réelle.
@@ -112,6 +126,9 @@ export async function upsertLeadFromContact(
     hs_contact_id: contactId,
     commission_due: commissionDue,
     created_at: hsCreateDate.toISOString(),
+    subscribed_at: subscribedAt,
+    unsubscribed_at: unsubscribedAt,
+    first_paid_at: firstPaidAt,
   });
   await supabase.rpc("increment_partner_leads", { p_id: partner.id });
   if (commissionDue) await supabase.rpc("increment_partner_abonnes", { p_id: partner.id });

@@ -27,14 +27,19 @@ async function upsertLead(
   contactId: string,
   props: Record<string, string | null>
 ): Promise<string> {
-  const partnerUtm = props.partenaire__lead_ || props.utm_source || "";
+  const partnerUtm = (props.partenaire__lead_ || props.utm_source || "").replace(/_/g, "-");
   if (!partnerUtm) return "skip:no_utm";
 
-  const { data: partner } = await supabase
+  // INSENSIBLE À LA CASSE (ilike) : le tag HubSpot peut différer en casse de
+  // l'utm partenaire (ex. "CocoonR" vs "Cocoonr"). Avant, le .eq sensible à la
+  // casse skippait ces contacts → dates d'abonnement jamais écrites → facturation
+  // impossible. .limit(1) au lieu de .single() pour ne pas planter sur 0/N lignes.
+  const { data: partnersFound } = await supabase
     .from("partners")
     .select("id")
-    .eq("utm", partnerUtm)
-    .single();
+    .ilike("utm", partnerUtm)
+    .limit(1);
+  const partner = partnersFound?.[0];
 
   if (!partner) return `skip:partner_not_found(${partnerUtm})`;
 
