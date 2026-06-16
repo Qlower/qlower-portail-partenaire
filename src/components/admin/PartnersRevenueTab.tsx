@@ -40,11 +40,11 @@ interface PartnerRevenue {
   by_year: Record<string, YearBucket>;
 }
 interface RevenueResponse {
-  total: { ca: number; charges: number; unique_clients: number };
-  matched: { ca: number; charges: number; unique_clients: number };
+  total: { ca: number; ca_gross: number; refunded: number; charges: number; unique_clients: number };
+  matched: { ca: number; ca_gross: number; refunded: number; charges: number; unique_clients: number };
   unmatched: { ca: number; charges: number; unique_clients: number };
   by_year: Array<{ year: number; ca: number; charges: number; uniqueClients: number }>;
-  matched_by_year: Array<{ year: number; ca: number; charges: number; uniqueClients: number }>;
+  matched_by_year: Array<{ year: number; ca: number; ca_gross: number; refunded: number; charges: number; uniqueClients: number }>;
   matched_by_month: Array<{
     month: string;
     ca: number;
@@ -126,6 +126,8 @@ export default function PartnersRevenueTab() {
     if (yearFilter === "all") {
       return {
         ca: data.matched.ca,
+        caGross: data.matched.ca_gross,
+        refunded: data.matched.refunded,
         clients: data.matched.unique_clients,
         partners: data.by_partner.length,
         avgPerPartner:
@@ -135,6 +137,7 @@ export default function PartnersRevenueTab() {
       };
     }
     const yearStr = String(yearFilter);
+    const yearGross = data.matched_by_year.find((y) => y.year === yearFilter);
     let ca = 0;
     const clientSet = new Set<string>(); // approximation: total clients across partners with revenue this year
     let partnersWithRev = 0;
@@ -151,6 +154,8 @@ export default function PartnersRevenueTab() {
     }
     return {
       ca,
+      caGross: yearGross?.ca_gross ?? 0,
+      refunded: yearGross?.refunded ?? 0,
       clients: clientSet.size,
       partners: partnersWithRev,
       avgPerPartner: partnersWithRev > 0 ? Math.round(ca / partnersWithRev) : 0,
@@ -202,9 +207,15 @@ export default function PartnersRevenueTab() {
                 </p>
                 <p className="text-2xl font-bold tabular-nums mt-1">
                   {fmtEUR(scopedKpi?.ca || 0)} €
+                  <span className="text-[10px] font-medium text-white/40 ml-1">net</span>
+                </p>
+                <p className="text-[11px] text-white/70 mt-1 leading-tight">
+                  Brut : <strong className="text-white">{fmtEUR(scopedKpi?.caGross || 0)} €</strong>
+                  <span className="text-white/40"> · remboursé </span>
+                  {fmtEUR(scopedKpi?.refunded || 0)} €
                 </p>
                 <p className="text-[10px] text-white/40 mt-0.5">
-                  par les clients d&apos;apporteurs
+                  brut = avant remboursements (réconciliation)
                 </p>
               </div>
             </div>
@@ -315,7 +326,10 @@ export default function PartnersRevenueTab() {
                       {y.uniqueClients} client{y.uniqueClients > 1 ? "s" : ""} ·{" "}
                       {y.charges} charge{y.charges > 1 ? "s" : ""}
                     </p>
-                    <p className="text-[9px] text-gray-300 mt-1 border-t border-gray-50 pt-1">
+                    <p className="text-[9px] text-gray-400 mt-1 border-t border-gray-50 pt-1">
+                      Brut : {fmtEUR(y.ca_gross)} € · remb. {fmtEUR(y.refunded)} €
+                    </p>
+                    <p className="text-[9px] text-gray-300">
                       Total Stripe : {fmtEUR(tot?.ca || 0)} €
                     </p>
                   </button>

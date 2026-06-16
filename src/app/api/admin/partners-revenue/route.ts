@@ -42,6 +42,8 @@ interface PartnerRevenue {
 interface AttributionRow {
   email: string;
   amount_net_eur: number | null;
+  amount_gross_eur: number | null;
+  amount_refunded_eur: number | null;
   created_at: string;
 }
 
@@ -108,7 +110,7 @@ export async function GET(request: NextRequest) {
   while (true) {
     const { data, error } = await supabase
       .from("attribution_rows")
-      .select("email, amount_net_eur, created_at")
+      .select("email, amount_net_eur, amount_gross_eur, amount_refunded_eur, created_at")
       .range(from, from + PAGE_SIZE - 1);
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -137,15 +139,44 @@ export async function GET(request: NextRequest) {
   let globalTotalCharges = 0;
   const globalUniqueClients = new Set<string>();
 
+  // Brut (avant remboursement) + remboursé — comptabilisés sur TOUTES les charges,
+  // y compris celles totalement remboursées (net = 0, ignorées par le calcul net).
+  // But : permettre la réconciliation avec une source qui ne tracke pas les refunds.
+  let grossTotal = 0;
+  let refundedTotal = 0;
+  let matchedGrossTotal = 0;
+  let matchedRefundedTotal = 0;
+  const grossRefByYear = new Map<number, { gross: number; refunded: number }>();
+  const matchedGrossRefByYear = new Map<number, { gross: number; refunded: number }>();
+
   for (const c of allCharges) {
-    if (!c.email || c.amount_net_eur == null) continue;
-    const amount = Number(c.amount_net_eur) || 0;
-    if (amount <= 0) continue;
+    if (!c.email) continue;
     const d = new Date(c.created_at);
     const year = d.getUTCFullYear();
     if (isNaN(year)) continue;
-    const monthKey = `${year}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
     const emailKey = c.email.toLowerCase();
+
+    // ── Brut / remboursé (toutes charges, net inclus ou non) ──
+    const grossAmt = Number(c.amount_gross_eur) || 0;
+    const refundedAmt = Number(c.amount_refunded_eur) || 0;
+    grossTotal += grossAmt;
+    refundedTotal += refundedAmt;
+    let gy = grossRefByYear.get(year);
+    if (!gy) { gy = { gross: 0, refunded: 0 }; grossRefByYear.set(year, gy); }
+    gy.gross += grossAmt; gy.refunded += refundedAmt;
+    if (partnerByEmail.get(emailKey)) {
+      matchedGrossTotal += grossAmt;
+      matchedRefundedTotal += refundedAmt;
+      let mgy = matchedGrossRefByYear.get(year);
+      if (!mgy) { mgy = { gross: 0, refunded: 0 }; matchedGrossRefByYear.set(year, mgy); }
+      mgy.gross += grossAmt; mgy.refunded += refundedAmt;
+    }
+
+    // ── CA NET (logique existante, inchangée) ──
+    if (c.amount_net_eur == null) continue;
+    const amount = Number(c.amount_net_eur) || 0;
+    if (amount <= 0) continue;
+    const monthKey = `${year}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 
     globalTotalCa += amount;
     globalTotalCharges++;
@@ -260,11 +291,15 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     total: {
       ca: Math.round(globalTotalCa),
+      ca_gross: Math.round(grossTotal),
+      refunded: Math.round(refundedTotal),
       charges: globalTotalCharges,
       unique_clients: globalUniqueClients.size,
     },
     matched: {
       ca: Math.round(globalTotalCa - unmatchedCa),
+      ca_gross: Math.round(matchedGrossTotal),
+      refunded: Math.round(matchedRefundedTotal),
       charges: globalTotalCharges - unmatchedCharges,
       unique_clients: globalUniqueClients.size - unmatchedClients.size,
     },
@@ -279,6 +314,8 @@ export async function GET(request: NextRequest) {
       .map(([year, v]) => ({
         year,
         ca: Math.round(v.ca),
+        ca_gross: Math.round(matchedGrossRefByYear.get(year)?.gross || 0),
+        refunded: Math.round(matchedGrossRefByYear.get(year)?.refunded || 0),
         charges: v.charges,
         uniqueClients: v.clients.size,
       }))
