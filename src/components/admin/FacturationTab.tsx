@@ -23,6 +23,7 @@ import {
   Banknote,
   Check,
   Eye,
+  Download,
 } from "lucide-react";
 
 // ============================================================================
@@ -145,6 +146,8 @@ export default function FacturationTab() {
   const [year, setYear] = useState<number>(currentYear);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "all" | "actionable">("actionable");
+  const [exportFrom, setExportFrom] = useState("");
+  const [exportTo, setExportTo] = useState("");
   // Liste d'IDs qu'on vient de modifier (animation de feedback)
   const [recentlyUpdated, setRecentlyUpdated] = useState<Set<string>>(new Set());
   // Détail partenaire (panneau latéral)
@@ -452,6 +455,46 @@ export default function FacturationTab() {
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
+          </div>
+          {/* Export XLS — plage de dates de paiement optionnelle (sinon = année sélectionnée) */}
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className="text-[10px] text-gray-400">Paiements :</span>
+            <input
+              type="date"
+              value={exportFrom}
+              onChange={(e) => setExportFrom(e.target.value)}
+              className="text-xs px-2 py-1.5 border border-gray-200 rounded bg-white text-gray-600"
+              title="Date de paiement — du"
+            />
+            <span className="text-[10px] text-gray-400">→</span>
+            <input
+              type="date"
+              value={exportTo}
+              onChange={(e) => setExportTo(e.target.value)}
+              className="text-xs px-2 py-1.5 border border-gray-200 rounded bg-white text-gray-600"
+              title="Date de paiement — au"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              onClick={() => {
+                const params = new URLSearchParams();
+                // Si une plage de paiement est saisie → mode historique de paiement
+                // (on ignore l'année). Sinon → export de l'année sélectionnée.
+                if (exportFrom || exportTo) {
+                  if (exportFrom) params.set("from", exportFrom);
+                  if (exportTo) params.set("to", exportTo);
+                } else {
+                  params.set("year", String(year));
+                }
+                window.open(`/api/admin/invoices/export?${params.toString()}`, "_blank");
+              }}
+              title="Télécharger les factures en XLS (filtre date de paiement ou année)"
+            >
+              <Download className="size-3.5 mr-1" />
+              Exporter XLS
+            </Button>
           </div>
         </div>
 
