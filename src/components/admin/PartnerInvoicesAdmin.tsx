@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Check, X, FileText, Download, Mail, AlertCircle, Eye, Upload } from "lucide-react";
+import { Loader2, Check, X, FileText, Download, Mail, AlertCircle, Eye, Upload, Banknote } from "lucide-react";
 
 interface PartnerInvoice {
   id: string;
@@ -177,8 +177,79 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
       });
       if (!res.ok) throw new Error("Update failed");
       await qc.invalidateQueries({ queryKey: ["admin-partner-invoices", partnerId] });
+      await qc.invalidateQueries({ queryKey: ["admin-billing-overview"] });
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // Saisie / modification MANUELLE du paiement (montant, payé o/n, date, note).
+  // Fonctionne pour une facture existante (PATCH) comme pour une année sans
+  // facture déposée (POST création — placeholder).
+  const [payModal, setPayModal] = useState<{
+    invoiceId: string | null;
+    year: number;
+    amount: number;
+    isPaid: boolean;
+    paidAt: string; // yyyy-mm-dd
+    note: string;
+  } | null>(null);
+  const [savingPay, setSavingPay] = useState(false);
+
+  const openPayModal = (inv: PartnerInvoice) => {
+    setPayModal({
+      invoiceId: inv.id.startsWith("placeholder-") ? null : inv.id,
+      year: inv.year,
+      amount: inv.amount || 0,
+      isPaid: inv.is_paid,
+      paidAt: inv.paid_at
+        ? new Date(inv.paid_at).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10),
+      note: inv.notes || "",
+    });
+  };
+
+  const savePayment = async () => {
+    if (!payModal) return;
+    setSavingPay(true);
+    try {
+      const paidAtIso = payModal.isPaid ? new Date(payModal.paidAt).toISOString() : null;
+      const res = payModal.invoiceId
+        ? await fetch("/api/admin/invoices", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: payModal.invoiceId,
+              is_paid: payModal.isPaid,
+              paid_at: paidAtIso,
+              amount: payModal.amount,
+              notes: payModal.note,
+            }),
+          })
+        : await fetch("/api/admin/invoices", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              partner_id: partnerId,
+              year: payModal.year,
+              amount: payModal.amount,
+              is_paid: payModal.isPaid,
+              paid_at: paidAtIso,
+              notes: payModal.note,
+            }),
+          });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Erreur");
+      }
+      await qc.invalidateQueries({ queryKey: ["admin-partner-invoices", partnerId] });
+      await qc.invalidateQueries({ queryKey: ["admin-all-invoices"] });
+      await qc.invalidateQueries({ queryKey: ["admin-billing-overview"] });
+      setPayModal(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erreur");
+    } finally {
+      setSavingPay(false);
     }
   };
 
@@ -464,6 +535,18 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
                       Soldé hors facture
                     </Button>
                   )}
+                  {!inv.historical && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 text-[10px] px-2 border-[#0A3855]/20 text-[#0A3855] hover:bg-[#E5EDF1]/40"
+                      onClick={() => openPayModal(inv)}
+                      title="Saisir / modifier le paiement manuellement (montant, date, note)"
+                    >
+                      <Banknote className="size-3 mr-0.5" />
+                      Paiement
+                    </Button>
+                  )}
                   {!inv.historical && !inv.id.startsWith("placeholder-") && (
                     <Button
                       size="sm"
@@ -588,6 +671,97 @@ export default function PartnerInvoicesAdmin({ partnerId, partnerName, partnerEm
                   <Mail className="size-4 mr-1.5" />
                   Confirmer &amp; envoyer
                 </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Modale paiement manuel (saisie / modification) */}
+    {payModal && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        onClick={() => !savingPay && setPayModal(null)}
+      >
+        <div
+          className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">
+                Paiement {payModal.year}
+              </h3>
+              <p className="text-[11px] text-gray-400">{partnerName ?? ""}</p>
+            </div>
+            <button
+              onClick={() => !savingPay && setPayModal(null)}
+              className="text-gray-400 hover:text-gray-600"
+              disabled={savingPay}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">
+                Montant ({commissionHt ? "HT" : "TTC"}, €)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={payModal.amount}
+                onChange={(e) => setPayModal({ ...payModal, amount: parseFloat(e.target.value) || 0 })}
+                className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-[#0A3855]/20"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={payModal.isPaid}
+                onChange={(e) => setPayModal({ ...payModal, isPaid: e.target.checked })}
+              />
+              Marquée payée
+            </label>
+            {payModal.isPaid && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Date de paiement</label>
+                <input
+                  type="date"
+                  value={payModal.paidAt}
+                  onChange={(e) => setPayModal({ ...payModal, paidAt: e.target.value })}
+                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-[#0A3855]/20"
+                />
+              </div>
+            )}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">Note (optionnel)</label>
+              <input
+                type="text"
+                value={payModal.note}
+                onChange={(e) => setPayModal({ ...payModal, note: e.target.value })}
+                placeholder="ex. virement reçu, acompte, règlement direct…"
+                className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-[#0A3855]/20"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end pt-2 border-t">
+            <Button variant="ghost" onClick={() => setPayModal(null)} disabled={savingPay}>
+              Annuler
+            </Button>
+            <Button
+              className="bg-[#0A3855] text-white hover:bg-[#0A3855]/90"
+              onClick={savePayment}
+              disabled={savingPay || payModal.amount <= 0}
+            >
+              {savingPay ? (
+                <>
+                  <Loader2 className="size-4 mr-1.5 animate-spin" />
+                  Enregistrement…
+                </>
+              ) : (
+                "Enregistrer"
               )}
             </Button>
           </div>

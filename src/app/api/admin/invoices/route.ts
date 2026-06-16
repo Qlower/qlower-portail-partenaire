@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   if (auth.error) return auth.error;
 
   const body = await request.json();
-  const { partner_id, year, amount, is_paid, notes, file_url } = body;
+  const { partner_id, year, amount, is_paid, notes, file_url, paid_at } = body;
   if (!partner_id) return NextResponse.json({ error: "partner_id required" }, { status: 400 });
   if (typeof year !== "number" || isNaN(year)) {
     return NextResponse.json({ error: "year (number) required" }, { status: 400 });
@@ -68,7 +68,8 @@ export async function POST(request: NextRequest) {
     year,
     amount: typeof amount === "number" ? amount : 0,
     is_paid: is_paid === true,
-    paid_at: is_paid === true ? now : null,
+    // Date de paiement : celle fournie (saisie manuelle), sinon maintenant si payé.
+    paid_at: is_paid === true ? (paid_at || now) : null,
     file_url: file_url || null,
     uploaded_at: file_url ? now : null,
     notes: notes || null,
