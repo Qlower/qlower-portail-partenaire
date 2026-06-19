@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Building2, Users, Euro, Target, ChevronRight, Trophy, LogOut } from "lucide-react";
+import { Loader2, Building2, Users, Euro, Target, ChevronRight, Trophy, LogOut, ArrowLeft } from "lucide-react";
 
 interface Agency {
   id: string;
@@ -25,10 +26,15 @@ const fmtEUR = (n: number) => Math.round(n).toLocaleString("fr-FR");
 
 export default function MasterPage() {
   const { signOut } = useAuth();
+  // ?network= : présent uniquement quand un admin visualise le siège d'un réseau.
+  const [network] = useState<string | null>(() =>
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("network") : null,
+  );
+  const qs = network ? `?network=${encodeURIComponent(network)}` : "";
   const { data, isLoading, error } = useQuery<Overview & { agencies: Agency[] }>({
-    queryKey: ["master-overview"],
+    queryKey: ["master-overview", network],
     queryFn: async () => {
-      const res = await fetch("/api/master/overview");
+      const res = await fetch(`/api/master/overview${qs}`);
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Erreur");
       return res.json();
     },
@@ -66,13 +72,23 @@ export default function MasterPage() {
           <Badge className="bg-[#E5EDF1] text-[#0A3855] border border-[#0A3855]/10 shadow-none">
             {data.network.statut === "pilote" ? "Phase pilote" : "Réseau"} · {data.totals.agences} agence{data.totals.agences > 1 ? "s" : ""}
           </Badge>
-          <button
-            onClick={() => signOut()}
-            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-[#0A3855] border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors"
-          >
-            <LogOut className="size-3.5" />
-            Se déconnecter
-          </button>
+          {network ? (
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-[#0A3855] border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors"
+            >
+              <ArrowLeft className="size-3.5" />
+              Retour admin
+            </Link>
+          ) : (
+            <button
+              onClick={() => signOut()}
+              className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-[#0A3855] border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors"
+            >
+              <LogOut className="size-3.5" />
+              Se déconnecter
+            </button>
+          )}
         </div>
       </div>
 
@@ -155,7 +171,7 @@ export default function MasterPage() {
                     <td className="px-4 py-2.5 text-right text-gray-500 tabular-nums">{a.leads}</td>
                     <td className="px-4 py-2.5 text-right text-gray-700 tabular-nums">{fmtEUR(a.ca)} €</td>
                     <td className="px-4 py-2.5 text-right">
-                      <Link href={`/master/agence/${a.id}`} className="inline-flex items-center text-[#0A3855] hover:underline text-xs">
+                      <Link href={`/master/agence/${a.id}${qs}`} className="inline-flex items-center text-[#0A3855] hover:underline text-xs">
                         Détail <ChevronRight className="size-3.5" />
                       </Link>
                     </td>

@@ -78,10 +78,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
     const meta = user.user_metadata as Record<string, unknown> | undefined;
-    if (meta?.role !== "master" && !meta?.network_id) {
+    // Master OU admin (l'admin peut visualiser le siège via ?network=).
+    if (meta?.role !== "master" && !meta?.network_id && meta?.role !== "admin") {
       const url = request.nextUrl.clone();
-      if (meta?.role === "admin") url.pathname = "/admin";
-      else if (meta?.partner_id) url.pathname = "/dashboard";
+      if (meta?.partner_id) url.pathname = "/dashboard";
       else url.pathname = "/login";
       return NextResponse.redirect(url);
     }

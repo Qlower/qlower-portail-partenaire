@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createServiceClient } from "@/lib/supabase-server";
+import { ADMIN_EMAILS } from "@/lib/admin-auth";
 
 // Vérifie qu'une requête vient d'un utilisateur "master" (siège réseau) et
 // renvoie le network_id auquel il est rattaché.
@@ -10,7 +11,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 // surtout au routing). Le network_id n'est JAMAIS lu depuis l'URL → cloisonnement.
 export async function verifyMaster(
   request: NextRequest,
-): Promise<{ networkId?: string; userId?: string; error?: NextResponse }> {
+): Promise<{ networkId?: string; userId?: string; isAdmin?: boolean; error?: NextResponse }> {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -33,6 +34,17 @@ export async function verifyMaster(
     return { error: NextResponse.json({ error: "Authentication required" }, { status: 401 }) };
   }
 
+  // Impersonation admin : un admin Qlower peut consulter le siège de N'IMPORTE
+  // quel réseau via ?network=. Réservé aux admins (un vrai master ne peut JAMAIS
+  // changer de réseau par l'URL — son network_id vient de network_members).
+  const isAdmin = ADMIN_EMAILS.includes(user.email || "");
+  if (isAdmin) {
+    const queryNetwork = new URL(request.url).searchParams.get("network");
+    if (queryNetwork) {
+      return { networkId: queryNetwork, userId: user.id, isAdmin: true };
+    }
+  }
+
   const sb = createServiceClient();
   const { data: members } = await sb
     .from("network_members")
@@ -48,5 +60,5 @@ export async function verifyMaster(
     return { error: NextResponse.json({ error: "Master access required" }, { status: 403 }) };
   }
 
-  return { networkId, userId: user.id };
+  return { networkId, userId: user.id, isAdmin };
 }

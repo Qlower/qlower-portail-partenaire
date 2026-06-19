@@ -326,6 +326,7 @@ export default function PartnersTab() {
   });
   const countAffilies = partners.filter((p) => !p.network_id).length;
   const countMarqueBlanche = partners.filter((p) => !!p.network_id).length;
+  const networkIds = [...new Set(partners.filter((p) => p.network_id).map((p) => p.network_id as string))];
 
   const handleCreate = async () => {
     setError("");
@@ -488,6 +489,19 @@ export default function PartnersTab() {
           </Badge>
         </div>
         <div className="flex items-center gap-2">
+          {segment === "marque_blanche" &&
+            networkIds.map((nid) => (
+              <Button
+                key={nid}
+                variant="outline"
+                className="h-9 text-xs"
+                onClick={() => window.open(`/master?network=${encodeURIComponent(nid)}`, "_blank")}
+                title={`Voir la vue siège du réseau ${nid}`}
+              >
+                <Eye className="size-3.5 mr-1" />
+                Voir le siège {nid}
+              </Button>
+            ))}
           <Input
             placeholder="Rechercher partenaire..."
             value={partnerSearch}

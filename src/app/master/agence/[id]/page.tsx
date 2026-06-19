@@ -22,10 +22,12 @@ const fmtMonth = (m: string) => {
 export default function MasterAgencyPage() {
   const params = useParams();
   const id = String(params.id);
+  const network = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("network") : null;
+  const qs = network ? `?network=${encodeURIComponent(network)}` : "";
   const { data, isLoading, error } = useQuery<Detail>({
-    queryKey: ["master-agency", id],
+    queryKey: ["master-agency", id, network],
     queryFn: async () => {
-      const res = await fetch(`/api/master/agency/${id}`);
+      const res = await fetch(`/api/master/agency/${id}${qs}`);
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Erreur");
       return res.json();
     },
@@ -52,7 +54,7 @@ export default function MasterAgencyPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-5 py-8 space-y-6">
-      <Link href="/master" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#0A3855]">
+      <Link href={`/master${qs}`} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#0A3855]">
         <ArrowLeft className="size-3.5" /> Retour au consolidé
       </Link>
 
