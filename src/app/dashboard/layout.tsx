@@ -38,6 +38,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   });
   const isAdmin = ADMIN_EMAILS.includes(user?.email || "");
   const overrideId = isAdmin && impersonateId ? impersonateId : undefined;
+  // Un compte "master" (siège réseau) n'a pas d'espace partenaire → on le
+  // renvoie vers /master (filet de sécurité quel que soit le routing du login).
+  const isMaster =
+    user?.user_metadata?.role === "master" || !!user?.user_metadata?.network_id;
 
   const partnerIdFromMeta = overrideId || (user?.user_metadata?.partner_id as string | undefined);
   const { data: partnerById, isLoading: loadingById } = usePartner(partnerIdFromMeta);
@@ -56,6 +60,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
   }, [authLoading, user, router]);
+
+  // Master (siège réseau) → sa vue dédiée, jamais l'espace partenaire.
+  useEffect(() => {
+    if (!authLoading && user && isMaster) router.replace("/master");
+  }, [authLoading, user, isMaster, router]);
 
   // Auto-fix: if partner found via user_id fallback but metadata has wrong partner_id, update it
   useEffect(() => {
@@ -97,6 +106,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="w-10 h-10 border-2 border-[#0A3855] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <p className="text-sm text-gray-400">Chargement de votre espace...</p>
         </div>
+      </div>
+    );
+  }
+
+  // Master : on n'affiche pas l'erreur "pas de partenaire" — on redirige (effet ci-dessus).
+  if (isMaster) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-[#0A3855] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
