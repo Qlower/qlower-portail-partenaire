@@ -68,9 +68,11 @@ export default function LoginForm() {
       const target =
         role === "admin"
           ? "/admin"
-          : internalRole === "sales" || internalRole === "sales_admin"
-            ? returnTo && returnTo.startsWith("/sales") ? returnTo : "/sales/ventes"
-            : "/dashboard";
+          : role === "master"
+            ? "/master"
+            : internalRole === "sales" || internalRole === "sales_admin"
+              ? returnTo && returnTo.startsWith("/sales") ? returnTo : "/sales/ventes"
+              : "/dashboard";
       router.push(target);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Erreur de connexion.";

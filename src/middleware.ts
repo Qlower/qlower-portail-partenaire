@@ -54,10 +54,34 @@ export async function middleware(request: NextRequest) {
       // Logged in but not authorised for sales area.
       // For partners → keep them on their dashboard. For admin → on /admin.
       const url = request.nextUrl.clone();
-      const partnerId = (user.user_metadata as Record<string, unknown> | undefined)?.partner_id;
-      const role = (user.user_metadata as Record<string, unknown> | undefined)?.role;
+      const meta = user.user_metadata as Record<string, unknown> | undefined;
+      const partnerId = meta?.partner_id;
+      const role = meta?.role;
       if (role === "admin") url.pathname = "/admin";
+      else if (role === "master" || meta?.network_id) url.pathname = "/master";
       else if (partnerId) url.pathname = "/dashboard";
+      else url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // ----- Garde de la zone Master (siège réseau) -----
+  // Les pages /master/** sont réservées aux comptes master. Les API /api/master/**
+  // sont protégées au niveau route (verifyMaster) pour renvoyer du JSON, pas une
+  // redirection HTML.
+  const isMasterArea = pathname === "/master" || pathname.startsWith("/master/");
+  if (isMasterArea) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("returnTo", pathname);
+      return NextResponse.redirect(url);
+    }
+    const meta = user.user_metadata as Record<string, unknown> | undefined;
+    if (meta?.role !== "master" && !meta?.network_id) {
+      const url = request.nextUrl.clone();
+      if (meta?.role === "admin") url.pathname = "/admin";
+      else if (meta?.partner_id) url.pathname = "/dashboard";
       else url.pathname = "/login";
       return NextResponse.redirect(url);
     }
