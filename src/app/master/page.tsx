@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Building2, Users, Euro, Target, ChevronRight, Trophy } from "lucide-react";
+import { Loader2, Building2, Users, Euro, Target, ChevronRight, Trophy, LogOut } from "lucide-react";
 
 interface Agency {
   id: string;
@@ -23,6 +24,7 @@ interface Overview {
 const fmtEUR = (n: number) => Math.round(n).toLocaleString("fr-FR");
 
 export default function MasterPage() {
+  const { signOut } = useAuth();
   const { data, isLoading, error } = useQuery<Overview & { agencies: Agency[] }>({
     queryKey: ["master-overview"],
     queryFn: async () => {
@@ -60,9 +62,18 @@ export default function MasterPage() {
           <p className="text-[11px] uppercase tracking-widest text-gray-400 font-semibold">Vue siège · consolidé</p>
           <h1 className="text-2xl font-bold text-[#0A3855]">{data.network.brand_label || data.network.nom}</h1>
         </div>
-        <Badge className="bg-[#E5EDF1] text-[#0A3855] border border-[#0A3855]/10 shadow-none">
-          {data.network.statut === "pilote" ? "Phase pilote" : "Réseau"} · {data.totals.agences} agence{data.totals.agences > 1 ? "s" : ""}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge className="bg-[#E5EDF1] text-[#0A3855] border border-[#0A3855]/10 shadow-none">
+            {data.network.statut === "pilote" ? "Phase pilote" : "Réseau"} · {data.totals.agences} agence{data.totals.agences > 1 ? "s" : ""}
+          </Badge>
+          <button
+            onClick={() => signOut()}
+            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-[#0A3855] border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors"
+          >
+            <LogOut className="size-3.5" />
+            Se déconnecter
+          </button>
+        </div>
       </div>
 
       {/* KPI consolidés */}
