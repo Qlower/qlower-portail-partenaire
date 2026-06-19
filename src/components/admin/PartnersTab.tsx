@@ -298,6 +298,8 @@ export default function PartnersTab() {
   const [editForm, setEditForm] = useState<Partial<Partner>>({});
   const [viewingLeadsId, setViewingLeadsId] = useState<string | null>(null);
   const [partnerSearch, setPartnerSearch] = useState("");
+  // Cloisonnement : affiliés historiques (sans réseau) vs marque blanche (réseau).
+  const [segment, setSegment] = useState<"affilies" | "marque_blanche">("affilies");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [linkLoading, setLinkLoading] = useState<string | null>(null);
@@ -308,6 +310,11 @@ export default function PartnersTab() {
   // et /api/admin/reconcile-attribution.
 
   const filteredPartners = partners.filter((p) => {
+    // Cloisonnement marque blanche : un partenaire rattaché à un réseau
+    // (network_id) n'apparaît QUE dans l'onglet "Marque blanche", et inversement
+    // les affiliés historiques (sans réseau) restent dans "Affiliés".
+    const inSegment = segment === "marque_blanche" ? !!p.network_id : !p.network_id;
+    if (!inSegment) return false;
     if (!partnerSearch.trim()) return true;
     const q = partnerSearch.toLowerCase();
     return (
@@ -317,6 +324,8 @@ export default function PartnersTab() {
       (p.code || "").toLowerCase().includes(q)
     );
   });
+  const countAffilies = partners.filter((p) => !p.network_id).length;
+  const countMarqueBlanche = partners.filter((p) => !!p.network_id).length;
 
   const handleCreate = async () => {
     setError("");
@@ -455,8 +464,27 @@ export default function PartnersTab() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-semibold text-gray-900">Partenaires</h3>
+          {/* Cloisonnement Affiliés / Marque blanche */}
+          <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
+            <button
+              onClick={() => setSegment("affilies")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                segment === "affilies" ? "bg-[#0A3855] text-white" : "text-gray-600 hover:text-[#0A3855]"
+              }`}
+            >
+              Affiliés <span className="opacity-60">({countAffilies})</span>
+            </button>
+            <button
+              onClick={() => setSegment("marque_blanche")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                segment === "marque_blanche" ? "bg-[#0A3855] text-white" : "text-gray-600 hover:text-[#0A3855]"
+              }`}
+            >
+              Marque blanche <span className="opacity-60">({countMarqueBlanche})</span>
+            </button>
+          </div>
           <Badge variant="secondary" className="bg-[#E5EDF1] text-[#0A3855]">
-            {filteredPartners.length}/{partners.length}
+            {filteredPartners.length}
           </Badge>
         </div>
         <div className="flex items-center gap-2">

@@ -63,6 +63,8 @@ export interface Partner {
   rcs?: string | null;
   contact_civilite?: string | null;
   contact_position?: string | null;
+  is_test?: boolean;
+  network_id?: string | null; // réseau marque blanche (Laforêt…) ; null = affilié indépendant
 }
 
 // ── Lead ──────────────────────────────────────────────────────
