@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyPartnerAccess } from "@/lib/partner-auth";
 import ExcelJS from "exceljs";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const partnerId = searchParams.get("partner_id");
 
-  if (!partnerId) {
-    return NextResponse.json({ error: "partner_id is required" }, { status: 400 });
-  }
+  const access = await verifyPartnerAccess(request, partnerId);
+  if (access.error) return access.error;
 
   const supabase = createServiceClient();
   const { data: leads, error } = await supabase

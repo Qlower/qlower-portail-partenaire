@@ -7,14 +7,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
-
-const TOKEN = "qlower-provision-master-2026";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 export async function POST(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  if (searchParams.get("token") !== TOKEN) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
   const body = await request.json().catch(() => ({}));
   const networkId = body.network_id as string | undefined;
   const email = body.email as string | undefined;

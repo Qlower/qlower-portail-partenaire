@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyPartnerAccess } from "@/lib/partner-auth";
 
 const HS_TOKEN = process.env.HUBSPOT_TOKEN!;
 const HS_BASE = "https://api.hubapi.com";
@@ -44,9 +45,8 @@ export async function GET(request: NextRequest) {
   const isAllYears = yearParam === "all";
   const year = isAllYears ? new Date().getFullYear() : parseInt(yearParam);
 
-  if (!partnerId) {
-    return NextResponse.json({ error: "partner_id is required" }, { status: 400 });
-  }
+  const access = await verifyPartnerAccess(request, partnerId);
+  if (access.error) return access.error;
 
   const supabase = createServiceClient();
 

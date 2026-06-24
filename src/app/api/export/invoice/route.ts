@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyPartnerAccess } from "@/lib/partner-auth";
 import PDFDocument from "pdfkit";
 
 export async function GET(request: NextRequest) {
@@ -20,6 +21,10 @@ export async function GET(request: NextRequest) {
   if (error || !invoice) {
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
+
+  // Autorisation : seul le partenaire propriétaire (ou un admin) peut exporter.
+  const access = await verifyPartnerAccess(request, (invoice as { partner_id?: string | null }).partner_id);
+  if (access.error) return access.error;
 
   const partner = invoice.partners as { nom: string; email: string } | null;
 

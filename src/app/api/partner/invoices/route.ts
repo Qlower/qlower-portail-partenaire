@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { getResend, INTERNAL_FROM } from "@/lib/resend";
+import { verifyPartnerAccess } from "@/lib/partner-auth";
 
 // Destinataires de l'alerte "nouvelle facture déposée".
 const INVOICE_ALERT_TO = ["coline@qlower.com", "alexandre@qlower.com"];
@@ -10,9 +11,8 @@ const INVOICE_ALERT_TO = ["coline@qlower.com", "alexandre@qlower.com"];
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const partnerId = searchParams.get("partner_id");
-  if (!partnerId) {
-    return NextResponse.json({ error: "partner_id is required" }, { status: 400 });
-  }
+  const access = await verifyPartnerAccess(request, partnerId);
+  if (access.error) return access.error;
 
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -34,6 +34,9 @@ export async function POST(request: NextRequest) {
   const year = parseInt(String(form.get("year") || "0"));
   const amount = parseFloat(String(form.get("amount") || "0"));
   const file = form.get("file") as File | null;
+
+  const access = await verifyPartnerAccess(request, partnerId);
+  if (access.error) return access.error;
 
   if (!partnerId || !year || amount <= 0 || !file) {
     return NextResponse.json(

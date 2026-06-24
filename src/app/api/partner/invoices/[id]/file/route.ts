@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyPartnerAccess } from "@/lib/partner-auth";
 
 // GET /api/partner/invoices/[id]/file → download the uploaded PDF
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -19,6 +20,10 @@ export async function GET(
   if (!invoice?.file_url) {
     return NextResponse.json({ error: "No file uploaded for this invoice" }, { status: 404 });
   }
+
+  // Autorisation : seul le partenaire propriétaire (ou un admin) peut télécharger.
+  const access = await verifyPartnerAccess(request, invoice.partner_id);
+  if (access.error) return access.error;
 
   const { data: fileData, error } = await supabase.storage
     .from("partner-invoices")

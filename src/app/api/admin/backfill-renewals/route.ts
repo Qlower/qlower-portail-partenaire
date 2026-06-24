@@ -10,17 +10,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
 
-const BACKFILL_TOKEN = "qlower-backfill-renewals-2026";
-
 export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
   const { searchParams } = new URL(request.url);
-  if (searchParams.get("token") !== BACKFILL_TOKEN) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
   const ym = searchParams.get("ym");
   if (!ym || !/^\d{4}-\d{2}$/.test(ym)) {
     return NextResponse.json({ error: "ym (YYYY-MM) requis" }, { status: 400 });

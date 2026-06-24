@@ -13,11 +13,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { upsertLeadFromContact } from "@/lib/hubspot-leads";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
 
-const TOKEN = "qlower-sync-partner-leads-2026";
 const HS_TOKEN = process.env.HUBSPOT_TOKEN || "";
 const HS_BASE = "https://api.hubapi.com";
 const PROPS = [
@@ -35,10 +35,9 @@ const PROPS = [
 ];
 
 export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (auth.error) return auth.error;
   const { searchParams } = new URL(request.url);
-  if (searchParams.get("token") !== TOKEN) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
   if (!HS_TOKEN) return NextResponse.json({ error: "HUBSPOT_TOKEN manquant" }, { status: 503 });
   const dry = searchParams.get("dry") === "1";
   const sb = createServiceClient();

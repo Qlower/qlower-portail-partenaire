@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyPartnerAccess } from "@/lib/partner-auth";
 import PDFDocument from "pdfkit";
 
 // GET /api/partner/invoice-call?partner_id=X&year=Y
@@ -17,6 +18,9 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  const access = await verifyPartnerAccess(request, partnerId);
+  if (access.error) return access.error;
 
   const supabase = createServiceClient();
 

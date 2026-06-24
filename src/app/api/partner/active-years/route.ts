@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { verifyPartnerAccess } from "@/lib/partner-auth";
 
 // GET /api/partner/active-years?partner_id=X
 // Returns years eligible for invoicing : activity in the year AND contract was signed at that time.
@@ -8,9 +9,8 @@ import { createServiceClient } from "@/lib/supabase-server";
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const partnerId = searchParams.get("partner_id");
-  if (!partnerId) {
-    return NextResponse.json({ error: "partner_id is required" }, { status: 400 });
-  }
+  const access = await verifyPartnerAccess(request, partnerId);
+  if (access.error) return access.error;
 
   const supabase = createServiceClient();
 
