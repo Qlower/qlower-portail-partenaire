@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
             // Sync à HubSpot en best-effort (n'écrase pas une attribution existante)
             const hs = await syncPromoAttributionToHubSpot(match);
             console.log(
-              `[stripe-webhook] promo-code attribution: charge=${charge.id} email=${match.customer_email} → partner=${match.partner_code} (${match.partner_id}) via=${match.matched_via} lead=${leadAction.action} hs=${hs.ok ? "synced" : hs.reason}`,
+              `[stripe-webhook] promo-code attribution: charge=${charge.id} → partner=${match.partner_code} (${match.partner_id}) via=${match.matched_via} lead=${leadAction.action} hs=${hs.ok ? "synced" : hs.reason}`,
             );
           }
         } catch (e) {

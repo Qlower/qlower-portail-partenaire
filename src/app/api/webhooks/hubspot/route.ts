@@ -363,7 +363,8 @@ export async function POST(request: NextRequest) {
       events_count: parsedEarly.length,
       contact_ids: earlyContactIds,
       body_size: rawBody.length,
-      body_excerpt: rawBody.slice(0, 500),
+      // Résumé non-PII (le payload peut contenir un email en cas de propertyChange).
+      body_excerpt: `${parsedEarly.length} event(s) · ${earlyContactIds.length} contact(s)`,
     })
     .select("id")
     .single()
