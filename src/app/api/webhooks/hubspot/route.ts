@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { syncHubspotEnum } from "@/services/sync-enum";
+import { resolvePartnerIdByTag } from "@/lib/hubspot-leads";
 
 // Allow up to 60s — needed because we may sleep 25s waiting for HubSpot
 // analytics to populate after a fresh contact creation (race-guard).
@@ -231,15 +232,10 @@ async function upsertLead(
     return { status: detached ? `detached:${detached}` : "skip:no_partner_utm" };
   }
 
-  // Find partner by UTM — INSENSIBLE À LA CASSE (corrige "CocoonR" vs "cocoonr").
-  const { data: partnersFound } = await supabase
-    .from("partners")
-    .select("id")
-    .ilike("utm", partnerUtm)
-    .limit(1);
-  const partner = partnersFound?.[0];
-
-  if (!partner) return { status: `skip:partner_not_found(${partnerUtm})` };
+  // Partenaire par UTM ou ALIAS (forçage du rattachement quel que soit le tag).
+  const partnerId = await resolvePartnerIdByTag(supabase, partnerUtm);
+  if (!partnerId) return { status: `skip:partner_not_found(${partnerUtm})` };
+  const partner = { id: partnerId };
 
   const nom = [props.firstname, props.lastname].filter(Boolean).join(" ") || props.email || "Inconnu";
   const email = props.email || "";

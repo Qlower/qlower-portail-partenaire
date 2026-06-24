@@ -10,6 +10,24 @@ import { createServiceClient } from "@/lib/supabase-server";
 
 type SB = ReturnType<typeof createServiceClient>;
 
+// Résout l'id partenaire à partir d'une valeur de tag `partenaire__lead_` :
+// d'abord par `partners.utm` (insensible casse), sinon par `partner_aliases`
+// (plusieurs valeurs de tag peuvent pointer vers un même partenaire — ex.
+// Vauvert tête de réseau = vauvert-immobilier + vie-et-logis + orpi-nimes…).
+// → permet de "forcer le rattachement" dès qu'un contact est tagué.
+export async function resolvePartnerIdByTag(supabase: SB, tagRaw: string): Promise<string | null> {
+  const tag = (tagRaw || "").trim().replace(/_/g, "-");
+  if (!tag) return null;
+  const { data: byUtm } = await supabase.from("partners").select("id").ilike("utm", tag).limit(1);
+  if (byUtm?.[0]) return byUtm[0].id as string;
+  const { data: byAlias } = await supabase
+    .from("partner_aliases")
+    .select("partner_id")
+    .ilike("alias", tag)
+    .limit(1);
+  return (byAlias?.[0]?.partner_id as string) ?? null;
+}
+
 // ── Map HubSpot lifecycle → stage Qlower ──
 export function mapStage(props: Record<string, string | null>): "Abonne" | "Payeur" | "Non payeur" {
   const lc = (props.lifecyclestage || props.hs_lifecyclestage || "").toLowerCase();
@@ -30,14 +48,10 @@ export async function upsertLeadFromContact(
   const partnerUtm = (props.partenaire__lead_ || props.utm_source || "").trim().replace(/_/g, "-");
   if (!partnerUtm) return { status: "skip:no_partner_utm" };
 
-  // Partenaire par UTM — INSENSIBLE À LA CASSE (ilike, sans wildcard = égalité).
-  const { data: partners } = await supabase
-    .from("partners")
-    .select("id")
-    .ilike("utm", partnerUtm)
-    .limit(1);
-  const partner = partners?.[0];
-  if (!partner) return { status: `skip:partner_not_found(${partnerUtm})` };
+  // Partenaire par UTM ou ALIAS (forçage du rattachement quel que soit le tag).
+  const partnerId = await resolvePartnerIdByTag(supabase, partnerUtm);
+  if (!partnerId) return { status: `skip:partner_not_found(${partnerUtm})` };
+  const partner = { id: partnerId };
 
   const nom = [props.firstname, props.lastname].filter(Boolean).join(" ") || props.email || "Inconnu";
   const email = props.email || "";

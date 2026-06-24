@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { resolvePartnerIdByTag } from "@/lib/hubspot-leads";
 
 const HS_TOKEN = process.env.HUBSPOT_TOKEN!;
 const HS_BASE = "https://api.hubapi.com";
@@ -30,18 +31,10 @@ async function upsertLead(
   const partnerUtm = (props.partenaire__lead_ || props.utm_source || "").replace(/_/g, "-");
   if (!partnerUtm) return "skip:no_utm";
 
-  // INSENSIBLE À LA CASSE (ilike) : le tag HubSpot peut différer en casse de
-  // l'utm partenaire (ex. "CocoonR" vs "Cocoonr"). Avant, le .eq sensible à la
-  // casse skippait ces contacts → dates d'abonnement jamais écrites → facturation
-  // impossible. .limit(1) au lieu de .single() pour ne pas planter sur 0/N lignes.
-  const { data: partnersFound } = await supabase
-    .from("partners")
-    .select("id")
-    .ilike("utm", partnerUtm)
-    .limit(1);
-  const partner = partnersFound?.[0];
-
-  if (!partner) return `skip:partner_not_found(${partnerUtm})`;
+  // Partenaire par UTM ou ALIAS (insensible casse, forçage du rattachement).
+  const partnerId = await resolvePartnerIdByTag(supabase, partnerUtm);
+  if (!partnerId) return `skip:partner_not_found(${partnerUtm})`;
+  const partner = { id: partnerId };
 
   const nom = [props.firstname, props.lastname].filter(Boolean).join(" ") || props.email || "Inconnu";
   const email = props.email || "";
