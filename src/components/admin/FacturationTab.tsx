@@ -148,6 +148,10 @@ export default function FacturationTab() {
   const [statusFilter, setStatusFilter] = useState<Status | "all" | "actionable">("actionable");
   const [exportFrom, setExportFrom] = useState("");
   const [exportTo, setExportTo] = useState("");
+  // Confirmation "marquer payée" + email de confirmation au partenaire
+  const [confirmPay, setConfirmPay] = useState<BillingRow | null>(null);
+  const [sendPayEmail, setSendPayEmail] = useState(true);
+  const [payingNow, setPayingNow] = useState(false);
   // Liste d'IDs qu'on vient de modifier (animation de feedback)
   const [recentlyUpdated, setRecentlyUpdated] = useState<Set<string>>(new Set());
   // Détail partenaire (panneau latéral)
@@ -263,6 +267,43 @@ export default function FacturationTab() {
     } catch (e) {
       console.error(e);
       alert("Erreur lors de la mise à jour");
+    }
+  };
+
+  // Valide le paiement (is_paid=true) + envoie l'email de confirmation au partenaire.
+  const doConfirmPay = async () => {
+    const row = confirmPay;
+    if (!row?.invoice) { setConfirmPay(null); return; }
+    setPayingNow(true);
+    try {
+      const res = await fetch("/api/admin/invoices", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: row.invoice.id, is_paid: true }),
+      });
+      if (!res.ok) throw new Error("update failed");
+      if (sendPayEmail && row.partner_email) {
+        const mail = await fetch("/api/admin/send-payment-confirmation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            partner_id: row.partner_id,
+            year: row.year,
+            amount: row.invoice.amount || row.commission,
+          }),
+        });
+        const j = await mail.json().catch(() => ({}));
+        if (!mail.ok || j.sent === 0) {
+          alert(`Paiement enregistré, mais email NON envoyé : ${j.reason || j.error || "raison inconnue"}`);
+        }
+      }
+      flashUpdate(row.partner_id + "-" + row.year);
+      await qc.invalidateQueries({ queryKey: ["admin-billing-overview", year] });
+      setConfirmPay(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erreur");
+    } finally {
+      setPayingNow(false);
     }
   };
 
@@ -664,7 +705,7 @@ export default function FacturationTab() {
                               <Button
                                 size="sm"
                                 className="h-7 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white"
-                                onClick={() => togglePaid(row)}
+                                onClick={() => { setSendPayEmail(true); setConfirmPay(row); }}
                                 title="Marquer la facture comme payée"
                               >
                                 <Check className="size-3 mr-0.5" />
@@ -771,6 +812,69 @@ export default function FacturationTab() {
             Toutes les actions sont disponibles en 1 clic dans la colonne Actions.
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* ============ Modale confirmation paiement + email ============ */}
+      {confirmPay && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !payingNow && setConfirmPay(null)}
+        >
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3">
+              <div className="bg-emerald-50 p-2 rounded-full"><Check className="size-5 text-emerald-600" /></div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Confirmer le paiement</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{confirmPay.partner_name} — {confirmPay.year}</p>
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-md p-3 grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-gray-500 block">Montant réglé</span>
+                <span className="font-bold text-[#0A3855]">
+                  {Math.round(confirmPay.invoice?.amount || confirmPay.commission).toLocaleString("fr-FR")} € {confirmPay.commission_ht ? "HT" : "TTC"}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500 block">Date</span>
+                <span>{new Date().toLocaleDateString("fr-FR")}</span>
+              </div>
+            </div>
+            <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={sendPayEmail && !!confirmPay.partner_email}
+                onChange={(e) => setSendPayEmail(e.target.checked)}
+                disabled={!confirmPay.partner_email}
+                className="mt-0.5"
+              />
+              <span>
+                Envoyer un email de confirmation au partenaire{" "}
+                {confirmPay.partner_email ? (
+                  <span className="font-mono text-[11px] text-gray-600">({confirmPay.partner_email})</span>
+                ) : (
+                  <span className="text-amber-600">(aucun email enregistré)</span>
+                )}
+                <br />
+                <span className="text-[11px] text-gray-400">Contient : date, montant, code promo, lien d&apos;affiliation.</span>
+              </span>
+            </label>
+            <div className="flex gap-2 justify-end pt-2 border-t">
+              <Button variant="ghost" onClick={() => setConfirmPay(null)} disabled={payingNow}>Annuler</Button>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={doConfirmPay}
+                disabled={payingNow}
+              >
+                {payingNow ? (
+                  <><Loader2 className="size-4 mr-1.5 animate-spin" />Traitement…</>
+                ) : (
+                  <><Check className="size-4 mr-1.5" />Confirmer{sendPayEmail && confirmPay.partner_email ? " & envoyer" : ""}</>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ============ Panneau détail ============ */}
