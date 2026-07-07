@@ -3,6 +3,18 @@ import { createServiceClient } from "@/lib/supabase-server";
 
 const HUBSPOT_BASE = "https://api.hubapi.com";
 
+// HubSpot exige un téléphone au format E.164 (+33…). On normalise les numéros
+// FR (0X… → +33X…) ; si on ne sait pas normaliser, on OMET le tél plutôt que
+// de faire échouer toute la soumission (INVALID_PHONE_NUMBER).
+function toE164(raw: string | undefined | null): string {
+  const d = (raw || "").replace(/[^\d+]/g, "");
+  if (!d) return "";
+  if (d.startsWith("+")) return d;
+  if (d.startsWith("00")) return "+" + d.slice(2);
+  if (d.length === 10 && d.startsWith("0")) return "+33" + d.slice(1);
+  return ""; // format inconnu → on n'envoie pas à HubSpot
+}
+
 export async function POST(request: NextRequest) {
   const token = process.env.HUBSPOT_TOKEN;
   if (!token) {
@@ -34,6 +46,7 @@ export async function POST(request: NextRequest) {
 
   let contactResult = null;
   let referralResult = null;
+  let hubspotWarning: string | null = null;
 
   const hsHeaders = {
     Authorization: `Bearer ${token}`,
@@ -46,8 +59,9 @@ export async function POST(request: NextRequest) {
       firstname: prenom || "",
       lastname: nom || "",
       email,
-      phone: tel || "",
     };
+    const phoneE164 = toE164(tel);
+    if (phoneE164) properties.phone = phoneE164;
 
     if (partnerUtm) {
       properties.partenaire__lead_ = partnerUtm;
@@ -93,21 +107,15 @@ export async function POST(request: NextRequest) {
       });
 
       if (!res.ok) {
-        const errBody = await res.text();
-        return NextResponse.json(
-          { error: `HubSpot error: ${res.status} ${errBody}` },
-          { status: res.status >= 400 && res.status < 500 ? res.status : 502 }
-        );
+        // Non bloquant : on garde la trace mais on n'échoue PAS la soumission
+        // (le contact sera quand même enregistré côté Qlower en step 2).
+        hubspotWarning = `HubSpot ${res.status}: ${(await res.text()).slice(0, 200)}`;
+      } else {
+        contactResult = await res.json();
       }
-
-      contactResult = await res.json();
     }
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json(
-      { error: `HubSpot request failed: ${message}` },
-      { status: 502 }
-    );
+    hubspotWarning = `HubSpot request failed: ${err instanceof Error ? err.message : "Unknown error"}`;
   }
 
   // Step 2: Insert referral row in Supabase
@@ -148,6 +156,7 @@ export async function POST(request: NextRequest) {
     {
       contact: contactResult,
       referral: referralResult,
+      ...(hubspotWarning ? { hubspotWarning } : {}),
     },
     { status: 201 }
   );
