@@ -129,9 +129,8 @@ export async function POST(request: NextRequest) {
       tel: tel || null,
       biens: biens || null,
       comment: comment || null,
-      partner_utm: partnerUtm || null,
       partner_id: partnerId || null,
-      hubspot_contact_id: contactResult?.id || null,
+      hs_contact_id: contactResult?.id || null,
     }).select().single();
 
     if (error) {
