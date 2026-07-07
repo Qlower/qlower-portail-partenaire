@@ -151,6 +151,53 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Step 3: Créer le LEAD immédiatement, pour qu'il apparaisse tout de suite dans
+  // « Historique de vos contacts » (qui lit la table `leads`), sans attendre le
+  // webhook/sync HubSpot. Le webhook retrouvera ce lead (match hs_contact_id/email)
+  // et le mettra à jour → pas de doublon.
+  try {
+    if (partnerId) {
+      const supabase = createServiceClient();
+      const emailNorm = (email || "").trim().toLowerCase();
+      const hsId = contactResult?.id || null;
+      const orFilter = hsId
+        ? `hs_contact_id.eq.${hsId},email.eq.${emailNorm}`
+        : `email.eq.${emailNorm}`;
+      const { data: existingLead } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("partner_id", partnerId)
+        .or(orFilter)
+        .limit(1);
+
+      if (!existingLead?.[0]) {
+        const now = new Date();
+        const nomComplet = [prenom, nom].filter(Boolean).join(" ") || emailNorm || "Inconnu";
+        await supabase.from("leads").insert({
+          partner_id: partnerId,
+          nom: nomComplet,
+          email: emailNorm,
+          source: "Manuel",
+          stage: "Non payeur",
+          mois: now.toLocaleDateString("fr-FR", { month: "short", year: "numeric" }),
+          biens: 0,
+          hs_contact_id: hsId,
+          commission_due: false,
+          created_at: now.toISOString(),
+        });
+        await supabase.rpc("increment_partner_leads", { p_id: partnerId });
+        await supabase.from("partner_actions").insert({
+          partner_id: partnerId,
+          type: "contact" as const,
+          label: `Nouveau contact : ${nomComplet} (${emailNorm})`,
+          date: now.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }),
+        });
+      }
+    }
+  } catch {
+    // Non bloquant : le referral est déjà enregistré, le lead sera rattrapé par le sync.
+  }
+
   return NextResponse.json(
     {
       contact: contactResult,

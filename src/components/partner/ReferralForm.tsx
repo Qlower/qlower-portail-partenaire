@@ -178,14 +178,17 @@ export default function ReferralForm({ partner }: ReferralFormProps) {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-gray-700">Telephone (optionnel)</Label>
+            <Label className="text-xs font-medium text-gray-700">Téléphone</Label>
             <Input
               type="tel"
               value={tel}
               onChange={(e) => setTel(e.target.value)}
-              placeholder="06 12 34 56 78"
+              placeholder="06 12 34 56 78  ou  +33 6 12 34 56 78"
               className="border-gray-200 focus:border-[#0A3855] focus:ring-[#0A3855]/20"
             />
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              <span className="text-[#0A3855] font-medium">Important :</span> renseignez le numéro (format FR <span className="font-mono">06…</span> ou international <span className="font-mono">+33…</span>). Il nous permet d&apos;identifier et de suivre votre client dans notre CRM.
+            </p>
           </div>
 
           <Select label="Nombre de biens" options={BIENS_OPTIONS} value={biens} onChange={(e) => setBiens(e.target.value)} />
