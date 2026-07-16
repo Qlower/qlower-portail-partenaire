@@ -27,16 +27,26 @@ function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       setLoading(false);
+
+      // Lien de réinitialisation de mot de passe : Supabase ne redirige que vers
+      // le Site URL (les chemins ne sont pas dans la liste blanche Redirect URLs),
+      // donc le lien atterrit sur l'accueil. On rattrape ici : dès qu'une session
+      // de récupération est posée, on envoie l'utilisateur sur le formulaire.
+      if (event === "PASSWORD_RECOVERY" && typeof window !== "undefined") {
+        if (window.location.pathname !== "/auth/reset-password") {
+          router.push("/auth/reset-password");
+        }
+      }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [supabase, router]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
