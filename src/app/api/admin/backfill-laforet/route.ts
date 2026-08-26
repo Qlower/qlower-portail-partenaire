@@ -1,0 +1,140 @@
+// Rétro-tag des abonnements Laforêt (marque grise) déjà en base.
+//
+// POST /api/admin/backfill-laforet   body: { since?: "2026-06-01", limit?: 300, dry_run?: boolean }
+//
+// Parcourt attribution_rows (charges réelles, mois >= since, pas encore
+// taguées "Abo Laforet"), récupère le produit Stripe de chaque charge, et si
+// c'est un produit Laforêt :
+//   - family = "Abo Laforet"            → hors objectifs / hors commissions + label
+//   - auto/override_commercial_id = null → plus aucun commercial crédité
+//   - auto_source/reason = libellé explicite
+//
+// dry_run:true → ne modifie rien, retourne juste ce qui SERAIT tagué.
+// Signale les mois VERROUILLÉS touchés (impact rétroactif sur un mois clôturé).
+// Auth : admin (cookie) ou sales_admin. Idempotent, borné par time budget.
+
+import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
+import { createServerClient } from "@supabase/ssr";
+import { createServiceClient } from "@/lib/supabase-server";
+import { verifyAdmin } from "@/lib/admin-auth";
+import { fetchProductInfo } from "@/lib/charge-classifier";
+import { LAFORET_FAMILY, LAFORET_PRODUCT_IDS } from "@/lib/objective-scope";
+
+export const maxDuration = 60;
+export const runtime = "nodejs";
+
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
+const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
+
+async function verifyAdminOrSalesAdmin(
+  request: NextRequest,
+): Promise<{ ok: true } | { ok: false; error: NextResponse }> {
+  const adminCheck = await verifyAdmin(request);
+  if (!adminCheck.error) return { ok: true };
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll() { return request.cookies.getAll(); }, setAll() {} } },
+  );
+  const { data: { user } } = await supabase.auth.getUser();
+  const role = (user?.user_metadata as Record<string, unknown> | undefined)?.internal_role;
+  if (role === "sales_admin") return { ok: true };
+  return { ok: false, error: adminCheck.error };
+}
+
+export async function POST(request: NextRequest) {
+  if (!stripe) {
+    return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });
+  }
+  const auth = await verifyAdminOrSalesAdmin(request);
+  if (!auth.ok) return auth.error;
+
+  let body: { since?: string; limit?: number; dry_run?: boolean } = {};
+  try {
+    body = await request.json();
+  } catch {
+    // optional
+  }
+  const since = body.since || "2026-06-01";
+  const limit = Math.max(1, Math.min(1000, body.limit || 300));
+  const dryRun = !!body.dry_run;
+
+  const sb = createServiceClient();
+  const start = Date.now();
+  const TIME_BUDGET_MS = 45_000;
+
+  // Charges réelles à examiner : pas déjà taguées Laforet, pas des lignes ledger
+  // de refund, sur un mois >= since. On joint le run pour connaître le verrou.
+  const { data: rows } = await sb
+    .from("attribution_rows")
+    .select("charge_id, created_at, family, monthly_runs!inner(year_month, locked)")
+    .gte("created_at", `${since}T00:00:00Z`)
+    .neq("family", LAFORET_FAMILY)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  type Row = {
+    charge_id: string;
+    created_at: string;
+    family: string | null;
+    monthly_runs?: { year_month: string; locked: boolean };
+  };
+  const candidates = ((rows as unknown as Row[]) || []).filter(
+    (r) => r.charge_id && !r.charge_id.startsWith("refund_") && !r.charge_id.startsWith("manual_"),
+  );
+
+  const stats = {
+    since,
+    dry_run: dryRun,
+    examined: 0,
+    tagged: [] as Array<{ charge_id: string; year_month: string; locked: boolean }>,
+    locked_months_touched: new Set<string>(),
+    errors: [] as Array<{ charge_id: string; error: string }>,
+    time_budget_exceeded: false,
+  };
+
+  for (const r of candidates) {
+    if (Date.now() - start > TIME_BUDGET_MS) {
+      stats.time_budget_exceeded = true;
+      break;
+    }
+    stats.examined++;
+    try {
+      const charge = await stripe.charges.retrieve(r.charge_id);
+      const { product_ids } = await fetchProductInfo(stripe, charge);
+      const isLaforet = product_ids.some((id) => LAFORET_PRODUCT_IDS.has(id));
+      if (!isLaforet) continue;
+
+      const ym = r.monthly_runs?.year_month || "";
+      const locked = !!r.monthly_runs?.locked;
+      if (locked) stats.locked_months_touched.add(ym);
+      stats.tagged.push({ charge_id: r.charge_id, year_month: ym, locked });
+
+      if (!dryRun) {
+        const { error } = await sb
+          .from("attribution_rows")
+          .update({
+            family: LAFORET_FAMILY,
+            auto_commercial_id: null,
+            override_commercial_id: null,
+            auto_score: 0,
+            auto_source: "Abo Laforet (hors objectifs)",
+            auto_reason: "Abonnement marque grise Laforêt — hors objectifs et hors commissions (rétro-tag).",
+          })
+          .eq("charge_id", r.charge_id);
+        if (error) stats.errors.push({ charge_id: r.charge_id, error: error.message });
+      }
+    } catch (e) {
+      stats.errors.push({ charge_id: r.charge_id, error: e instanceof Error ? e.message : "unknown" });
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    duration_ms: Date.now() - start,
+    ...stats,
+    tagged_count: stats.tagged.length,
+    locked_months_touched: [...stats.locked_months_touched],
+  });
+}

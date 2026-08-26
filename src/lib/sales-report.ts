@@ -6,6 +6,7 @@
 
 import { createServiceClient } from "@/lib/supabase-server";
 import { computeCommission, type CommissionResult } from "@/lib/commissions";
+import { isExcludedFromObjectives } from "@/lib/objective-scope";
 
 export interface NegoLine {
   commercial_id: string;
@@ -106,6 +107,8 @@ export interface ReportData {
   provenance: ProvenanceData; // affilié vs direct, top partenaires, canal
   renewalsTotal: number; // CA des reconductions d'abonnement (NON commissionnable)
   renewalsCount: number; // nb de reconductions du mois
+  laforetNet: number; // CA abo Laforêt (marque grise) — HORS objectifs / commissions
+  laforetCount: number; // nb de charges abo Laforêt du mois
   trend: { month: string; ca: number; renewals: number }[]; // 6 derniers mois
 }
 
@@ -124,7 +127,7 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
   const targetById = new Map<string, number>();
   for (const t of targets || []) targetById.set(t.commercial_id, t.target_eur);
 
-  const { data: rows } = await sb
+  const { data: rowsRaw } = await sb
     .from("attribution_rows")
     .select(
       "amount_net_eur, commissionable_amount_eur, decommission_commercial_id, decommission_amount_eur, auto_commercial_id, override_commercial_id, flagged_for_review, created_at, email, client_name, family, product_name, client_status, origin_source, origin_detail, newbiz_1m, newbiz_3m, auto_source, auto_score, last_efforts",
@@ -138,6 +141,14 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     (r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
       ? Number(r.commissionable_amount_eur)
       : Number(r.amount_net_eur)) || 0;
+
+  // Abo Laforêt (marque grise) : hors objectifs et hors commissions. On les
+  // retire de TOUT le calcul du rapport (CA équipe, classement, commissions,
+  // mix produit…) et on les expose à part, en clair, sous "Abo Laforet".
+  const laforetRows = (rowsRaw || []).filter(isExcludedFromObjectives);
+  const laforetNet = laforetRows.reduce((s, r) => s + commish(r), 0);
+  const laforetCount = laforetRows.length;
+  const rows = (rowsRaw || []).filter((r) => !isExcludedFromObjectives(r));
 
   // Total team
   let totalCA_TTC = 0;
@@ -692,16 +703,18 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     if (rid) {
       const { data: tr } = await sb
         .from("attribution_rows")
-        .select("amount_net_eur, commissionable_amount_eur")
+        .select("amount_net_eur, commissionable_amount_eur, family")
         .eq("run_id", rid);
-      ca = (tr || []).reduce(
-        (s, r) =>
-          s +
-          ((r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
-            ? Number(r.commissionable_amount_eur)
-            : Number(r.amount_net_eur)) || 0),
-        0,
-      );
+      ca = (tr || [])
+        .filter((r) => !isExcludedFromObjectives(r))
+        .reduce(
+          (s, r) =>
+            s +
+            ((r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+              ? Number(r.commissionable_amount_eur)
+              : Number(r.amount_net_eur)) || 0),
+          0,
+        );
     }
     const { data: rn } = await sb
       .from("subscription_renewals")
@@ -745,6 +758,8 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     provenance,
     renewalsTotal,
     renewalsCount,
+    laforetNet,
+    laforetCount,
     trend,
   };
 }

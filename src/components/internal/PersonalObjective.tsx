@@ -17,6 +17,7 @@ import {
 } from "@/lib/working-days";
 import SpeedometerGauge from "./SpeedometerGauge";
 import ObjectiveViewSelector from "./ObjectiveViewSelector";
+import { isExcludedFromObjectives } from "@/lib/objective-scope";
 
 interface CommercialAuth {
   commercial_id: string | null;
@@ -87,10 +88,12 @@ async function getPersonalStats(
 
   const { data: rows } = await sb
     .from("attribution_rows")
-    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, created_at, decommission_commercial_id, decommission_amount_eur")
+    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, created_at, decommission_commercial_id, decommission_amount_eur, family")
     .eq("run_id", run.id);
 
   const mine = (rows || []).filter((r) => {
+    // Abo Laforêt : hors objectifs (ni équipe, ni individuel).
+    if (isExcludedFromObjectives(r)) return false;
     if (filter.mode === "team") return true;
     const cid = r.override_commercial_id || r.auto_commercial_id;
     return cid === filter.commercialId;

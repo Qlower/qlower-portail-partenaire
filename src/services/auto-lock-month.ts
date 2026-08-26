@@ -11,6 +11,7 @@
 import { createServiceClient } from "@/lib/supabase-server";
 import { resend, FROM } from "@/lib/resend";
 import { shiftYearMonth, currentYearMonth, formatYearMonthFull } from "@/lib/year-month";
+import { isExcludedFromObjectives } from "@/lib/objective-scope";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://partenaire.qlower.com";
 // Jour du mois auquel on verrouille (UTC). Configurable via env.
@@ -122,9 +123,12 @@ async function notifyAutoLock(yearMonth: string): Promise<number> {
       .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
     const { data: rows } = await sb
       .from("attribution_rows")
-      .select("amount_net_eur, flagged_for_review")
+      .select("amount_net_eur, flagged_for_review, family")
       .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
-    const total = (rows || []).reduce((s, r) => s + (r.amount_net_eur || 0), 0);
+    // Abo Laforêt (marque grise) exclu du CA équipe communiqué au verrouillage.
+    const total = (rows || [])
+      .filter((r) => !isExcludedFromObjectives(r))
+      .reduce((s, r) => s + (r.amount_net_eur || 0), 0);
     const flagged = (rows || []).filter((r) => r.flagged_for_review).length;
 
     // Recipients : tous les sales_admin

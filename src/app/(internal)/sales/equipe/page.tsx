@@ -3,6 +3,7 @@ import { Trophy } from "lucide-react";
 import MonthSelector from "@/components/internal/MonthSelector";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
+import { isExcludedFromObjectives } from "@/lib/objective-scope";
 
 async function loadTeamData(yearMonth: string) {
   const sb = createServiceClient();
@@ -15,7 +16,7 @@ async function loadTeamData(yearMonth: string) {
 
   const { data: rows } = await sb
     .from("attribution_rows")
-    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, flagged_for_review, decommission_commercial_id, decommission_amount_eur")
+    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, flagged_for_review, decommission_commercial_id, decommission_amount_eur, family")
     .eq("run_id", run?.id || "00000000-0000-0000-0000-000000000000");
 
   const { data: commercials } = await sb
@@ -52,6 +53,9 @@ async function loadTeamData(yearMonth: string) {
   const byId = new Map<string, Agg>();
   let autonomeNet = 0;
   let autonomeRows = 0;
+  // Abo Laforêt (marque grise) : hors classement et hors total équipe.
+  let laforetNet = 0;
+  let laforetRows = 0;
 
   // Index décommissionnements par commercial_id pour ce mois
   const retenueByCommercial = new Map<string, number>();
@@ -71,6 +75,12 @@ async function loadTeamData(yearMonth: string) {
       ? Number(r.commissionable_amount_eur)
       : Number(r.amount_net_eur);
   for (const r of rows || []) {
+    // Abo Laforêt : hors objectifs — ni dans le classement, ni dans le total.
+    if (isExcludedFromObjectives(r)) {
+      laforetNet += commish(r);
+      laforetRows++;
+      continue;
+    }
     const cid = (r.override_commercial_id || r.auto_commercial_id) as string | null;
     if (!cid) continue;
     const c = commercials?.find((x) => x.id === cid);
@@ -115,7 +125,7 @@ async function loadTeamData(yearMonth: string) {
   }
 
   const all = [...byId.values()].sort((a, b) => b.net - a.net);
-  return { all, teamTarget: teamTarget?.target_eur || 0, autonomeNet, autonomeRows };
+  return { all, teamTarget: teamTarget?.target_eur || 0, autonomeNet, autonomeRows, laforetNet, laforetRows };
 }
 
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
@@ -128,7 +138,7 @@ export default async function EquipePage({
 }) {
   const params = await searchParams;
   const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
-  const { all, teamTarget, autonomeNet, autonomeRows } = await loadTeamData(yearMonth);
+  const { all, teamTarget, autonomeNet, autonomeRows, laforetNet, laforetRows } = await loadTeamData(yearMonth);
   const monthLabel = formatYearMonthFull(yearMonth);
 
   // Le total d'équipe inclut les achats autonomes (pour la jauge globale)
@@ -230,6 +240,15 @@ export default async function EquipePage({
             🚫 <strong>Achats autonomes</strong> — {autonomeRows} vente{autonomeRows > 1 ? "s" : ""} sans intervention sales (hors classement)
           </span>
           <span className="font-mono tabular-nums text-gray-700">{fmtEur(autonomeNet)}</span>
+        </div>
+      )}
+
+      {laforetRows > 0 && (
+        <div className="bg-[#E5EDF1]/40 border border-[#0A3855]/15 rounded-lg p-3 flex items-center justify-between text-xs">
+          <span className="text-[#0A3855]/80">
+            🏢 <strong>Abo Laforêt</strong> (marque grise) — {laforetRows} vente{laforetRows > 1 ? "s" : ""} · <strong>hors objectifs & hors commissions</strong> (non attribué à un commercial)
+          </span>
+          <span className="font-mono tabular-nums text-[#0A3855]">{fmtEur(laforetNet)}</span>
         </div>
       )}
 

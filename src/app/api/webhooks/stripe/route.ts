@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 import { scoreCharge } from "@/lib/sales-scoring";
 import { enrichCharge, type ChargeEnrichment } from "@/lib/charge-classifier";
 import { fetchOriginByEmail } from "@/lib/hubspot-origin";
+import { LAFORET_FAMILY } from "@/lib/objective-scope";
 import {
   findPartnerByStripePromoCode,
   attributeLeadFromPromoMatch,
@@ -98,13 +99,26 @@ async function upsertCharge(input: ChargeUpsertInput): Promise<{ created: boolea
     .maybeSingle();
   if (run?.locked) return { created: false, updated: false, skipped: "month_locked" };
 
+  // Abo Laforêt (marque grise) : hors objectifs / hors commissions. Aucun
+  // commercial n'est crédité (attribution neutralisée), la ligne reste visible
+  // dans le Tour de contrôle sous le label "Abo Laforet".
+  const isLaforet = input.enrichment.family === LAFORET_FAMILY;
+
   // Score the charge against HubSpot data — incl. lookup par téléphone pour
   // gérer les clients ayant plusieurs fiches HubSpot (cas Baptiste Perlin).
-  const scoring = await scoreCharge({
-    email: input.email,
-    phone: input.phone,
-    paymentDate: input.created_at,
-  });
+  const scoring = isLaforet
+    ? {
+        commercial_id: null,
+        score: 0,
+        source: "Abo Laforet (hors objectifs)",
+        reason: "Abonnement marque grise Laforêt — hors objectifs et hors commissions.",
+        last_efforts: [],
+      }
+    : await scoreCharge({
+        email: input.email,
+        phone: input.phone,
+        paymentDate: input.created_at,
+      });
 
   // Vraie origine marketing depuis HubSpot (Google / Ads / direct / appel…).
   // Best-effort : si non trouvée, on n'écrase pas une valeur existante.

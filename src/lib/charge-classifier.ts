@@ -8,6 +8,7 @@
 // Logique utilisée par /api/webhooks/stripe à chaque charge captured.
 
 import Stripe from "stripe";
+import { LAFORET_FAMILY, LAFORET_PRODUCT_IDS } from "@/lib/objective-scope";
 
 // Patterns inférés depuis les données Avril 2026 (10 mois de signaux V1).
 // Ordre = priorité : le 1er match gagne.
@@ -68,10 +69,22 @@ interface InvoiceLineItemLegacy {
   pricing?: { price_details?: { product?: string } };
 }
 
+// Extrait l'id produit Stripe d'une ligne de facture (plusieurs shapes selon
+// la version du SDK / de l'API : price.product (string ou objet) ou
+// pricing.price_details.product).
+function productIdOfLine(line: InvoiceLineItemLegacy): string | null {
+  const pr = line.price?.product;
+  if (typeof pr === "string") return pr;
+  if (pr && typeof pr === "object" && "id" in pr) return (pr as Stripe.Product).id || null;
+  const pd = line.pricing?.price_details?.product;
+  if (typeof pd === "string") return pd;
+  return null;
+}
+
 export async function fetchProductInfo(
   stripe: Stripe,
   charge: Stripe.Charge,
-): Promise<{ product_name: string | null; family: string }> {
+): Promise<{ product_name: string | null; family: string; product_ids: string[] }> {
   const amount_eur = charge.amount / 100;
   const chargeWithInv = charge as ChargeWithInvoice;
 
@@ -80,27 +93,31 @@ export async function fetchProductInfo(
       const invoice = await stripe.invoices.retrieve(chargeWithInv.invoice, {
         expand: ["lines.data.price.product"],
       });
-      const firstLine = invoice.lines.data[0] as unknown as InvoiceLineItemLegacy | undefined;
+      const lines = (invoice.lines.data as unknown as InvoiceLineItemLegacy[]) || [];
+      const product_ids = lines.map(productIdOfLine).filter(Boolean) as string[];
+      const firstLine = lines[0];
       if (firstLine) {
         const productRef = firstLine.price?.product;
         if (productRef && typeof productRef === "object" && "name" in productRef) {
           const name = (productRef as Stripe.Product).name || firstLine.description || null;
-          return { product_name: name, family: inferFamily(name, amount_eur) };
+          return { product_name: name, family: inferFamily(name, amount_eur), product_ids };
         }
         if (firstLine.description) {
           return {
             product_name: firstLine.description,
             family: inferFamily(firstLine.description, amount_eur),
+            product_ids,
           };
         }
       }
+      return { product_name: charge.description || null, family: inferFamily(charge.description || null, amount_eur), product_ids };
     } catch (e) {
       console.warn("[charge-classifier] invoice fetch failed:", e instanceof Error ? e.message : e);
     }
   }
 
   const desc = charge.description || null;
-  return { product_name: desc, family: inferFamily(desc, amount_eur) };
+  return { product_name: desc, family: inferFamily(desc, amount_eur), product_ids: [] };
 }
 
 /**
@@ -156,9 +173,19 @@ export async function enrichCharge(
   stripe: Stripe,
   charge: Stripe.Charge,
 ): Promise<ChargeEnrichment> {
-  const [{ product_name, family }, { newbiz_1m, newbiz_3m, client_status }] = await Promise.all([
+  const [{ product_name, family, product_ids }, { newbiz_1m, newbiz_3m, client_status }] = await Promise.all([
     fetchProductInfo(stripe, charge),
     inferNewBiz(stripe, charge),
   ]);
-  return { family, product_name, newbiz_1m, newbiz_3m, client_status };
+  // Abo Laforêt (marque grise) → hors objectifs / hors commissions.
+  // Détecté par l'id produit Stripe (fiable) ; on force la family qui sert
+  // à la fois de label et de signal d'exclusion.
+  const isLaforet = product_ids.some((id) => LAFORET_PRODUCT_IDS.has(id));
+  return {
+    family: isLaforet ? LAFORET_FAMILY : family,
+    product_name,
+    newbiz_1m,
+    newbiz_3m,
+    client_status,
+  };
 }

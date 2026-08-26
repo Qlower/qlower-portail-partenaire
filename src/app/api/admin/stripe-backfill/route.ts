@@ -21,6 +21,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { scoreCharge } from "@/lib/sales-scoring";
 import { enrichCharge } from "@/lib/charge-classifier";
+import { LAFORET_FAMILY } from "@/lib/objective-scope";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -217,11 +218,20 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const scoring = await scoreCharge({
-          email,
-          phone,
-          paymentDate: createdAtIso,
-        });
+        // Abo Laforêt : hors objectifs / commissions, attribution neutralisée.
+        const scoring = enrichment.family === LAFORET_FAMILY
+          ? {
+              commercial_id: null,
+              score: 0,
+              source: "Abo Laforet (hors objectifs)",
+              reason: "Abonnement marque grise Laforêt — hors objectifs et hors commissions.",
+              last_efforts: [],
+            }
+          : await scoreCharge({
+              email,
+              phone,
+              paymentDate: createdAtIso,
+            });
 
         const { error: insertErr } = await sb.from("attribution_rows").insert({
           charge_id: charge.id,

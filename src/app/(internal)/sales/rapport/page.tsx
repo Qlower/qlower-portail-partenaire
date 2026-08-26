@@ -121,6 +121,11 @@ export default async function RapportPage({
               🚫 {fmtEur(data.autonomeNet)} d&apos;achats autonomes (hors classement)
             </span>
           )}
+          {data.laforetCount > 0 && (
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#E5EDF1]/50 border border-[#0A3855]/15 text-[#0A3855]/80 text-sm rounded-lg">
+              🏢 {fmtEur(data.laforetNet)} d&apos;abo Laforêt ({data.laforetCount}) — hors objectifs & commissions
+            </span>
+          )}
         </div>
       )}
 

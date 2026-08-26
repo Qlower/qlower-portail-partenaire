@@ -7,6 +7,7 @@ import PersonalObjective from "@/components/internal/PersonalObjective";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
 import { resolveSalesView } from "@/lib/sales-view";
+import { isExcludedFromObjectives } from "@/lib/objective-scope";
 
 const fmtEur = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} €`;
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -35,7 +36,7 @@ async function getDashboardData(yearMonth: string) {
   // Per-commercial totals (joins commercials for name).
   const { data: rows } = await sb
     .from("attribution_rows")
-    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, auto_score, flagged_for_review")
+    .select("amount_net_eur, commissionable_amount_eur, auto_commercial_id, override_commercial_id, auto_score, flagged_for_review, family")
     .eq("run_id", runRow?.id || "00000000-0000-0000-0000-000000000000");
 
   const { data: commercials } = await sb
@@ -61,8 +62,16 @@ async function getDashboardData(yearMonth: string) {
   // le ranking individuel (puisqu'aucun commercial n'est responsable).
   let autonomeNet = 0;
   let autonomeRows = 0;
+  // Abo Laforêt (marque grise) : hors objectifs / hors commissions.
+  let laforetNet = 0;
+  let laforetRows = 0;
   for (const r of rows || []) {
     const amt = commish(r);
+    if (isExcludedFromObjectives(r)) {
+      laforetNet += amt;
+      laforetRows++;
+      continue;
+    }
     const cid = (r.override_commercial_id || r.auto_commercial_id) as string | null;
     const c = commercials?.find((x) => x.id === cid);
     if (c?.role === "system_none") {
@@ -103,6 +112,8 @@ async function getDashboardData(yearMonth: string) {
     flaggedCount,
     autonomeNet,
     autonomeRows,
+    laforetNet,
+    laforetRows,
     perCommercial: [...byId.entries()]
       .map(([id, v]) => ({
         id,
@@ -209,6 +220,22 @@ export default async function SalesHomePage({
           </div>
           <div className="text-xl font-bold text-gray-700 font-mono tabular-nums">
             {fmtEur(data.autonomeNet)}
+          </div>
+        </div>
+      )}
+
+      {/* Hors périmètre : abo Laforêt (marque grise) */}
+      {data.laforetRows > 0 && (
+        <div className="bg-[#E5EDF1]/40 border border-[#0A3855]/15 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-wider text-[#0A3855]/70">🏢 Hors objectifs — Abo Laforêt (marque grise)</div>
+            <div className="text-xs text-[#0A3855]/70 mt-1">
+              {data.laforetRows} vente{data.laforetRows > 1 ? "s" : ""} vendues par les agences Laforêt —{" "}
+              <strong>exclues du CA équipe, des objectifs et des commissions</strong>.
+            </div>
+          </div>
+          <div className="text-xl font-bold text-[#0A3855] font-mono tabular-nums">
+            {fmtEur(data.laforetNet)}
           </div>
         </div>
       )}

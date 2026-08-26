@@ -11,6 +11,7 @@ import MonthSelector from "@/components/internal/MonthSelector";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
 import { resolveSalesView } from "@/lib/sales-view";
+import { isExcludedFromObjectives } from "@/lib/objective-scope";
 
 // Données live : vues "mes ventes" + historique doivent refléter l'état temps
 // réel. Sans force-dynamic, Next.js 16 sert un rendu caché.
@@ -172,13 +173,17 @@ export default async function VentesPage({
   // Aligné sur PersonalObjective et /sales : on totalise sur le montant
   // commissionnable (override admin = upsell, refund assumé, etc.), pas sur
   // le brut Stripe — pour que tous les CA affichés soient cohérents.
-  const total = rows.reduce((sum, r) => {
-    const amt =
-      r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
-        ? Number(r.commissionable_amount_eur)
-        : Number(r.amount_net_eur);
-    return sum + (amt || 0);
-  }, 0);
+  // Le total équipe affiché exclut les abo Laforêt (marque grise, hors
+  // objectifs) — ils restent visibles dans le tableau, libellés "Abo Laforet".
+  const total = rows
+    .filter((r) => !isExcludedFromObjectives(r))
+    .reduce((sum, r) => {
+      const amt =
+        r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+          ? Number(r.commissionable_amount_eur)
+          : Number(r.amount_net_eur);
+      return sum + (amt || 0);
+    }, 0);
   const myRowsCount = myCommercialId
     ? rows.filter((r) => r.effective_commercial_id === myCommercialId).length
     : 0;
