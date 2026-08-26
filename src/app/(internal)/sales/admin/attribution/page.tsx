@@ -18,6 +18,7 @@ import { createServerClient } from "@supabase/ssr";
 import { resolveYearMonthWithFallback } from "@/lib/available-months";
 import { formatYearMonthFull } from "@/lib/year-month";
 import { resolveSalesView } from "@/lib/sales-view";
+import { isExcludedFromObjectives } from "@/lib/objective-scope";
 
 // Données live : l'historique des modifications et les overrides doivent
 // refléter l'état temps réel. Sans force-dynamic, Next.js 16 sert un rendu
@@ -262,13 +263,14 @@ export default async function AttributionAdminPage({
   // Total CA du mois — utile pour visualiser l'atteinte d'objectif.
   // On utilise le montant commissionnable s'il est override (ex: upsell),
   // sinon le net Stripe. Aligné avec la paie effective.
-  const totalCA = rows.reduce((s, r) => {
-    const amt =
-      r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
-        ? Number(r.commissionable_amount_eur)
-        : Number(r.amount_net_eur);
-    return s + (amt || 0);
-  }, 0);
+  // Les abo Laforêt (marque grise) sont EXCLUS du CA objectif et affichés à part.
+  const amtOf = (r: RowData) =>
+    (r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+      ? Number(r.commissionable_amount_eur)
+      : Number(r.amount_net_eur)) || 0;
+  const totalCA = rows.filter((r) => !isExcludedFromObjectives(r)).reduce((s, r) => s + amtOf(r), 0);
+  const laforetCA = rows.filter((r) => isExcludedFromObjectives(r)).reduce((s, r) => s + amtOf(r), 0);
+  const laforetCount = rows.filter((r) => isExcludedFromObjectives(r)).length;
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
@@ -276,8 +278,11 @@ export default async function AttributionAdminPage({
         <div>
           <h1 className="text-2xl font-bold text-[#0A3855]">Attribution — {monthLabel}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {rows.length} ligne{rows.length > 1 ? "s" : ""} · <strong className="text-[#0A3855]">{Math.round(totalCA).toLocaleString("fr-FR")} €</strong> · Édition admin{" "}
-            {run?.locked ? "(verrouillé)" : "(active)"}
+            {rows.length} ligne{rows.length > 1 ? "s" : ""} · <strong className="text-[#0A3855]">{Math.round(totalCA + laforetCA).toLocaleString("fr-FR")} €</strong>
+            {laforetCount > 0 && (
+              <> · <span className="text-[#0A3855]/70">dont <strong>{Math.round(laforetCA).toLocaleString("fr-FR")} €</strong> Abo Laforêt (hors objectif &amp; commissions)</span></>
+            )}{" "}
+            · Édition admin {run?.locked ? "(verrouillé)" : "(active)"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">

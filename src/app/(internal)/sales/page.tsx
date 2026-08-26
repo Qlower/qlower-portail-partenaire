@@ -183,6 +183,11 @@ export default async function SalesHomePage({
           <div className="text-xs uppercase tracking-wider text-gray-500">CA équipe</div>
           <div className="text-3xl font-bold text-[#0A3855] mt-1">{fmtEur(data.totalNet)}</div>
           <div className="text-xs text-gray-500 mt-1">objectif {fmtEur(data.teamTarget)}</div>
+          {data.laforetRows > 0 && (
+            <div className="text-[11px] text-[#0A3855]/70 mt-1.5 pt-1.5 border-t border-gray-100">
+              + {fmtEur(data.laforetNet)} de CA Abo Laforêt <span className="text-gray-400">(hors objectif &amp; commissions)</span>
+            </div>
+          )}
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-5">
           <div className="text-xs uppercase tracking-wider text-gray-500">Atteinte objectif</div>
