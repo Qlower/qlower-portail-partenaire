@@ -20,6 +20,7 @@ export const LAFORET_PRODUCT_IDS = new Set<string>([
   "prod_UjBRojbwkWLm9t",
   "prod_UjBSoTyj21rPbs",
   "prod_Ulm2pVFhbwPt0I",
+  "prod_UsXbj66fm1n7C1", // produit payé par ZOUNON (ajouté 27/08/2026)
 ]);
 
 // Vrai si la ligne est hors périmètre objectifs/commissions (ex. abo Laforet).
