@@ -114,44 +114,40 @@ export async function POST(request: NextRequest) {
     try {
       const charge = await stripe.charges.retrieve(r.charge_id);
 
-      // DEBUG : dump la structure brute de la 1ere ligne de facture pour
-      // comprendre ou est range l'id produit (structure Stripe variable).
+      // DEBUG : dump la structure brute (facture ET checkout session) pour
+      // localiser l'id produit (structure Stripe variable selon le mode de paiement).
       if (debug && debugDump.length < 3) {
-        const chAny = charge as unknown as { invoice?: string | null };
+        const chAny = charge as unknown as { invoice?: string | null; payment_intent?: string | { id?: string } | null };
         const invId = chAny.invoice || null;
-        let lineDump: unknown = null;
-        let subDump: unknown = null;
-        if (invId && typeof invId === "string") {
+        const piId = typeof chAny.payment_intent === "string" ? chAny.payment_intent : chAny.payment_intent?.id || null;
+        const dump: Record<string, unknown> = { charge_id: r.charge_id, email: r.email, invoice_id: invId, payment_intent: piId };
+        // Checkout session (cas Payment Link / paiement sans facture)
+        if (piId) {
           try {
-            const inv = await stripe.invoices.retrieve(invId, {
-              expand: ["lines.data.price.product", "lines.data.pricing.price_details"],
+            const sessions = await stripe.checkout.sessions.list({
+              payment_intent: piId,
+              limit: 1,
+              expand: ["data.line_items.data.price.product"],
             });
-            const l0 = (inv.lines?.data?.[0] || null) as unknown as Record<string, unknown> | null;
-            const invAny = inv as unknown as { subscription?: string | null };
-            if (l0) {
-              lineDump = {
-                keys: Object.keys(l0),
-                description: l0.description,
-                price: l0.price,
-                pricing: l0.pricing,
-                plan: (l0 as { plan?: unknown }).plan,
+            const sess = sessions.data[0] as unknown as { id?: string; mode?: string; line_items?: { data?: Array<Record<string, unknown>> } } | undefined;
+            if (!sess) {
+              dump.checkout = "aucune session trouvee pour ce payment_intent";
+            } else {
+              const items = sess.line_items?.data || [];
+              dump.checkout = {
+                session_id: sess.id,
+                mode: sess.mode,
+                nb_line_items: items.length,
+                line0: items[0]
+                  ? { keys: Object.keys(items[0]), description: items[0].description, price: items[0].price }
+                  : null,
               };
             }
-            // Fallback : via la subscription (souvent la source fiable du produit)
-            if (invAny.subscription && typeof invAny.subscription === "string") {
-              const sub = await stripe.subscriptions.retrieve(invAny.subscription, {
-                expand: ["items.data.price.product"],
-              });
-              subDump = (sub.items?.data || []).map((it) => {
-                const price = it.price as unknown as { id?: string; product?: unknown };
-                return { price_id: price?.id, product: price?.product };
-              });
-            }
           } catch (e) {
-            lineDump = { error: e instanceof Error ? e.message : "unknown" };
+            dump.checkout = { error: e instanceof Error ? e.message : "unknown" };
           }
         }
-        debugDump.push({ charge_id: r.charge_id, email: r.email, invoice_id: invId, line0: lineDump, subscription_items: subDump });
+        debugDump.push(dump);
       }
 
       const { product_ids } = await fetchProductInfo(stripe, charge);
