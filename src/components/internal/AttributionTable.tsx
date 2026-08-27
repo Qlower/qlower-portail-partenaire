@@ -6,6 +6,7 @@ import { ChevronDown, History, MessageSquare, Flag, Plus, Search, Wallet, Scale,
 import EngagementPanel from "./EngagementPanel";
 import DecommissionDecisionModal, { type DecommissionRowData } from "./DecommissionDecisionModal";
 import { hubspotSearchByEmailUrl } from "@/lib/hubspot-urls";
+import { LAFORET_FAMILY } from "@/lib/objective-scope";
 
 export interface CommercialOption {
   id: string;
@@ -966,11 +967,17 @@ function RowComponent({
   const isRefundLedger =
     row.auto_source === "stripe_refund_ledger" ||
     row.auto_source === "manual_refund_ledger";
+  // Abo Laforêt (marque grise) : hors objectifs / commissions, NON attribuable.
+  // Surligné en rouge clair pour qu'on ne s'y trompe pas.
+  const isLaforet = row.family === LAFORET_FAMILY;
   // Highlight subtilement les lignes qui me concernent dans la vue équipe.
-  const rowClass = isMine
-    ? "border-t border-gray-100 hover:bg-gray-50/40 bg-blue-50/30"
-    : "border-t border-gray-100 hover:bg-gray-50/40";
-  const cellBg = isMine ? "bg-blue-50/30" : "bg-white";
+  // Laforet (rouge clair) est prioritaire sur "mes lignes" (bleu).
+  const rowClass = isLaforet
+    ? "border-t border-red-100 bg-red-50 hover:bg-red-100/70"
+    : isMine
+      ? "border-t border-gray-100 hover:bg-gray-50/40 bg-blue-50/30"
+      : "border-t border-gray-100 hover:bg-gray-50/40";
+  const cellBg = isLaforet ? "bg-red-50" : isMine ? "bg-blue-50/30" : "bg-white";
   return (
     <>
       <tr className={rowClass}>
@@ -1034,12 +1041,27 @@ function RowComponent({
             )}
           </div>
         </td>
-        <td className="px-2 py-2">{row.family || "—"}</td>
+        <td className="px-2 py-2">
+          {isLaforet ? (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold text-red-700 bg-red-100 border border-red-200">
+              🏢 Abo Laforêt
+            </span>
+          ) : (
+            row.family || "—"
+          )}
+        </td>
         <td className="px-2 py-2 text-[11px] text-gray-500">
           {row.newbiz_1m || "—"} / {row.newbiz_3m || "—"}
         </td>
         <td className="px-2 py-2">
-          {editable ? (
+          {isLaforet ? (
+            <span
+              className="inline-flex items-center gap-1 text-[11px] text-red-700 font-medium"
+              title="Abonnement marque grise Laforêt : hors objectifs et hors commissions. Non attribuable à un commercial."
+            >
+              🔒 Non attribuable
+            </span>
+          ) : editable ? (
             <div className="flex items-center gap-1.5">
               <select
                 value={row.override_commercial_id || ""}

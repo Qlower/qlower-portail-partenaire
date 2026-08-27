@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { verifySales } from "@/lib/sales-auth";
 import { notifyAttributionChange } from "@/lib/sales-notifications";
+import { LAFORET_FAMILY } from "@/lib/objective-scope";
 
 interface OverrideBody {
   commercial_id?: string | null;     // commercials.id; null/empty = clear override
@@ -32,11 +33,19 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ charge
   // Fetch current state of the row + commercial names for the audit log
   const { data: row, error: rowErr } = await sb
     .from("attribution_rows")
-    .select("charge_id, run_id, auto_commercial_id, override_commercial_id, flagged_for_review")
+    .select("charge_id, run_id, auto_commercial_id, override_commercial_id, flagged_for_review, family")
     .eq("charge_id", chargeId)
     .maybeSingle();
   if (rowErr || !row) {
     return NextResponse.json({ error: "Row not found" }, { status: 404 });
+  }
+  // Abo Laforêt (marque grise) : NON attribuable. Aucun commercial ne doit être
+  // crédité (hors objectifs / hors commissions). On refuse toute attribution.
+  if (row.family === LAFORET_FAMILY && body.commercial_id) {
+    return NextResponse.json(
+      { error: "Ligne Abo Laforêt : non attribuable (hors objectifs et hors commissions)." },
+      { status: 422 },
+    );
   }
   // Capture si la ligne ÉTAIT flaggée AVANT le update — sinon le clear de
   // flagged_for_review qu'on fait plus bas masquerait l'info au moment d'envoyer
