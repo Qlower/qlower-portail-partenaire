@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
             const sessions = await stripe.checkout.sessions.list({
               payment_intent: piId,
               limit: 1,
-              expand: ["data.line_items.data.price.product"],
+              expand: ["data.line_items.data.price"],
             });
             const sess = sessions.data[0] as unknown as { id?: string; mode?: string; line_items?: { data?: Array<Record<string, unknown>> } } | undefined;
             if (!sess) {

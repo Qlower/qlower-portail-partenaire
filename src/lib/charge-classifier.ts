@@ -121,10 +121,13 @@ export async function fetchProductInfo(
         : charge.payment_intent?.id;
     if (pi) {
       try {
+        // Expand limité à 4 niveaux par Stripe → on s'arrête à `price`
+        // (price.product est déjà présent sous forme d'id string, suffisant
+        // pour la détection Laforet).
         const sessions = await stripe.checkout.sessions.list({
           payment_intent: pi,
           limit: 1,
-          expand: ["data.line_items.data.price.product"],
+          expand: ["data.line_items.data.price"],
         });
         const sess = sessions.data[0] as unknown as { line_items?: { data?: InvoiceLineItemLegacy[] } } | undefined;
         const items = (sess?.line_items?.data || []) as InvoiceLineItemLegacy[];
