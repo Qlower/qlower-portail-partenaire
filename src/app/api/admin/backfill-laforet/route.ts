@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   const auth = await verifyAdminOrSalesAdmin(request);
   if (!auth.ok) return auth.error;
 
-  let body: { since?: string; limit?: number; dry_run?: boolean } = {};
+  let body: { since?: string; limit?: number; dry_run?: boolean; email?: string } = {};
   try {
     body = await request.json();
   } catch {
@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
   const since = body.since || "2026-06-01";
   const limit = Math.max(1, Math.min(1000, body.limit || 300));
   const dryRun = !!body.dry_run;
+  const emailFilter = (body.email || "").trim().toLowerCase();
 
   const sb = createServiceClient();
   const start = Date.now();
@@ -66,18 +67,21 @@ export async function POST(request: NextRequest) {
 
   // Charges réelles à examiner : pas déjà taguées Laforet, pas des lignes ledger
   // de refund, sur un mois >= since. On joint le run pour connaître le verrou.
-  const { data: rows } = await sb
+  let q = sb
     .from("attribution_rows")
-    .select("charge_id, created_at, family, monthly_runs!inner(year_month, locked)")
+    .select("charge_id, created_at, family, email, monthly_runs!inner(year_month, locked)")
     .gte("created_at", `${since}T00:00:00Z`)
     .neq("family", LAFORET_FAMILY)
     .order("created_at", { ascending: false })
     .limit(limit);
+  if (emailFilter) q = q.ilike("email", emailFilter);
+  const { data: rows } = await q;
 
   type Row = {
     charge_id: string;
     created_at: string;
     family: string | null;
+    email: string | null;
     monthly_runs?: { year_month: string; locked: boolean };
   };
   const candidates = ((rows as unknown as Row[]) || []).filter(
@@ -93,6 +97,11 @@ export async function POST(request: NextRequest) {
     errors: [] as Array<{ charge_id: string; error: string }>,
     time_budget_exceeded: false,
   };
+  // Diagnostic : compte les IDs produits Stripe rencontrés (pour comprendre
+  // pourquoi rien ne matche — ex. produit Laforet non listé dans les 5 IDs).
+  const productSeen = new Map<string, number>();
+  // Détail par charge (utile surtout quand on cible un email précis).
+  const perCharge: Array<{ charge_id: string; email: string | null; product_ids: string[]; is_laforet: boolean }> = [];
 
   for (const r of candidates) {
     if (Date.now() - start > TIME_BUDGET_MS) {
@@ -104,6 +113,11 @@ export async function POST(request: NextRequest) {
       const charge = await stripe.charges.retrieve(r.charge_id);
       const { product_ids } = await fetchProductInfo(stripe, charge);
       const isLaforet = product_ids.some((id) => LAFORET_PRODUCT_IDS.has(id));
+      // Diagnostic
+      for (const pid of product_ids) productSeen.set(pid, (productSeen.get(pid) || 0) + 1);
+      if (emailFilter || perCharge.length < 20) {
+        perCharge.push({ charge_id: r.charge_id, email: r.email, product_ids, is_laforet: isLaforet });
+      }
       if (!isLaforet) continue;
 
       const ym = r.monthly_runs?.year_month || "";
@@ -136,5 +150,10 @@ export async function POST(request: NextRequest) {
     ...stats,
     tagged_count: stats.tagged.length,
     locked_months_touched: [...stats.locked_months_touched],
+    product_ids_seen: [...productSeen.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, count]) => ({ id, count, is_laforet: LAFORET_PRODUCT_IDS.has(id) })),
+    laforet_ids_configured: [...LAFORET_PRODUCT_IDS],
+    sample: perCharge,
   });
 }
