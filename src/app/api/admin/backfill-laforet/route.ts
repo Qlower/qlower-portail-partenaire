@@ -60,7 +60,6 @@ export async function POST(request: NextRequest) {
   const limit = Math.max(1, Math.min(1000, body.limit || 300));
   const dryRun = !!body.dry_run;
   const emailFilter = (body.email || "").trim().toLowerCase();
-  const debug = !!(body as { debug?: boolean }).debug;
 
   const sb = createServiceClient();
   const start = Date.now();
@@ -103,7 +102,6 @@ export async function POST(request: NextRequest) {
   const productSeen = new Map<string, number>();
   // Détail par charge (utile surtout quand on cible un email précis).
   const perCharge: Array<{ charge_id: string; email: string | null; product_ids: string[]; is_laforet: boolean }> = [];
-  const debugDump: Array<Record<string, unknown>> = [];
 
   for (const r of candidates) {
     if (Date.now() - start > TIME_BUDGET_MS) {
@@ -113,43 +111,6 @@ export async function POST(request: NextRequest) {
     stats.examined++;
     try {
       const charge = await stripe.charges.retrieve(r.charge_id);
-
-      // DEBUG : dump la structure brute (facture ET checkout session) pour
-      // localiser l'id produit (structure Stripe variable selon le mode de paiement).
-      if (debug && debugDump.length < 3) {
-        const chAny = charge as unknown as { invoice?: string | null; payment_intent?: string | { id?: string } | null };
-        const invId = chAny.invoice || null;
-        const piId = typeof chAny.payment_intent === "string" ? chAny.payment_intent : chAny.payment_intent?.id || null;
-        const dump: Record<string, unknown> = { charge_id: r.charge_id, email: r.email, invoice_id: invId, payment_intent: piId };
-        // Checkout session (cas Payment Link / paiement sans facture)
-        if (piId) {
-          try {
-            const sessions = await stripe.checkout.sessions.list({
-              payment_intent: piId,
-              limit: 1,
-              expand: ["data.line_items.data.price"],
-            });
-            const sess = sessions.data[0] as unknown as { id?: string; mode?: string; line_items?: { data?: Array<Record<string, unknown>> } } | undefined;
-            if (!sess) {
-              dump.checkout = "aucune session trouvee pour ce payment_intent";
-            } else {
-              const items = sess.line_items?.data || [];
-              dump.checkout = {
-                session_id: sess.id,
-                mode: sess.mode,
-                nb_line_items: items.length,
-                line0: items[0]
-                  ? { keys: Object.keys(items[0]), description: items[0].description, price: items[0].price }
-                  : null,
-              };
-            }
-          } catch (e) {
-            dump.checkout = { error: e instanceof Error ? e.message : "unknown" };
-          }
-        }
-        debugDump.push(dump);
-      }
-
       const { product_ids } = await fetchProductInfo(stripe, charge);
       const isLaforet = product_ids.some((id) => LAFORET_PRODUCT_IDS.has(id));
       // Diagnostic
@@ -183,6 +144,21 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Résout le NOM de chaque produit Stripe rencontré (dry-run uniquement) —
+  // sert à construire la table produit → famille pour fiabiliser la
+  // classification (aujourd'hui devinée par regex/montant).
+  const nameById = new Map<string, string>();
+  if (dryRun) {
+    for (const id of productSeen.keys()) {
+      try {
+        const p = await stripe.products.retrieve(id);
+        nameById.set(id, p.name || "");
+      } catch {
+        nameById.set(id, "(introuvable)");
+      }
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     duration_ms: Date.now() - start,
@@ -191,9 +167,8 @@ export async function POST(request: NextRequest) {
     locked_months_touched: [...stats.locked_months_touched],
     product_ids_seen: [...productSeen.entries()]
       .sort((a, b) => b[1] - a[1])
-      .map(([id, count]) => ({ id, count, is_laforet: LAFORET_PRODUCT_IDS.has(id) })),
+      .map(([id, count]) => ({ id, name: nameById.get(id) || null, count, is_laforet: LAFORET_PRODUCT_IDS.has(id) })),
     laforet_ids_configured: [...LAFORET_PRODUCT_IDS],
     sample: perCharge,
-    debug_dump: debugDump,
   });
 }
