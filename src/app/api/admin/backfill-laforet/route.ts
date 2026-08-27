@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
   const limit = Math.max(1, Math.min(1000, body.limit || 300));
   const dryRun = !!body.dry_run;
   const emailFilter = (body.email || "").trim().toLowerCase();
+  const debug = !!(body as { debug?: boolean }).debug;
 
   const sb = createServiceClient();
   const start = Date.now();
@@ -102,6 +103,7 @@ export async function POST(request: NextRequest) {
   const productSeen = new Map<string, number>();
   // Détail par charge (utile surtout quand on cible un email précis).
   const perCharge: Array<{ charge_id: string; email: string | null; product_ids: string[]; is_laforet: boolean }> = [];
+  const debugDump: Array<Record<string, unknown>> = [];
 
   for (const r of candidates) {
     if (Date.now() - start > TIME_BUDGET_MS) {
@@ -111,6 +113,47 @@ export async function POST(request: NextRequest) {
     stats.examined++;
     try {
       const charge = await stripe.charges.retrieve(r.charge_id);
+
+      // DEBUG : dump la structure brute de la 1ere ligne de facture pour
+      // comprendre ou est range l'id produit (structure Stripe variable).
+      if (debug && debugDump.length < 3) {
+        const chAny = charge as unknown as { invoice?: string | null };
+        const invId = chAny.invoice || null;
+        let lineDump: unknown = null;
+        let subDump: unknown = null;
+        if (invId && typeof invId === "string") {
+          try {
+            const inv = await stripe.invoices.retrieve(invId, {
+              expand: ["lines.data.price.product", "lines.data.pricing.price_details"],
+            });
+            const l0 = (inv.lines?.data?.[0] || null) as unknown as Record<string, unknown> | null;
+            const invAny = inv as unknown as { subscription?: string | null };
+            if (l0) {
+              lineDump = {
+                keys: Object.keys(l0),
+                description: l0.description,
+                price: l0.price,
+                pricing: l0.pricing,
+                plan: (l0 as { plan?: unknown }).plan,
+              };
+            }
+            // Fallback : via la subscription (souvent la source fiable du produit)
+            if (invAny.subscription && typeof invAny.subscription === "string") {
+              const sub = await stripe.subscriptions.retrieve(invAny.subscription, {
+                expand: ["items.data.price.product"],
+              });
+              subDump = (sub.items?.data || []).map((it) => {
+                const price = it.price as unknown as { id?: string; product?: unknown };
+                return { price_id: price?.id, product: price?.product };
+              });
+            }
+          } catch (e) {
+            lineDump = { error: e instanceof Error ? e.message : "unknown" };
+          }
+        }
+        debugDump.push({ charge_id: r.charge_id, email: r.email, invoice_id: invId, line0: lineDump, subscription_items: subDump });
+      }
+
       const { product_ids } = await fetchProductInfo(stripe, charge);
       const isLaforet = product_ids.some((id) => LAFORET_PRODUCT_IDS.has(id));
       // Diagnostic
@@ -155,5 +198,6 @@ export async function POST(request: NextRequest) {
       .map(([id, count]) => ({ id, count, is_laforet: LAFORET_PRODUCT_IDS.has(id) })),
     laforet_ids_configured: [...LAFORET_PRODUCT_IDS],
     sample: perCharge,
+    debug_dump: debugDump,
   });
 }
