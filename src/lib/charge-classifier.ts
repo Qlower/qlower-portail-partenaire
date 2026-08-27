@@ -87,37 +87,64 @@ export async function fetchProductInfo(
 ): Promise<{ product_name: string | null; family: string; product_ids: string[] }> {
   const amount_eur = charge.amount / 100;
   const chargeWithInv = charge as ChargeWithInvoice;
+  let product_ids: string[] = [];
+  let product_name: string | null = null;
 
+  // ── Cas 1 : charge facturée (abonnement Stripe) → invoice.lines ──
   if (chargeWithInv.invoice && typeof chargeWithInv.invoice === "string") {
     try {
       const invoice = await stripe.invoices.retrieve(chargeWithInv.invoice, {
         expand: ["lines.data.price.product"],
       });
       const lines = (invoice.lines.data as unknown as InvoiceLineItemLegacy[]) || [];
-      const product_ids = lines.map(productIdOfLine).filter(Boolean) as string[];
+      product_ids = lines.map(productIdOfLine).filter(Boolean) as string[];
       const firstLine = lines[0];
       if (firstLine) {
         const productRef = firstLine.price?.product;
-        if (productRef && typeof productRef === "object" && "name" in productRef) {
-          const name = (productRef as Stripe.Product).name || firstLine.description || null;
-          return { product_name: name, family: inferFamily(name, amount_eur), product_ids };
-        }
-        if (firstLine.description) {
-          return {
-            product_name: firstLine.description,
-            family: inferFamily(firstLine.description, amount_eur),
-            product_ids,
-          };
-        }
+        product_name =
+          productRef && typeof productRef === "object" && "name" in productRef
+            ? (productRef as Stripe.Product).name || firstLine.description || null
+            : firstLine.description || null;
       }
-      return { product_name: charge.description || null, family: inferFamily(charge.description || null, amount_eur), product_ids };
     } catch (e) {
       console.warn("[charge-classifier] invoice fetch failed:", e instanceof Error ? e.message : e);
     }
   }
 
-  const desc = charge.description || null;
-  return { product_name: desc, family: inferFamily(desc, amount_eur), product_ids: [] };
+  // ── Cas 2 : paiement via Payment Link / Checkout (pas de facture) ──
+  // Le produit vit sur les line items de la Checkout Session, retrouvée par
+  // le payment_intent de la charge. C'est le cas des abo Laforêt (marque grise).
+  if (product_ids.length === 0) {
+    const pi =
+      typeof charge.payment_intent === "string"
+        ? charge.payment_intent
+        : charge.payment_intent?.id;
+    if (pi) {
+      try {
+        const sessions = await stripe.checkout.sessions.list({
+          payment_intent: pi,
+          limit: 1,
+          expand: ["data.line_items.data.price.product"],
+        });
+        const sess = sessions.data[0] as unknown as { line_items?: { data?: InvoiceLineItemLegacy[] } } | undefined;
+        const items = (sess?.line_items?.data || []) as InvoiceLineItemLegacy[];
+        const ids = items.map(productIdOfLine).filter(Boolean) as string[];
+        if (ids.length) product_ids = ids;
+        if (!product_name && items[0]) {
+          const pr = items[0].price?.product;
+          product_name =
+            pr && typeof pr === "object" && "name" in pr
+              ? (pr as Stripe.Product).name || items[0].description || null
+              : items[0].description || null;
+        }
+      } catch (e) {
+        console.warn("[charge-classifier] checkout session lookup failed:", e instanceof Error ? e.message : e);
+      }
+    }
+  }
+
+  if (!product_name) product_name = charge.description || null;
+  return { product_name, family: inferFamily(product_name, amount_eur), product_ids };
 }
 
 /**
