@@ -9,6 +9,7 @@
 
 import Stripe from "stripe";
 import { LAFORET_FAMILY, LAFORET_PRODUCT_IDS } from "@/lib/objective-scope";
+import { familyForProductIds } from "@/lib/product-families";
 
 // Patterns inférés depuis les données Avril 2026 (10 mois de signaux V1).
 // Ordre = priorité : le 1er match gagne.
@@ -207,12 +208,14 @@ export async function enrichCharge(
     fetchProductInfo(stripe, charge),
     inferNewBiz(stripe, charge),
   ]);
-  // Abo Laforêt (marque grise) → hors objectifs / hors commissions.
-  // Détecté par l'id produit Stripe (fiable) ; on force la family qui sert
-  // à la fois de label et de signal d'exclusion.
+  // Résolution de la famille par ID produit Stripe (fiable), dans l'ordre :
+  //   1. produit Laforêt   → "Abo Laforet" (hors objectifs / commissions)
+  //   2. produit connu     → famille mappée (product-families)
+  //   3. inconnu           → fallback regex/montant (family déjà calculée)
   const isLaforet = product_ids.some((id) => LAFORET_PRODUCT_IDS.has(id));
+  const mappedFamily = isLaforet ? LAFORET_FAMILY : familyForProductIds(product_ids);
   return {
-    family: isLaforet ? LAFORET_FAMILY : family,
+    family: mappedFamily || family,
     product_name,
     newbiz_1m,
     newbiz_3m,
