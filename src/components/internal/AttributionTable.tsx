@@ -248,15 +248,11 @@ export default function AttributionTable({
     if (filterMode === "mine" && r.effective_commercial_id !== myCommercialId) return false;
     if (filterMode === "flagged" && !r.flagged_for_review) return false;
     if (filterMode === "manual" && !r.is_override) return false;
-    // "À vérifier" = attribution auto à faible confiance (score 1→5, non manuelle).
-    // On exclut les score 0 (aucun signal) et surtout les Abo Laforêt (non
-    // attribuables) pour rester cohérent avec le compteur du filtre.
+    // "À vérifier" = attribution auto à faible confiance (score < 6, non manuelle),
+    // score 0 INCLUS (à contrôler). On exclut juste les Abo Laforêt (non attribuables).
     if (
       filterMode === "low_score" &&
-      (r.is_override ||
-        r.family === LAFORET_FAMILY ||
-        (r.auto_score ?? 0) <= 0 ||
-        (r.auto_score ?? 0) >= 6)
+      (r.is_override || r.family === LAFORET_FAMILY || (r.auto_score ?? 0) >= 6)
     )
       return false;
     if (filterMode === "refunded" && !(r.amount_refunded_eur && r.amount_refunded_eur > 0)) return false;
@@ -514,7 +510,7 @@ export default function AttributionTable({
           { v: "mine", l: `👤 Mes ventes (${myRowsCount})`, hidden: !myCommercialId },
           { v: "flagged", l: `🚩 Contestées (${rows.filter((r) => r.flagged_for_review).length})`, hidden: false },
           { v: "manual", l: `✎ Manuelles (${rows.filter((r) => r.is_override).length})`, hidden: false },
-          { v: "low_score", l: `À vérifier (${rows.filter((r) => !r.is_override && r.family !== LAFORET_FAMILY && (r.auto_score ?? 0) > 0 && (r.auto_score ?? 0) < 6).length})`, hidden: false },
+          { v: "low_score", l: `À vérifier (${rows.filter((r) => !r.is_override && r.family !== LAFORET_FAMILY && (r.auto_score ?? 0) < 6).length})`, hidden: false },
           { v: "refunded", l: `↩ Remboursées (${rows.filter((r) => r.amount_refunded_eur && r.amount_refunded_eur > 0).length})`, hidden: rows.filter((r) => r.amount_refunded_eur && r.amount_refunded_eur > 0).length === 0 },
         ] as const).filter((opt) => !opt.hidden).map((opt) => (
           <button
