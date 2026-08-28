@@ -8,6 +8,16 @@ import DecommissionDecisionModal, { type DecommissionRowData } from "./Decommiss
 import { hubspotSearchByEmailUrl } from "@/lib/hubspot-urls";
 import { LAFORET_FAMILY } from "@/lib/objective-scope";
 
+// Remplace les UUID de commerciaux présents dans un texte libre (ex. la raison
+// d'un refund ledger : "…au négo b472f9ba-…") par le nom réel du commercial.
+function humanizeCommercialIds(text: string | null | undefined, nameById: Map<string, string>): string {
+  if (!text) return "—";
+  return text.replace(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+    (uuid) => nameById.get(uuid) || uuid,
+  );
+}
+
 export interface CommercialOption {
   id: string;
   name: string;
@@ -976,6 +986,8 @@ function RowComponent({
   // Abo Laforêt (marque grise) : hors objectifs / commissions, NON attribuable.
   // Surligné en rouge clair pour qu'on ne s'y trompe pas.
   const isLaforet = row.family === LAFORET_FAMILY;
+  // Map id → nom pour humaniser les UUID dans la raison (refund ledger, etc.).
+  const commercialNameById = new Map(commercials.map((c) => [c.id, c.name]));
   // Highlight subtilement les lignes qui me concernent dans la vue équipe.
   // Laforet (rouge clair) est prioritaire sur "mes lignes" (bleu).
   const rowClass = isLaforet
@@ -1141,7 +1153,7 @@ function RowComponent({
         </td>
         <td className="px-2 py-2 text-[11px]">
           <div className="font-medium text-gray-800">{row.is_override ? "Manuel" : (row.auto_source || "—")}</div>
-          <div className="text-gray-500 leading-snug">{row.auto_reason || "—"}</div>
+          <div className="text-gray-500 leading-snug">{humanizeCommercialIds(row.auto_reason, commercialNameById)}</div>
         </td>
         <td className="px-2 py-2 whitespace-nowrap text-right">
           <button
