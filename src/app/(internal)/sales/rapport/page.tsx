@@ -103,7 +103,7 @@ export default async function RapportPage({
       </div>
 
       {/* Status banner */}
-      {(data.flaggedCount > 0 || data.locked) && (
+      {(data.flaggedCount > 0 || data.locked || data.autonomeNet > 0 || data.laforetCount > 0) && (
         <div className="flex flex-wrap gap-2">
           {data.flaggedCount > 0 && (
             <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 text-orange-800 text-sm rounded-lg">
@@ -143,6 +143,13 @@ export default async function RapportPage({
               <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">CA reconductions</div>
               <div className="text-2xl font-bold text-gray-700 tabular-nums">{fmtEur(data.renewalsTotal)}</div>
             </div>
+            {data.laforetCount > 0 && (
+              <div className="text-right border-l border-gray-100 pl-6">
+                <div className="text-[10px] uppercase tracking-wider text-[#0A3855]/60 font-semibold">CA Abo Laforêt</div>
+                <div className="text-2xl font-bold text-[#0A3855] tabular-nums">{fmtEur(data.laforetNet)}</div>
+                <div className="text-[10px] text-gray-400">hors objectif · {data.laforetCount} vente{data.laforetCount > 1 ? "s" : ""}</div>
+              </div>
+            )}
             <div className="text-right border-l border-gray-100 pl-6">
               <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">CA total incl. reconductions</div>
               <div className="text-2xl font-bold text-[#0A3855] tabular-nums">{fmtEur(data.totalCA_TTC + data.renewalsTotal)}</div>
