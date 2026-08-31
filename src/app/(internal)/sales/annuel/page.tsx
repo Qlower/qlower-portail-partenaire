@@ -19,7 +19,13 @@ export default async function AnnuelPage({
 }) {
   const params = await searchParams;
   const available = await loadAvailableMonths();
-  const yearsWithData = [...new Set(available.map((m) => m.year_month.slice(0, 4)))].sort().reverse();
+  // On ne propose que les années réellement exploitées (>= 2026). 2024/2025
+  // n'ont pas de stats fiables → on les masque du sélecteur.
+  const MIN_YEAR = 2026;
+  const yearsWithData = [...new Set(available.map((m) => m.year_month.slice(0, 4)))]
+    .filter((y) => Number(y) >= MIN_YEAR)
+    .sort()
+    .reverse();
   const nowYear = new Date().getUTCFullYear();
   const yearParam = Array.isArray(params.year) ? params.year[0] : params.year;
   const year = Number(yearParam) || Number(yearsWithData[0]) || nowYear;
