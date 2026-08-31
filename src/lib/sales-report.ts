@@ -798,10 +798,9 @@ export async function loadAnnualData(year: number): Promise<AnnualData> {
   const sb = createServiceClient();
   const prefix = `${year}-`;
 
-  const [{ data: targets }, { data: runs }, { data: renewals }] = await Promise.all([
+  const [{ data: targets }, { data: runs }] = await Promise.all([
     sb.from("team_monthly_targets").select("year_month, target_eur").like("year_month", `${prefix}%`),
     sb.from("monthly_runs").select("id, year_month, locked").like("year_month", `${prefix}%`),
-    sb.from("subscription_renewals").select("year_month, amount_eur").like("year_month", `${prefix}%`),
   ]);
 
   const targetByMonth = new Map<string, number>();
@@ -814,10 +813,20 @@ export async function loadAnnualData(year: number): Promise<AnnualData> {
     runIdToMonth.set(r.id as string, r.year_month as string);
   }
 
+  // Reconductions de l'année — paginées (peuvent dépasser 1000 sur l'année).
   const renewalsByMonth = new Map<string, number>();
-  for (const r of renewals || []) {
-    const k = r.year_month as string;
-    renewalsByMonth.set(k, (renewalsByMonth.get(k) || 0) + (Number(r.amount_eur) || 0));
+  for (let from = 0; ; from += 1000) {
+    const { data: renewals, error } = await sb
+      .from("subscription_renewals")
+      .select("year_month, amount_eur")
+      .like("year_month", `${prefix}%`)
+      .range(from, from + 999);
+    if (error || !renewals || renewals.length === 0) break;
+    for (const r of renewals) {
+      const k = r.year_month as string;
+      renewalsByMonth.set(k, (renewalsByMonth.get(k) || 0) + (Number(r.amount_eur) || 0));
+    }
+    if (renewals.length < 1000) break;
   }
 
   // Toutes les lignes d'attribution de l'année, agrégées par mois.
@@ -825,22 +834,30 @@ export async function loadAnnualData(year: number): Promise<AnnualData> {
   const laforetByMonth = new Map<string, number>();
   const runIds = [...runIdToMonth.keys()];
   if (runIds.length > 0) {
-    const { data: rows } = await sb
-      .from("attribution_rows")
-      .select("run_id, amount_net_eur, commissionable_amount_eur, family")
-      .in("run_id", runIds);
-    for (const r of rows || []) {
-      const ym = runIdToMonth.get(r.run_id as string);
-      if (!ym) continue;
-      const amt =
-        (r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
-          ? Number(r.commissionable_amount_eur)
-          : Number(r.amount_net_eur)) || 0;
-      if (isExcludedFromObjectives(r)) {
-        laforetByMonth.set(ym, (laforetByMonth.get(ym) || 0) + amt);
-      } else {
-        caByMonth.set(ym, (caByMonth.get(ym) || 0) + amt);
+    // PostgREST plafonne à 1000 lignes par requête. Sur une année entière on
+    // dépasse largement → on pagine, sinon les derniers mois sont tronqués.
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data: rows, error } = await sb
+        .from("attribution_rows")
+        .select("run_id, amount_net_eur, commissionable_amount_eur, family")
+        .in("run_id", runIds)
+        .range(from, from + PAGE - 1);
+      if (error || !rows || rows.length === 0) break;
+      for (const r of rows) {
+        const ym = runIdToMonth.get(r.run_id as string);
+        if (!ym) continue;
+        const amt =
+          (r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+            ? Number(r.commissionable_amount_eur)
+            : Number(r.amount_net_eur)) || 0;
+        if (isExcludedFromObjectives(r)) {
+          laforetByMonth.set(ym, (laforetByMonth.get(ym) || 0) + amt);
+        } else {
+          caByMonth.set(ym, (caByMonth.get(ym) || 0) + amt);
+        }
       }
+      if (rows.length < PAGE) break;
     }
   }
 
