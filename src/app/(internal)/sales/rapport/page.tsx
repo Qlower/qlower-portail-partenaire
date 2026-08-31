@@ -25,10 +25,15 @@ const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 export default async function RapportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ym?: string | string[] }>;
+  searchParams: Promise<{ ym?: string | string[]; share?: string | string[] }>;
 }) {
   const params = await searchParams;
   const { yearMonth, available: availableMonths } = await resolveYearMonthWithFallback(params.ym);
+  // Mode partage : masque les données sensibles (commissions + CA/perf par
+  // commercial) pour partager le rapport à d'autres équipes (produit, dev,
+  // marketing…). Bascule via ?share=1.
+  const shareMode = (Array.isArray(params.share) ? params.share[0] : params.share) === "1";
+  const shareHref = shareMode ? `?ym=${yearMonth}` : `?ym=${yearMonth}&share=1`;
   const data = await loadReportData(yearMonth);
   const monthLabel = formatYearMonthFull(yearMonth);
   const teamPct = data.teamObj_eur > 0 ? (data.totalCA_TTC / data.teamObj_eur) * 100 : 0;
@@ -55,8 +60,31 @@ export default async function RapportPage({
           </div>
           <h1 className="text-3xl font-bold text-[#0A3855]">{monthLabel}</h1>
         </div>
-        <MonthSelector current={yearMonth} available={availableMonths} />
+        <div className="flex items-center gap-2">
+          <a
+            href={shareHref}
+            className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+              shareMode
+                ? "bg-[#0A3855] text-white border-[#0A3855] hover:bg-[#0A3855]/90"
+                : "bg-white text-[#0A3855] border-[#0A3855]/20 hover:bg-[#E5EDF1]/50"
+            }`}
+            title={shareMode ? "Revenir à la vue complète (interne équipe commerciale)" : "Masquer commissions & CA par commercial pour partager hors équipe commerciale"}
+          >
+            <Share2 className="w-4 h-4" />
+            {shareMode ? "Quitter le mode partage" : "Mode partage"}
+          </a>
+          <MonthSelector current={yearMonth} available={availableMonths} />
+        </div>
       </div>
+
+      {shareMode && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 text-sm text-amber-800 flex items-center gap-2">
+          <Share2 className="w-4 h-4 shrink-0" />
+          <span>
+            <strong>Mode partage actif</strong> — les commissions et le CA/classement par commercial sont masqués. Vue adaptée pour partager hors équipe commerciale (produit, dev, marketing…).
+          </span>
+        </div>
+      )}
 
       {/* Sommaire — clique pour scroller à la section */}
       <nav className="bg-white border border-gray-200 rounded-xl px-5 py-3 text-xs flex flex-wrap items-center gap-x-4 gap-y-2 text-gray-600">
@@ -65,7 +93,7 @@ export default async function RapportPage({
         <a href="#composition" className="hover:text-[#0A3855] hover:underline">2. Composition du CA</a>
         <a href="#provenance" className="hover:text-[#0A3855] hover:underline">3. Provenance</a>
         <a href="#funnel" className="hover:text-[#0A3855] hover:underline">4. Funnel & délais</a>
-        <a href="#negos" className="hover:text-[#0A3855] hover:underline">5. Performance négos</a>
+        {!shareMode && <a href="#negos" className="hover:text-[#0A3855] hover:underline">5. Performance négos</a>}
         <a href="#top-clients" className="hover:text-[#0A3855] hover:underline">6. Top clients</a>
         <a href="#distribution" className="hover:text-[#0A3855] hover:underline">7. Panier</a>
       </nav>
@@ -90,16 +118,18 @@ export default async function RapportPage({
           sub={`${data.totalRows} ventes`}
           highlight={teamObjReached ? "green" : teamPct >= 70 ? "primary" : "amber"}
         />
-        <KpiCard
-          label="Commissions à verser"
-          value={fmtEurCents(data.totalCommissionsNet)}
-          sub={
-            data.totalRetenues > 0
-              ? `Brut ${fmtEurCents(data.totalCommissions)} − retenues ${fmtEurCents(data.totalRetenues)}`
-              : `${data.negos.filter((n) => n.commission_net_eur > 0).length} négos rémunérés`
-          }
-          highlight="primary"
-        />
+        {!shareMode && (
+          <KpiCard
+            label="Commissions à verser"
+            value={fmtEurCents(data.totalCommissionsNet)}
+            sub={
+              data.totalRetenues > 0
+                ? `Brut ${fmtEurCents(data.totalCommissions)} − retenues ${fmtEurCents(data.totalRetenues)}`
+                : `${data.negos.filter((n) => n.commission_net_eur > 0).length} négos rémunérés`
+            }
+            highlight="primary"
+          />
+        )}
       </div>
 
       {/* Status banner */}
@@ -388,7 +418,8 @@ export default async function RapportPage({
         />
       </div>
 
-      {/* Per-négo table */}
+      {/* Per-négo table — masqué en mode partage (CA & commissions par commercial) */}
+      {!shareMode && (<>
       <div id="negos" />
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -451,6 +482,7 @@ export default async function RapportPage({
           </tfoot>
         </table>
       </div>
+      </>)}
 
       {/* ====== Section Top clients ====== */}
       <div id="top-clients" />
@@ -542,7 +574,8 @@ export default async function RapportPage({
         })}
       </div>
 
-      {/* Légende des règles de commission */}
+      {/* Légende des règles de commission — masqué en mode partage */}
+      {!shareMode && (
       <details className="bg-blue-50/50 border border-blue-100 rounded-lg p-4 text-xs text-gray-700">
         <summary className="cursor-pointer font-semibold text-[#0A3855]">Barème commissions appliqué</summary>
         <div className="mt-3 space-y-2">
@@ -562,6 +595,7 @@ export default async function RapportPage({
           <div className="text-gray-500 mt-2">CA HT = CA TTC ÷ 1.20 (TVA 20%). Centimes affichés pour le calcul de paie. Si tu réattribues une vente manuellement, la commission suit la nouvelle attribution.</div>
         </div>
       </details>
+      )}
     </div>
   );
 }
