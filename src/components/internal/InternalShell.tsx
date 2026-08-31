@@ -15,6 +15,7 @@ import {
   FileBarChart,
   Copy,
   Trophy,
+  CalendarRange,
 } from "lucide-react";
 
 type InternalRole = "sales" | "sales_admin";
@@ -29,6 +30,7 @@ const NAV_BASE = [
   { href: "/sales/ventes", label: "Détail ventes", icon: TrendingUp, exact: false },
   { href: "/sales/equipe", label: "Classement", icon: Trophy, exact: false },
   { href: "/sales/rapport", label: "Rapport", icon: FileBarChart, exact: false },
+  { href: "/sales/annuel", label: "Bilan annuel", icon: CalendarRange, exact: false },
   { href: "/sales/historique", label: "Historique", icon: History, exact: false },
 ];
 

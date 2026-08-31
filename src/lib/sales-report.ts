@@ -763,3 +763,133 @@ export async function loadReportData(yearMonth: string): Promise<ReportData> {
     trend,
   };
 }
+
+// ============================================================================
+// Vue ANNUELLE — cumul de l'année + objectif annuel (somme des objectifs mensuels)
+// ============================================================================
+
+export interface AnnualMonth {
+  year_month: string;   // "2026-08"
+  monthIndex: number;   // 1..12
+  ca_ttc: number;       // CA net du mois, HORS Abo Laforêt, net des refunds
+  objectif: number;     // objectif équipe du mois (team_monthly_targets)
+  renewals: number;     // reconductions (hors commission)
+  laforet: number;      // CA Abo Laforêt du mois (hors objectif)
+  hasRun: boolean;      // un monthly_run existe pour ce mois
+  locked: boolean;
+}
+
+export interface AnnualData {
+  year: number;
+  months: AnnualMonth[]; // 12 entrées (jan→déc)
+  caTotal: number;       // cumul CA année (hors Laforêt)
+  caHT: number;
+  objAnnual: number;     // somme des objectifs mensuels de l'année
+  attainmentPct: number; // caTotal / objAnnual
+  renewalsTotal: number;
+  laforetTotal: number;
+  // Rythme à date : objectif cumulé vs CA cumulé jusqu'au mois courant inclus
+  elapsedMonths: number;
+  expectedToDate: number;
+  caToDate: number;
+}
+
+export async function loadAnnualData(year: number): Promise<AnnualData> {
+  const sb = createServiceClient();
+  const prefix = `${year}-`;
+
+  const [{ data: targets }, { data: runs }, { data: renewals }] = await Promise.all([
+    sb.from("team_monthly_targets").select("year_month, target_eur").like("year_month", `${prefix}%`),
+    sb.from("monthly_runs").select("id, year_month, locked").like("year_month", `${prefix}%`),
+    sb.from("subscription_renewals").select("year_month, amount_eur").like("year_month", `${prefix}%`),
+  ]);
+
+  const targetByMonth = new Map<string, number>();
+  for (const t of targets || []) targetByMonth.set(t.year_month as string, Number(t.target_eur) || 0);
+
+  const runByMonth = new Map<string, { id: string; locked: boolean }>();
+  const runIdToMonth = new Map<string, string>();
+  for (const r of runs || []) {
+    runByMonth.set(r.year_month as string, { id: r.id as string, locked: !!r.locked });
+    runIdToMonth.set(r.id as string, r.year_month as string);
+  }
+
+  const renewalsByMonth = new Map<string, number>();
+  for (const r of renewals || []) {
+    const k = r.year_month as string;
+    renewalsByMonth.set(k, (renewalsByMonth.get(k) || 0) + (Number(r.amount_eur) || 0));
+  }
+
+  // Toutes les lignes d'attribution de l'année, agrégées par mois.
+  const caByMonth = new Map<string, number>();
+  const laforetByMonth = new Map<string, number>();
+  const runIds = [...runIdToMonth.keys()];
+  if (runIds.length > 0) {
+    const { data: rows } = await sb
+      .from("attribution_rows")
+      .select("run_id, amount_net_eur, commissionable_amount_eur, family")
+      .in("run_id", runIds);
+    for (const r of rows || []) {
+      const ym = runIdToMonth.get(r.run_id as string);
+      if (!ym) continue;
+      const amt =
+        (r.commissionable_amount_eur !== null && r.commissionable_amount_eur !== undefined
+          ? Number(r.commissionable_amount_eur)
+          : Number(r.amount_net_eur)) || 0;
+      if (isExcludedFromObjectives(r)) {
+        laforetByMonth.set(ym, (laforetByMonth.get(ym) || 0) + amt);
+      } else {
+        caByMonth.set(ym, (caByMonth.get(ym) || 0) + amt);
+      }
+    }
+  }
+
+  const now = new Date();
+  const currentYm = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+
+  const months: AnnualMonth[] = [];
+  let caTotal = 0, objAnnual = 0, renewalsTotal = 0, laforetTotal = 0;
+  let elapsedMonths = 0, expectedToDate = 0, caToDate = 0;
+  for (let m = 1; m <= 12; m++) {
+    const ym = `${year}-${String(m).padStart(2, "0")}`;
+    const ca = caByMonth.get(ym) || 0;
+    const objectif = targetByMonth.get(ym) || 0;
+    const rn = renewalsByMonth.get(ym) || 0;
+    const lf = laforetByMonth.get(ym) || 0;
+    const run = runByMonth.get(ym);
+    months.push({
+      year_month: ym,
+      monthIndex: m,
+      ca_ttc: ca,
+      objectif,
+      renewals: rn,
+      laforet: lf,
+      hasRun: !!run,
+      locked: !!run?.locked,
+    });
+    caTotal += ca;
+    objAnnual += objectif;
+    renewalsTotal += rn;
+    laforetTotal += lf;
+    // Rythme à date : mois <= mois courant (pour l'année en cours) ou tous (années passées)
+    if (ym <= currentYm) {
+      elapsedMonths++;
+      expectedToDate += objectif;
+      caToDate += ca;
+    }
+  }
+
+  return {
+    year,
+    months,
+    caTotal,
+    caHT: caTotal / 1.2,
+    objAnnual,
+    attainmentPct: objAnnual > 0 ? (caTotal / objAnnual) * 100 : 0,
+    renewalsTotal,
+    laforetTotal,
+    elapsedMonths,
+    expectedToDate,
+    caToDate,
+  };
+}
