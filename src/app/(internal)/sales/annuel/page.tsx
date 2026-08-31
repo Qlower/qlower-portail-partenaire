@@ -97,12 +97,41 @@ export default async function AnnuelPage({
             style={{ width: `${Math.min(100, data.attainmentPct)}%` }}
           />
         </div>
-        {(data.renewalsTotal > 0 || data.laforetTotal > 0) && (
-          <div className="flex flex-wrap gap-4 mt-3 text-xs text-gray-500">
-            {data.renewalsTotal > 0 && <span>+ {fmtEur(data.renewalsTotal)} de reconductions <span className="text-gray-400">(hors commission)</span></span>}
-            {data.laforetTotal > 0 && <span>+ {fmtEur(data.laforetTotal)} d&apos;Abo Laforêt <span className="text-gray-400">(hors objectif)</span></span>}
+        {data.laforetTotal > 0 && (
+          <div className="mt-3 text-xs text-gray-500">
+            + {fmtEur(data.laforetTotal)} d&apos;Abo Laforêt <span className="text-gray-400">(hors objectif)</span>
           </div>
         )}
+      </div>
+
+      {/* Activité totale incl. reconductions — mis en avant : le CA récurrent
+          fidélisé n'entre pas dans l'objectif mais montre la vraie activité. */}
+      <div className="bg-gradient-to-br from-[#FFF5ED] to-white border border-[#F6CCA4]/60 rounded-xl p-5">
+        <div className="flex flex-wrap items-center justify-between gap-6">
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-[#B8864E] font-semibold">
+              Activité totale {year} — CA + reconductions
+            </div>
+            <div className="text-4xl font-bold text-[#0A3855] mt-1 tabular-nums">
+              {fmtEur(data.caTotal + data.renewalsTotal)}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              dont <strong>{fmtEur(data.caTotal)}</strong> de CA commissionnable + <strong>{fmtEur(data.renewalsTotal)}</strong> de reconductions d&apos;abonnements
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[11px] uppercase tracking-wider text-[#B8864E] font-semibold">Revenus récurrents fidélisés</div>
+            <div className="text-3xl font-bold text-emerald-600 mt-1 tabular-nums">{fmtEur(data.renewalsTotal)}</div>
+            <div className="text-[10px] text-gray-400 mt-0.5">
+              {data.caTotal + data.renewalsTotal > 0
+                ? `${fmtPct((data.renewalsTotal / (data.caTotal + data.renewalsTotal)) * 100)} de l'activité totale`
+                : "reconductions d'abonnements"}
+            </div>
+          </div>
+        </div>
+        <p className="text-[11px] text-gray-500 mt-3 pt-3 border-t border-[#F6CCA4]/40">
+          Les reconductions ne sont pas comptées dans l&apos;objectif ni commissionnées, mais elles reflètent la base installée qui se renouvelle — un socle de revenu qui s&apos;ajoute chaque année à la conquête.
+        </p>
       </div>
 
       {/* Détail mois par mois */}
@@ -115,9 +144,10 @@ export default async function AnnuelPage({
             <tr>
               <th className="px-4 py-3 text-left">Mois</th>
               <th className="px-4 py-3 text-right">CA équipe</th>
+              <th className="px-4 py-3 text-right">Reconductions</th>
               <th className="px-4 py-3 text-right">Objectif</th>
               <th className="px-4 py-3 text-right">% atteint</th>
-              <th className="px-4 py-3 w-[30%]">Progression</th>
+              <th className="px-4 py-3 w-[26%]">Progression</th>
             </tr>
           </thead>
           <tbody>
@@ -129,6 +159,7 @@ export default async function AnnuelPage({
             <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-[#0A3855]">
               <td className="px-4 py-3">Total {year}</td>
               <td className="px-4 py-3 text-right tabular-nums">{fmtEur(data.caTotal)}</td>
+              <td className="px-4 py-3 text-right tabular-nums text-emerald-600">+{fmtEur(data.renewalsTotal)}</td>
               <td className="px-4 py-3 text-right tabular-nums">{fmtEur(data.objAnnual)}</td>
               <td className="px-4 py-3 text-right tabular-nums">{fmtPct(data.attainmentPct)}</td>
               <td className="px-4 py-3" />
@@ -159,6 +190,7 @@ function MonthRow({ m, maxBar }: { m: AnnualMonth; maxBar: number }) {
         {m.locked && <span className="ml-2 text-[10px] text-gray-400">🔒</span>}
       </td>
       <td className="px-4 py-3 text-right font-mono tabular-nums">{noData ? "—" : fmtEur(m.ca_ttc)}</td>
+      <td className="px-4 py-3 text-right font-mono tabular-nums text-emerald-600">{m.renewals > 0 ? `+${fmtEur(m.renewals)}` : "—"}</td>
       <td className="px-4 py-3 text-right font-mono tabular-nums text-gray-500">{m.objectif > 0 ? fmtEur(m.objectif) : "—"}</td>
       <td className="px-4 py-3 text-right font-semibold tabular-nums">
         {m.objectif > 0 ? (
