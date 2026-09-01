@@ -19,7 +19,11 @@ import { createServiceClient } from "@/lib/supabase-server";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { fetchProductInfo } from "@/lib/charge-classifier";
 import { LAFORET_FAMILY, LAFORET_PRODUCT_IDS } from "@/lib/objective-scope";
-import { familyForProductIds, productNameForIds } from "@/lib/product-families";
+import { familyForProductIds, productNameForIds, PRODUCT_NAME_BY_ID } from "@/lib/product-families";
+
+// Libellés déjà canoniques → on peut sauter la ligne SANS relire Stripe
+// (sinon chaque passe re-lit les lignes déjà faites et n'atteint jamais la fin).
+const CANONICAL_NAMES = new Set(Object.values(PRODUCT_NAME_BY_ID));
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -96,6 +100,10 @@ export async function POST(request: NextRequest) {
   };
 
   for (const r of candidates) {
+    // Skips bon marché (sans appel Stripe) pour converger : lignes Laforêt déjà
+    // réglées, et lignes dont le libellé est déjà canonique.
+    if (r.family === LAFORET_FAMILY) continue;
+    if (r.product_name && CANONICAL_NAMES.has(r.product_name)) continue;
     if (Date.now() - start > TIME_BUDGET_MS) {
       stats.time_budget_exceeded = true;
       break;
