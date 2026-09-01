@@ -27,6 +27,15 @@ export default function StatsTab() {
     return s + c.total;
   }, 0);
 
+  // Taux de transformation (leads → abonnés), global + Affiliés vs Marque blanche.
+  const isAffiliation = (p: (typeof partners)[number]) => p.contrat === "affiliation";
+  const aff = partners.filter(isAffiliation);
+  const mb = partners.filter((p) => !isAffiliation(p));
+  const affLeads = aff.reduce((s, p) => s + p.leads, 0);
+  const affAbo = aff.reduce((s, p) => s + p.abonnes, 0);
+  const mbLeads = mb.reduce((s, p) => s + p.leads, 0);
+  const mbAbo = mb.reduce((s, p) => s + p.abonnes, 0);
+
   return (
     <div className="space-y-6">
       {/* KPI cards */}
@@ -52,6 +61,23 @@ export default function StatsTab() {
           label="Total commissions"
         />
       </div>
+
+      {/* Taux de transformation : global + Affiliés vs Marque blanche */}
+      <Card>
+        <CardHeader className="border-b">
+          <CardTitle>Taux de transformation (leads → abonnés)</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <TxCard label="Global" abo={totalAbonnes} leads={totalLeads} highlight />
+            <TxCard label="Affiliés" abo={affAbo} leads={affLeads} />
+            <TxCard label="Marque blanche" abo={mbAbo} leads={mbLeads} />
+          </div>
+          <p className="text-[11px] text-gray-400 mt-3">
+            Taux = abonnés / leads. Affiliés = contrat d&apos;affiliation · Marque blanche = réseaux (Laforêt, Orpi…).
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Detailed table */}
       <Card>
@@ -153,6 +179,40 @@ export default function StatsTab() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function TxCard({
+  label,
+  abo,
+  leads,
+  highlight,
+}: {
+  label: string;
+  abo: number;
+  leads: number;
+  highlight?: boolean;
+}) {
+  const taux = leads > 0 ? (abo / leads) * 100 : 0;
+  const reached = taux >= 20; // ~benchmark secteur
+  const barColor = reached ? "bg-emerald-500" : taux >= 10 ? "bg-[#0A3855]" : "bg-amber-400";
+  return (
+    <div
+      className={`rounded-xl border p-4 ${
+        highlight ? "border-[#0A3855]/20 bg-[#E5EDF1]/40" : "border-gray-200 bg-white"
+      }`}
+    >
+      <div className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">{label}</div>
+      <div className="text-3xl font-bold text-[#0A3855] mt-1 tabular-nums">
+        {leads > 0 ? `${taux.toFixed(1)}%` : "—"}
+      </div>
+      <div className="text-xs text-gray-500 mt-0.5 tabular-nums">
+        {abo} abonné{abo > 1 ? "s" : ""} / {leads} lead{leads > 1 ? "s" : ""}
+      </div>
+      <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full ${barColor} transition-all`} style={{ width: `${Math.min(100, taux)}%` }} />
+      </div>
     </div>
   );
 }
