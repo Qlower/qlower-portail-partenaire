@@ -19,7 +19,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { fetchProductInfo } from "@/lib/charge-classifier";
 import { LAFORET_FAMILY, LAFORET_PRODUCT_IDS } from "@/lib/objective-scope";
-import { familyForProductIds } from "@/lib/product-families";
+import { familyForProductIds, productNameForIds } from "@/lib/product-families";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
   let q = sb
     .from("attribution_rows")
-    .select("charge_id, created_at, family, email, monthly_runs!inner(year_month, locked)")
+    .select("charge_id, created_at, family, product_name, email, monthly_runs!inner(year_month, locked)")
     .gte("created_at", `${since}T00:00:00Z`)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
     charge_id: string;
     created_at: string;
     family: string | null;
+    product_name: string | null;
     email: string | null;
     monthly_runs?: { year_month: string; locked: boolean };
   };
@@ -104,17 +105,25 @@ export async function POST(request: NextRequest) {
       const charge = await stripe.charges.retrieve(r.charge_id);
       const { product_ids } = await fetchProductInfo(stripe, charge);
       const isLaforet = product_ids.some((id) => LAFORET_PRODUCT_IDS.has(id));
-      const target = isLaforet ? LAFORET_FAMILY : familyForProductIds(product_ids);
-      // Produit inconnu → on ne touche pas (garde le fallback existant).
-      if (!target || target === r.family) continue;
+      const targetFamily = isLaforet ? LAFORET_FAMILY : familyForProductIds(product_ids);
+      const targetName = productNameForIds(product_ids); // libellé propre (fini "Subscription creation")
+
+      const familyChange = !!targetFamily && targetFamily !== r.family;
+      const nameChange = !!targetName && targetName !== r.product_name;
+      // Produit inconnu (aucune cible) OU rien à changer → on passe.
+      if (!familyChange && !nameChange) continue;
 
       stats.changed++;
-      stats.changes.push({ charge_id: r.charge_id, from: r.family, to: target, email: r.email });
-      const key = `${r.family || "—"} → ${target}`;
+      const fromLabel = `${r.family || "—"}${r.product_name ? ` / ${r.product_name}` : ""}`;
+      const toLabel = `${targetFamily || r.family || "—"}${targetName ? ` / ${targetName}` : ""}`;
+      stats.changes.push({ charge_id: r.charge_id, from: fromLabel, to: toLabel, email: r.email });
+      const key = `${fromLabel} → ${toLabel}`;
       stats.by_transition[key] = (stats.by_transition[key] || 0) + 1;
 
       if (!dryRun) {
-        const update: Record<string, unknown> = { family: target };
+        const update: Record<string, unknown> = {};
+        if (familyChange) update.family = targetFamily;
+        if (nameChange) update.product_name = targetName;
         // Laforêt : on neutralise aussi l'attribution (hors objectifs/commissions).
         if (isLaforet) {
           update.auto_commercial_id = null;

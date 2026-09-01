@@ -9,7 +9,7 @@
 
 import Stripe from "stripe";
 import { LAFORET_FAMILY, LAFORET_PRODUCT_IDS } from "@/lib/objective-scope";
-import { familyForProductIds } from "@/lib/product-families";
+import { familyForProductIds, productNameForIds } from "@/lib/product-families";
 
 // Patterns inférés depuis les données Avril 2026 (10 mois de signaux V1).
 // Ordre = priorité : le 1er match gagne.
@@ -214,9 +214,11 @@ export async function enrichCharge(
   //   3. inconnu           → fallback regex/montant (family déjà calculée)
   const isLaforet = product_ids.some((id) => LAFORET_PRODUCT_IDS.has(id));
   const mappedFamily = isLaforet ? LAFORET_FAMILY : familyForProductIds(product_ids);
+  // Libellé produit propre par ID (fini "Subscription creation"/vide).
+  const canonicalName = productNameForIds(product_ids);
   return {
     family: mappedFamily || family,
-    product_name,
+    product_name: canonicalName || product_name,
     newbiz_1m,
     newbiz_3m,
     client_status,

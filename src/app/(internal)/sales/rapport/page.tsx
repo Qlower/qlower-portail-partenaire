@@ -251,7 +251,7 @@ export default async function RapportPage({
         <div className="px-5 py-3 border-b border-gray-100">
           <h3 className="text-sm font-semibold text-[#0A3855]">Top produits validés</h3>
           <p className="text-[11px] text-gray-500 mt-0.5">
-            Détail par libellé produit Stripe (l&apos;année figure dans le libellé quand elle existe) · top 8 par CA
+            Libellé produit normalisé (par produit Stripe, millésimes regroupés) · top 8 par CA
           </p>
         </div>
         {data.productNameStats.length === 0 ? (
