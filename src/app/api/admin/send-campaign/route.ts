@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://partenaire.qlower.com";
-  const perRecipient: Array<{ partner_id: string; email: string; ok: boolean; error?: string }> = [];
+  const perRecipient: Array<{ partner_id: string; email: string; ok: boolean; error?: string; message_id?: string }> = [];
 
   // ⚠️ Throttle : Resend limite à 5 requêtes/seconde sur la plupart des plans.
   // On envoie séquentiellement avec 260ms entre chaque (= ~3.8 req/sec, sous
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
     const subject = replaceVars(template.subject, vars);
     const html = layout(replaceVars(template.body, vars));
 
-    // Helper qui fait UN essai d'envoi → renvoie {ok, error}
+    // Helper qui fait UN essai d'envoi → renvoie {ok, error, messageId}
     const trySend = async () => {
       const resendRes = await resend.emails.send({ from: FROM, to: p.email!, subject, html });
       const r = resendRes as unknown as {
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       if (r.error) {
         return { ok: false, error: r.error.message || r.error.name || "Resend error" };
       }
-      return { ok: true };
+      return { ok: true, messageId: r.data?.id };
     };
 
     try {
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
         attempt = await trySend();
       }
       if (attempt.ok) {
-        perRecipient.push({ partner_id: p.id, email: p.email!, ok: true });
+        perRecipient.push({ partner_id: p.id, email: p.email!, ok: true, message_id: attempt.messageId });
       } else {
         perRecipient.push({
           partner_id: p.id,
@@ -201,18 +201,41 @@ export async function POST(request: NextRequest) {
 
   // Log the campaign send for the history view
   const recipientIds = partners.filter((p) => p.email).map((p) => p.id);
-  await supabase.from("campaign_sends").insert({
-    template_id: templateKey,
-    subject: template.subject,
-    body: template.body,
-    partner_ids: recipientIds,
-    partner_count: recipientIds.length,
-    sent_count: sent,
-    failed_count: failed,
-    // Stocke les échoués → permet le bouton "Renvoyer aux N échecs" depuis
-    // l'historique, même après refresh / lendemain.
-    failed_recipients: failures.length > 0 ? failures : null,
-  });
+  const { data: sendRow } = await supabase
+    .from("campaign_sends")
+    .insert({
+      template_id: templateKey,
+      subject: template.subject,
+      body: template.body,
+      partner_ids: recipientIds,
+      partner_count: recipientIds.length,
+      sent_count: sent,
+      failed_count: failed,
+      // Stocke les échoués → permet le bouton "Renvoyer aux N échecs" depuis
+      // l'historique, même après refresh / lendemain.
+      failed_recipients: failures.length > 0 ? failures : null,
+    })
+    .select("id")
+    .single();
+
+  // Tracking ouvertures : on enregistre l'ID de message Resend de chaque envoi
+  // réussi → le webhook Resend (email.opened) mettra `opened_at`. Non bloquant :
+  // si la table n'existe pas encore (migration à faire), on ignore silencieusement.
+  try {
+    const events = perRecipient
+      .filter((r) => r.ok && r.message_id && sendRow?.id)
+      .map((r) => ({
+        message_id: r.message_id as string,
+        campaign_send_id: sendRow!.id,
+        partner_id: r.partner_id,
+        email: r.email,
+      }));
+    if (events.length > 0) {
+      await supabase.from("campaign_email_events").upsert(events, { onConflict: "message_id" });
+    }
+  } catch (e) {
+    console.warn("[send-campaign] campaign_email_events insert skipped:", e instanceof Error ? e.message : e);
+  }
 
   // Si TOUS les envois ont échoué → on remonte un 500 explicite pour que la
   // modal affiche un vrai message d'erreur (au lieu du faux "envoyé à X partenaires").

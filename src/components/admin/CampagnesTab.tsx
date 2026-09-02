@@ -94,6 +94,7 @@ type CampaignSend = {
   failed_recipients: FailedRecipient[] | null;
   sent_at: string;
   recipients: Array<{ id: string; nom: string }>;
+  opens?: { tracked: number; opened: number; delivered: number };
 };
 
 export default function CampagnesTab() {
@@ -827,6 +828,15 @@ function CampaignHistory({
                             <>
                               {" • "}
                               <span className="text-rose-700 font-semibold">{h.failed_count} échec{h.failed_count > 1 ? "s" : ""}</span>
+                            </>
+                          )}
+                          {h.opens && h.opens.tracked > 0 && (
+                            <>
+                              {" • "}
+                              <span className="text-[#0A3855] font-semibold">
+                                {Math.round((h.opens.opened / h.opens.tracked) * 100)}% ouverts
+                              </span>
+                              <span className="text-gray-400"> ({h.opens.opened}/{h.opens.tracked})</span>
                             </>
                           )}
                         </p>

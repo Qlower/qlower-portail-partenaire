@@ -32,12 +32,36 @@ export async function GET(request: NextRequest) {
     nameById = Object.fromEntries((partners ?? []).map((p) => [p.id, p.nom]));
   }
 
+  // Compteurs d'ouverture / délivrance par campagne (via campaign_email_events,
+  // alimenté par le webhook Resend). Défensif : si la table n'existe pas encore
+  // (migration à faire), on renvoie simplement des compteurs nuls.
+  const opensByCampaign: Record<string, { tracked: number; opened: number; delivered: number }> = {};
+  try {
+    const sendIds = (sends ?? []).map((s) => s.id);
+    if (sendIds.length > 0) {
+      const { data: events } = await supabase
+        .from("campaign_email_events")
+        .select("campaign_send_id, opened_at, delivered_at")
+        .in("campaign_send_id", sendIds);
+      for (const e of events ?? []) {
+        const k = e.campaign_send_id as string;
+        opensByCampaign[k] = opensByCampaign[k] || { tracked: 0, opened: 0, delivered: 0 };
+        opensByCampaign[k].tracked++;
+        if (e.opened_at) opensByCampaign[k].opened++;
+        if (e.delivered_at) opensByCampaign[k].delivered++;
+      }
+    }
+  } catch {
+    // table absente → pas de tracking d'ouverture pour l'instant
+  }
+
   const enriched = (sends ?? []).map((s) => ({
     ...s,
     recipients: ((s.partner_ids ?? []) as string[]).map((id) => ({
       id,
       nom: nameById[id] ?? id,
     })),
+    opens: opensByCampaign[s.id] ?? { tracked: 0, opened: 0, delivered: 0 },
   }));
 
   return NextResponse.json(enriched);
