@@ -13,16 +13,32 @@ import { createServiceClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
-const SECRET = process.env.RESEND_WEBHOOK_SECRET || "";
+// Secret de signature Resend (whsec_…). Lu en priorité depuis l'env Vercel,
+// sinon depuis la table Supabase `app_config` (clé resend_webhook_secret) —
+// utile quand on n'a pas accès à Vercel pour poser la variable d'env.
+async function getSecret(): Promise<string> {
+  if (process.env.RESEND_WEBHOOK_SECRET) return process.env.RESEND_WEBHOOK_SECRET;
+  try {
+    const sb = createServiceClient();
+    const { data } = await sb
+      .from("app_config")
+      .select("value")
+      .eq("key", "resend_webhook_secret")
+      .maybeSingle();
+    return (data?.value as string) || "";
+  } catch {
+    return "";
+  }
+}
 
 // Vérifie la signature Svix (format Resend). Retourne true si valide.
-function verifySvix(payload: string, headers: Headers): boolean {
+function verifySvix(payload: string, headers: Headers, secret: string): boolean {
   const id = headers.get("svix-id");
   const ts = headers.get("svix-timestamp");
   const sig = headers.get("svix-signature");
-  if (!id || !ts || !sig || !SECRET) return false;
+  if (!id || !ts || !sig || !secret) return false;
   try {
-    const secretBytes = Buffer.from(SECRET.split("_")[1] || SECRET, "base64");
+    const secretBytes = Buffer.from(secret.split("_")[1] || secret, "base64");
     const signedContent = `${id}.${ts}.${payload}`;
     const expected = crypto.createHmac("sha256", secretBytes).update(signedContent).digest("base64");
     // Le header peut contenir plusieurs signatures "v1,xxx v1,yyy"
@@ -40,11 +56,12 @@ function verifySvix(payload: string, headers: Headers): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  if (!SECRET) {
-    return NextResponse.json({ error: "RESEND_WEBHOOK_SECRET not configured" }, { status: 503 });
+  const secret = await getSecret();
+  if (!secret) {
+    return NextResponse.json({ error: "Resend webhook secret not configured" }, { status: 503 });
   }
   const payload = await request.text();
-  if (!verifySvix(payload, request.headers)) {
+  if (!verifySvix(payload, request.headers, secret)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
