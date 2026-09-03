@@ -55,7 +55,7 @@ export default function ExpliquerPage() {
           </a>
 
           <a
-            href="https://drive.google.com/file/d/17xTVPzA8_WzgSaHMlPf5Y37imgtHBJCW/view"
+            href="/plaquette-b2c.pdf"
             target="_blank"
             rel="noreferrer"
             className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-[#0A3855]/40 transition"
@@ -68,7 +68,7 @@ export default function ExpliquerPage() {
                 <h3 className="text-sm font-semibold">Plaquette B2C</h3>
                 <p className="text-xs text-gray-500 mt-1">PDF prêt à envoyer</p>
                 <span className="text-xs text-[#0A3855] mt-2 inline-flex items-center gap-1">
-                  Google Drive <ExternalLink className="w-3 h-3" />
+                  Télécharger le PDF <ExternalLink className="w-3 h-3" />
                 </span>
               </div>
             </div>
